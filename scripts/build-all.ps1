@@ -18,7 +18,13 @@ foreach ($p in $projects) {
   if (Test-Path $p) {
     Write-Host "`n$p" -ForegroundColor Cyan
     Push-Location $p
-    mvn -q clean package -DskipTests
+    # Prefer Maven Wrapper if available, fallback to system Maven
+    $cmd = $null
+    if (Test-Path "mvnw.cmd") { $cmd = ".\mvnw.cmd" }
+    elseif (Test-Path "mvnw") { $cmd = "./mvnw" }
+    else { $cmd = "mvn" }
+
+    & $cmd -q clean package -DskipTests
     Pop-Location
   } else {
     Write-Host "Skipping missing: $p" -ForegroundColor Yellow
