@@ -1,0 +1,211 @@
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: smd-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 123456
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-scripts:/docker-entrypoint-initdb.d
+    networks:
+      - smd-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Discovery Server (Eureka)
+  discovery-server:
+    image: eclipse-temurin:21-jre
+    container_name: discovery-server
+    working_dir: /app
+    volumes:
+      - ./discovery-server/target/discovery-server-0.0.1-SNAPSHOT.jar:/app/app.jar
+    ports:
+      - "8761:8761"
+    environment:
+      JAVA_OPTS: "-Xmx256m -Xms256m"
+    command: java -jar app.jar
+    networks:
+      - smd-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8761/eureka/apps"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Config Server
+  config-server:
+    image: eclipse-temurin:21-jre
+    container_name: config-server
+    working_dir: /app
+    volumes:
+      - ./config-server/target/config-server-0.0.1-SNAPSHOT.jar:/app/app.jar
+    ports:
+      - "8888:8888"
+    environment:
+      JAVA_OPTS: "-Xmx256m -Xms256m"
+      EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE: http://discovery-server:8761/eureka
+    command: java -jar app.jar
+    depends_on:
+      discovery-server:
+        condition: service_healthy
+    networks:
+      - smd-network
+
+  # API Gateway
+  api-gateway:
+    image: eclipse-temurin:21-jre
+    container_name: api-gateway
+    working_dir: /app
+    volumes:
+      - ./api-gateway/target/api-gateway-0.0.1-SNAPSHOT.jar:/app/app.jar
+    ports:
+      - "8080:8080"
+    environment:
+      JAVA_OPTS: "-Xmx256m -Xms256m"
+      EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE: http://discovery-server:8761/eureka
+      SPRING_CONFIG_IMPORT: "optional:configserver:http://config-server:8888"
+    command: java -jar app.jar
+    depends_on:
+      discovery-server:
+        condition: service_healthy
+      config-server:
+        condition: service_started
+    networks:
+      - smd-network
+
+  # Auth Service
+  auth-service:
+    image: eclipse-temurin:17-jre
+    container_name: auth-service
+    working_dir: /app
+    volumes:
+      - ./auth-service/target/auth-service-0.0.1-SNAPSHOT.jar:/app/app.jar
+    ports:
+      - "8081:8081"
+    environment:
+      JAVA_OPTS: "-Xmx256m -Xms256m"
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/auth_db
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: 123456
+      EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE: http://discovery-server:8761/eureka
+      SPRING_CONFIG_IMPORT: "optional:configserver:http://config-server:8888"
+    command: java -jar app.jar
+    depends_on:
+      postgres:
+        condition: service_healthy
+      discovery-server:
+        condition: service_healthy
+      config-server:
+        condition: service_started
+    networks:
+      - smd-network
+
+  # Academic Service
+  academic-service:
+    image: eclipse-temurin:21-jre
+    container_name: academic-service
+    working_dir: /app
+    volumes:
+      - ./academic-service/target/academic-service-0.0.1-SNAPSHOT.jar:/app/app.jar
+    ports:
+      - "8082:8082"
+    environment:
+      JAVA_OPTS: "-Xmx256m -Xms256m"
+      EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE: http://discovery-server:8761/eureka
+      SPRING_CONFIG_IMPORT: "optional:configserver:http://config-server:8888"
+    command: java -jar app.jar
+    depends_on:
+      discovery-server:
+        condition: service_healthy
+      config-server:
+        condition: service_started
+    networks:
+      - smd-network
+
+  # Syllabus Service
+  syllabus-service:
+    image: eclipse-temurin:21-jre
+    container_name: syllabus-service
+    working_dir: /app
+    volumes:
+      - ./syllabus-service/target/syllabus-service-0.0.1-SNAPSHOT.jar:/app/app.jar
+    ports:
+      - "8085:8085"
+    environment:
+      JAVA_OPTS: "-Xmx256m -Xms256m"
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/syllabus_db
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: 123456
+      EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE: http://discovery-server:8761/eureka
+    command: java -jar app.jar
+    depends_on:
+      postgres:
+        condition: service_healthy
+      discovery-server:
+        condition: service_healthy
+    networks:
+      - smd-network
+
+  # Workflow Service
+  workflow-service:
+    image: eclipse-temurin:21-jre
+    container_name: workflow-service
+    working_dir: /app
+    volumes:
+      - ./workflow-service/target/workflow-service-0.0.1-SNAPSHOT.jar:/app/app.jar
+    ports:
+      - "8084:8084"
+    environment:
+      JAVA_OPTS: "-Xmx256m -Xms256m"
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/workflow_db
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: 123456
+      EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE: http://discovery-server:8761/eureka
+    command: java -jar app.jar
+    depends_on:
+      postgres:
+        condition: service_healthy
+      discovery-server:
+        condition: service_healthy
+    networks:
+      - smd-network
+
+  # Public Service
+  public-service:
+    image: eclipse-temurin:21-jre
+    container_name: public-service
+    working_dir: /app
+    volumes:
+      - ./public-service/target/public-service-0.0.1-SNAPSHOT.jar:/app/app.jar
+    ports:
+      - "8083:8083"
+    environment:
+      JAVA_OPTS: "-Xmx256m -Xms256m"
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/public_db
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: 123456
+      EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE: http://discovery-server:8761/eureka
+    command: java -jar app.jar
+    depends_on:
+      postgres:
+        condition: service_healthy
+      discovery-server:
+        condition: service_healthy
+    networks:
+      - smd-network
+
+networks:
+  smd-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+    driver: local
