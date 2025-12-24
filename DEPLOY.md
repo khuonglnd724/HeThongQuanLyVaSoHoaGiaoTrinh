@@ -4,8 +4,9 @@ This guide helps your team build and run the full stack locally with Docker Comp
 
 ## Prerequisites
 - Docker Desktop (Windows/macOS/Linux)
-- PowerShell 5+ (Windows) or Bash (macOS/Linux)
-- Java 17 + 21 and Maven 3.8+ (for building JARs)
+- PowerShell 5+ (Windows)
+- JDK 21 (recommended; auth-service requires JDK 17 minimum)
+- Maven is **optional** (project includes Maven Wrapper in each service)
 
 ## Services & Ports
 - API Gateway: http://localhost:8080
@@ -19,30 +20,29 @@ This guide helps your team build and run the full stack locally with Docker Comp
 - PostgreSQL: localhost:5432 (user: `postgres`, pass: `123456`)
 
 ## Build (one-click)
-Use the helper script:
+Use the helper script that auto-detects Maven Wrapper:
 
-PowerShell (Windows):
-```
+**PowerShell (Windows):**
+```powershell
 cd smd-microservices
-./scripts/build-all.ps1
+pwsh scripts/build-all.ps1
 ```
 
-Bash (macOS/Linux):
-```
-cd smd-microservices
-pwsh ./scripts/build-all.ps1
+**Alternative (manual):**
+```powershell
+cd <service-folder>
+.\mvnw.cmd clean package -DskipTests
 ```
 
 ## Run
 Start the stack:
-```
+```powershell
 cd smd-microservices
-./scripts/up.ps1
+pwsh scripts/up.ps1
 ```
 
 Manual alternative:
-```
-cd smd-microservices
+```powershell
 docker-compose up -d
 docker-compose ps
 ```
@@ -56,16 +56,17 @@ docker-compose ps
   - `curl http://localhost:8080` (or open in browser)
 
 ## Stop
-```
-cd smd-microservices
+```powershell
 docker-compose down
 ```
-To reset databases:
-```
+To reset databases and volumes:
+```powershell
 docker-compose down -v
 ```
 
 ## Notes
-- Config Server is currently optional; clients run with static configs. Do not enable `spring.config.import` unless using Config Server profiles.
-- Build scripts compile all service JARs that are volume-mounted by Compose.
-- If ports are in use, adjust mappings in `docker-compose.yml`.
+- **Maven Wrapper**: Build scripts prefer `mvnw.cmd`/`mvnw` (no global Maven install needed).
+- **Spring Versions**: Discovery/Auth/Academic/Public/Workflow/Syllabus use Spring Boot 3.2.0; API Gateway uses 3.4.0.
+- **Config Server**: Currently optional; services run with static YAML configs. Do not enable `spring.config.import` unless using Config Server with active profiles.
+- **Ports**: If ports conflict, adjust mappings in `docker-compose.yml`.
+- **Database Init**: `init-scripts/init.sql` creates databases on first run. To reinitialize, run `docker-compose down -v` then `docker-compose up -d`.
