@@ -1,6 +1,7 @@
 #!/bin/bash
 # AI Service Startup Script for Linux/Mac
 # Usage: ./startup-all.sh
+# Note: Run root docker-compose first: docker-compose up -d
 
 set -e
 
@@ -8,8 +9,11 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
 echo "========================================"
-echo "AI Service - Full Startup"
+echo "AI Service - Startup (Local Mode)"
 echo "========================================"
+echo ""
+echo "[!] This script runs API and Worker locally"
+echo "[!] Infrastructure (RabbitMQ/Redis/Kafka) must be running from root docker-compose"
 echo ""
 
 # Colors
@@ -19,24 +23,32 @@ YELLOW='\033[1;33m'
 CYAN='\033[0;36m'
 NC='\033[0m'
 
-# Check if Docker is running
-echo -e "${CYAN}🐳 Checking Docker...${NC}"
-if ! docker ps > /dev/null 2>&1; then
-    echo -e "${RED}❌ Docker is not running!${NC}"
-    echo -e "${YELLOW}   Please start Docker first${NC}"
+# Check if required containers are running
+echo -e "${CYAN}[*] Checking infrastructure containers...${NC}"
+
+REQUIRED_CONTAINERS=("smd-rabbitmq" "smd-redis" "smd-kafka")
+MISSING_CONTAINERS=()
+
+for container in "${REQUIRED_CONTAINERS[@]}"; do
+    if ! docker ps --filter "name=$container" --filter "status=running" --format "{{.Names}}" | grep -q "$container"; then
+        MISSING_CONTAINERS+=("$container")
+    fi
+done
+
+if [ ${#MISSING_CONTAINERS[@]} -gt 0 ]; then
+    echo -e "${RED}[!] Required containers not running: ${MISSING_CONTAINERS[*]}${NC}"
+    echo ""
+    echo -e "${YELLOW}[*] Please start infrastructure from project root:${NC}"
+    echo -e "${CYAN}    cd ..${NC}"
+    echo -e "${CYAN}    docker-compose up -d rabbitmq redis kafka zookeeper${NC}"
+    echo ""
+    echo -e "${YELLOW}Or start all services:${NC}"
+    echo -e "${CYAN}    docker-compose up -d${NC}"
+    echo ""
     exit 1
 fi
-echo -e "${GREEN}✅ Docker is running${NC}"
 
-# Start Docker containers
-echo ""
-echo -e "${CYAN}📦 Starting Docker containers...${NC}"
-docker-compose up -d
-
-echo -e "${YELLOW}⏳ Waiting for services to be ready (30 seconds)...${NC}"
-sleep 30
-
-echo -e "${GREEN}✅ Docker services are ready${NC}"
+echo -e "${GREEN}[+] Infrastructure containers are running${NC}"
 
 # Python path
 PYTHON_PATH="../.venv/bin/python"
@@ -77,22 +89,23 @@ echo "========================================"
 echo -e "${GREEN}✅ AI Service is Running!${NC}"
 echo "========================================"
 echo ""
-echo -e "${CYAN}📋 Access Points:${NC}"
-echo -e "${GREEN}   API Documentation: http://localhost:8000/docs${NC}"
-echo -e "${GREEN}   RabbitMQ Manager: http://localhost:15672 (guest/guest)${NC}"
-echo -e "${GREEN}   Kafka UI: http://localhost:8080${NC}"
+echo -e "${CYAN}[*] Access Points:${NC}"
+echo -e "${GREEN}    API Documentation: http://localhost:8000/docs${NC}"
+echo -e "${GREEN}    RabbitMQ Manager: http://localhost:15672 (guest/guest)${NC}"
+echo -e "${GREEN}    Kafka UI: http://localhost:8089${NC}"
 echo ""
-echo -e "${CYAN}💡 Tips:${NC}"
-echo -e "${YELLOW}   - Logs are in api.log and worker.log${NC}"
-echo -e "${YELLOW}   - To stop: killall python or docker-compose down${NC}"
-echo -e "${YELLOW}   - View API logs: tail -f api.log${NC}"
-echo -e "${YELLOW}   - View Worker logs: tail -f worker.log${NC}"
+echo -e "${CYAN}[*] Tips:${NC}"
+echo -e "${YELLOW}    - Logs are in api.log and worker.log${NC}"
+echo -e "${YELLOW}    - To stop: killall python${NC}"
+echo -e "${YELLOW}    - From project root, run: docker-compose down (to stop infrastructure)${NC}"
+echo -e "${YELLOW}    - View API logs: tail -f api.log${NC}"
+echo -e "${YELLOW}    - View Worker logs: tail -f worker.log${NC}"
 echo ""
-echo -e "${CYAN}📖 Test API:${NC}"
-echo -e "${GREEN}   1. Go to http://localhost:8000/docs${NC}"
-echo -e "${GREEN}   2. POST /ai/suggest with syllabusId${NC}"
-echo -e "${GREEN}   3. Copy jobId from response${NC}"
-echo -e "${GREEN}   4. GET /ai/jobs/{jobId} to check status${NC}"
+echo -e "${CYAN}[*] Test API:${NC}"
+echo -e "${GREEN}    1. Go to http://localhost:8000/docs${NC}"
+echo -e "${GREEN}    2. POST /ai/suggest with syllabusId${NC}"
+echo -e "${GREEN}    3. Copy jobId from response${NC}"
+echo -e "${GREEN}    4. GET /ai/jobs/jobId to check status${NC}"
 echo ""
 
 # Keep script running (Ctrl+C to exit)
