@@ -95,20 +95,16 @@ This will automatically:
 - Docker Desktop (for RabbitMQ, Redis, Kafka)
 - Virtual environment configured
 
-### Manual Setup (3 Terminal Windows)
+### Manual Setup (2 Terminal Windows)
 
-**Terminal 1: Start Infrastructure**
+**Prerequisite: Infrastructure Running**
+Ensure from project root:
 ```powershell
-cd ai-service
-docker-compose up -d
+docker-compose ps | Select-String "smd-rabbitmq|smd-redis|smd-kafka"
 ```
+Should show all 3 containers running.
 
-Wait ~30 seconds for all services to start. Verify:
-```powershell
-docker-compose ps
-```
-
-**Terminal 2: Start API Server**
+**Terminal 1: Start API Server**
 ```powershell
 cd ai-service
 # Activate venv (if not already)
@@ -123,7 +119,7 @@ You should see:
 INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
 ```
 
-**Terminal 3: Start Celery Worker**
+**Terminal 2: Start Celery Worker**
 ```powershell
 cd ai-service
 # Activate venv (if not already)
@@ -145,7 +141,7 @@ Once all three components are running:
 
 1. **API Documentation (Swagger UI)**: http://localhost:8000/docs
 2. **RabbitMQ Management**: http://localhost:15672 (guest/guest)
-3. **Kafka UI**: http://localhost:8080
+3. **Kafka UI**: http://localhost:8089
 4. **Redis**: localhost:6379
 
 ### Testing
@@ -168,16 +164,18 @@ Once all three components are running:
 
 **Worker can't connect to RabbitMQ:**
 ```powershell
+# From project root
 docker-compose logs rabbitmq
 docker-compose restart rabbitmq
 ```
 
 **Kafka connection issues:**
 ```powershell
+# From project root
 docker-compose logs kafka
 # Kafka takes ~30s to start, wait and try again
 ```
-
+root 
 **Port already in use:**
 Edit `docker-compose.yml` to change port mappings (e.g., `5673:5672` for RabbitMQ).
 
@@ -188,26 +186,39 @@ Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope Process
 
 Then run start-worker.ps1 or API command.
 
-### Stop Services
-
-To stop everything:
+### StopAI service:
 ```powershell
-# Stop worker and API (Ctrl+C in each terminal)
+# Stop worker and API (Ctrl+C in each terminal, or close windows)
+```
+
+To stop infrastructure (from project root):
+```powershell
+cd ..(Ctrl+C in each terminal)
 
 # Stop docker services
 docker-compose down
 
 # Remove volumes (clean slate)
-docker-compose down -v
+docker-compose 
+
+Infrastructure containers (from project root `docker-compose.yml`):
+- **RabbitMQ** (smd-rabbitmq) - Message broker (port 5672, UI 15672)
+- **Redis** (smd-redis) - Result backend (port 6379)
+- **Kafka** (smd-kafka) - Event streaming (port 9092)
+- **Zookeeper** (smd-zookeeper) - Kafka coordination (port 2181)
+- **Kafka UI** (smd-kafka-ui) - Kafka monitoring (port 8089)
+
+AI Service components (can run locally or in Docker):
+- **FastAPI** (ai-service) - REST API server (port 8000)
+- **Celery Worker** (ai-worker) - Task processor
+
+**Run AI in Docker (from project root):**
+```powershell
+docker-compose up -d ai-service ai-worker
 ```
 
-## Docker Setup (Complete)
-
-Contains:
-- **FastAPI** - REST API server (runs locally)
-- **Celery Worker** - Task processor (runs locally)
-- **RabbitMQ** - Message broker (Docker)
-- **Redis** - Result backend (Docker)
+**Run AI locally (current default):**
+Use startup scripts in `ai-service/` directory.
 - **Kafka** - Event streaming (Docker)
 - **Zookeeper** - Kafka coordination (Docker)
 - **Kafka UI** - Kafka monitoring (Docker)
