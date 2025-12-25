@@ -1,6 +1,7 @@
 @echo off
 REM AI Service Startup Script for Windows CMD
 REM Usage: startup-all.bat
+REM Note: Run root docker-compose first: docker-compose up -d
 
 setlocal enabledelayedexpansion
 
@@ -8,28 +9,40 @@ cd /d "%~dp0"
 
 echo.
 echo ========================================
-echo AI Service - Full Startup
+echo AI Service - Startup (Local Mode)
 echo ========================================
 echo.
+echo [!] This script runs API and Worker locally
+echo [!] Infrastructure (RabbitMQ/Redis/Kafka) must be running from root docker-compose
+echo.
 
-REM Check if Docker is running
-echo Checking Docker...
-docker ps >nul 2>&1
-if errorlevel 1 (
-    echo Error: Docker is not running!
-    echo Please start Docker Desktop first.
+REM Check if required containers are running
+echo [*] Checking infrastructure containers...
+
+docker ps --filter "name=smd-rabbitmq" --filter "status=running" --format "{{.Names}}" | findstr /C:"smd-rabbitmq" >nul
+if errorlevel 1 set MISSING=1
+
+docker ps --filter "name=smd-redis" --filter "status=running" --format "{{.Names}}" | findstr /C:"smd-redis" >nul
+if errorlevel 1 set MISSING=1
+
+docker ps --filter "name=smd-kafka" --filter "status=running" --format "{{.Names}}" | findstr /C:"smd-kafka" >nul
+if errorlevel 1 set MISSING=1
+
+if defined MISSING (
+    echo [!] Required containers not running: smd-rabbitmq, smd-redis, smd-kafka
+    echo.
+    echo [*] Please start infrastructure from project root:
+    echo     cd ..
+    echo     docker-compose up -d rabbitmq redis kafka zookeeper
+    echo.
+    echo Or start all services:
+    echo     docker-compose up -d
+    echo.
     pause
     exit /b 1
 )
-echo OK: Docker is running
 
-REM Start Docker containers
-echo.
-echo Starting Docker containers...
-docker-compose up -d
-
-echo Waiting for services to be ready (30 seconds)...
-timeout /t 30 /nobreak
+echo [+] Infrastructure containers are running
 
 echo.
 echo ========================================
@@ -66,9 +79,13 @@ echo ========================================
 echo AI Service is Running!
 echo ========================================
 echo.
-echo Access Points:
-echo   API Documentation: http://localhost:8000/docs
-echo   RabbitMQ Manager: http://localhost:15672 (guest/guest)
-echo   Kafka UI: http://localhost:8080
+echo [*] Access Points:
+echo     API Documentation: http://localhost:8000/docs
+echo     RabbitMQ Manager: http://localhost:15672 (guest/guest)
+echo     Kafka UI: http://localhost:8089
+echo.
+echo [*] Tips:
+echo     - Close windows to stop API/Worker
+echo     - From project root, run: docker-compose down (to stop infrastructure)
 echo.
 pause
