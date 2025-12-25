@@ -9,6 +9,8 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 import com.smd.auth_service.entity.User;
+
+import java.io.Serial;
 import java.util.Collection;
 import java.util.stream.Collectors;
 
@@ -17,7 +19,8 @@ import java.util.stream.Collectors;
 @AllArgsConstructor
 @Builder
 public class UserDetailsImpl implements UserDetails {
-    
+
+    @Serial
     private static final long serialVersionUID = 1L;
     
     private Long userId;
