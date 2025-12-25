@@ -31,3 +31,14 @@ foreach ($p in $projects) {
   }
 }
 Write-Host "`nAll builds done." -ForegroundColor Green
+
+# Build AI service Docker image
+$aiServicePath = Join-Path $PSScriptRoot "..\ai-service"
+if (Test-Path (Join-Path $aiServicePath "Dockerfile")) {
+  Write-Host "`nBuilding ai-service Docker image..." -ForegroundColor Cyan
+  Push-Location $aiServicePath
+  docker build -t ai-service:latest .
+  Pop-Location
+} else {
+  Write-Host "`nSkipping ai-service Docker build (Dockerfile not found)" -ForegroundColor Yellow
+}

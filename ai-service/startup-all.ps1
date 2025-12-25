@@ -1,15 +1,18 @@
 #!/usr/bin/env powershell
-# AI Service Startup Script - Starts all components automatically
+# AI Service Startup Script - Starts API and Worker (assumes infrastructure is running)
 # Usage: .\startup-all.ps1
+# Note: Run root docker-compose first: docker-compose up -d
 
 param(
-    [switch]$NoDocker = $false,
     [switch]$NoBrowser = $false
 )
 
 Write-Host "========================================" -ForegroundColor Cyan
-Write-Host "AI Service - Full Startup" -ForegroundColor Green
+Write-Host "AI Service - Startup (Local Mode)" -ForegroundColor Green
 Write-Host "========================================" -ForegroundColor Cyan
+Write-Host ""
+Write-Host "[!] This script runs API and Worker locally" -ForegroundColor Yellow
+Write-Host "[!] Infrastructure (RabbitMQ/Redis/Kafka) must be running from root docker-compose" -ForegroundColor Yellow
 Write-Host ""
 
 # Colors
@@ -24,49 +27,34 @@ Set-Location $scriptDir
 
 Write-Host "[*] Working directory: $(Get-Location)" -ForegroundColor $infoColor
 
-# Check if Docker is running
-if (-not $NoDocker) {
-    Write-Host ""
-    Write-Host "[*] Checking Docker..." -ForegroundColor $infoColor
-    
-    try {
-        $dockerStatus = docker ps 2>&1
-        if ($dockerStatus -like "*Cannot connect*" -or $dockerStatus -like "*error*") {
-            Write-Host "[!] Docker is not running!" -ForegroundColor $errorColor
-            Write-Host "    Please start Docker Desktop first" -ForegroundColor $warningColor
-            exit 1
-        }
-        Write-Host "[+] Docker is running" -ForegroundColor $successColor
-    }
-    catch {
-        Write-Host "[!] Docker not found! Install Docker Desktop." -ForegroundColor $errorColor
-        exit 1
-    }
+# Check if required containers are running
+Write-Host ""
+Write-Host "[*] Checking infrastructure containers..." -ForegroundColor $infoColor
 
-    # Check if containers are already running
-    Write-Host ""
-    Write-Host "[*] Checking containers..." -ForegroundColor $infoColor
-    
-    $containers = docker-compose ps 2>&1
-    
-    if ($containers -like "*Up*" -or $containers -like "*running*") {
-        Write-Host "[+] Containers already running" -ForegroundColor $successColor
-    }
-    else {
-        Write-Host "[*] Starting Docker containers..." -ForegroundColor $infoColor
-        docker-compose up -d
-        
-        Write-Host "[*] Waiting for services to be ready..." -ForegroundColor $warningColor
-        
-        # Wait for services
-        for ($i = 30; $i -gt 0; $i--) {
-            Write-Host "    Waiting $i seconds..." -NoNewline
-            Start-Sleep -Seconds 1
-            Write-Host "`r" -NoNewline
-        }
-        Write-Host "`n[+] Docker services are ready" -ForegroundColor $successColor
+$requiredContainers = @("smd-rabbitmq", "smd-redis", "smd-kafka")
+$missingContainers = @()
+
+foreach ($container in $requiredContainers) {
+    $status = docker ps --filter "name=$container" --filter "status=running" --format "{{.Names}}" 2>&1
+    if ($status -notlike "*$container*") {
+        $missingContainers += $container
     }
 }
+
+if ($missingContainers.Count -gt 0) {
+    Write-Host "[!] Required containers not running: $($missingContainers -join ', ')" -ForegroundColor $errorColor
+    Write-Host ""
+    Write-Host "[*] Please start infrastructure from project root:" -ForegroundColor $warningColor
+    Write-Host "    cd .." -ForegroundColor Cyan
+    Write-Host "    docker-compose up -d rabbitmq redis kafka zookeeper" -ForegroundColor Cyan
+    Write-Host ""
+    Write-Host "Or start all services:" -ForegroundColor $warningColor
+    Write-Host "    docker-compose up -d" -ForegroundColor Cyan
+    Write-Host ""
+    exit 1
+}
+
+Write-Host "[+] Infrastructure containers are running" -ForegroundColor $successColor
 
 Write-Host ""
 Write-Host "========================================" -ForegroundColor Cyan
@@ -117,12 +105,12 @@ Write-Host ""
 Write-Host "[*] Access Points:" -ForegroundColor $infoColor
 Write-Host "    API Documentation: http://localhost:8000/docs" -ForegroundColor $successColor
 Write-Host "    RabbitMQ Manager: http://localhost:15672 (guest/guest)" -ForegroundColor $successColor
-Write-Host "    Kafka UI: http://localhost:8080" -ForegroundColor $successColor
+Write-Host "    Kafka UI: http://localhost:8089" -ForegroundColor $successColor
 Write-Host ""
 Write-Host "[*] Tips:" -ForegroundColor $infoColor
 Write-Host "    - API and Worker run in separate windows (keep them open)" -ForegroundColor $warningColor
-Write-Host "    - Close windows to stop services" -ForegroundColor $warningColor
-Write-Host "    - Use docker-compose down to stop containers" -ForegroundColor $warningColor
+Write-Host "    - Close windows to stop API/Worker" -ForegroundColor $warningColor
+Write-Host "    - From project root, run: docker-compose down (to stop infrastructure)" -ForegroundColor $warningColor
 Write-Host ""
 Write-Host "[*] Test API:" -ForegroundColor $infoColor
 Write-Host "    1. Go to http://localhost:8000/docs" -ForegroundColor $successColor
