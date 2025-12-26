@@ -24,7 +24,7 @@ spring:
   
   # Config Server Configuration
   config:
-    import: optional:configserver:http://localhost:8888
+    import: optional:configserver:http://config-server:8888
 
 # JWT Configuration
 app:
@@ -39,3 +39,16 @@ eureka:
       defaultZone: http://discovery-server:8761/eureka
   instance:
     prefer-ip-address: true
+# Management endpoints
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: always
+  metrics:
+    export:
+      prometheus:
+        enabled: true
