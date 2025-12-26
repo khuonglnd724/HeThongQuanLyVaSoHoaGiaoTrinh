@@ -4,7 +4,7 @@ server:
 spring:
   application:
     name: academic-service
-  
+
   datasource:
     url: jdbc:postgresql://postgres:5432/academic_db
     username: postgres
@@ -18,15 +18,47 @@ spring:
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+        jdbc:
+          batch_size: 20
+          fetch_size: 50
+        order_inserts: true
+        order_updates: true
+    open-in-view: false
 
-  # Config Server Configuration (commented out - incompatible with Boot 3.4.0)
-  # config:
-  #   import: optional:configserver:http://config-server:8888
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+      indent-output: true
+    default-property-inclusion: non_null
 
-# Eureka Client Configuration
+logging:
+  level:
+    root: INFO
+    com.smd: DEBUG
+    org.springframework.web: DEBUG
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"
+
+# Eureka Service Discovery
 eureka:
   client:
     service-url:
-      defaultZone: http://discovery-server:8761/eureka/
+      defaultZone: http://eureka:8761/eureka
   instance:
     prefer-ip-address: true
+    hostname: academic-service
+
+# Management endpoints
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: always
+  metrics:
+    export:
+      prometheus:
+        enabled: true
