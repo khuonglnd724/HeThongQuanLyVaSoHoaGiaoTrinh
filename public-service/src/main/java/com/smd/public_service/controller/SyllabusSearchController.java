@@ -1,7 +1,6 @@
 package com.smd.public_service.controller;
 
 import com.smd.public_service.dto.SearchResponse;
-import com.smd.public_service.dto.SyllabusSummary;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
