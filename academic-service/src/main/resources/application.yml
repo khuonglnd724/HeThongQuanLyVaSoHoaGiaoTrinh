@@ -6,7 +6,7 @@ server:
 spring:
   application:
     name: academic-service
-  
+
   datasource:
     url: jdbc:postgresql://postgres:5432/academic_db
     username: postgres
@@ -60,19 +60,11 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics
+        include: health,info,metrics,prometheus
   endpoint:
     health:
       show-details: always
-
-  # Config Server Configuration (commented out - incompatible with Boot 3.4.0)
-  # config:
-  #   import: optional:configserver:http://config-server:8888
-
-# Eureka Client Configuration
-eureka:
-  client:
-    service-url:
-      defaultZone: http://discovery-server:8761/eureka/
-  instance:
-    prefer-ip-address: true
+  metrics:
+    export:
+      prometheus:
+        enabled: true

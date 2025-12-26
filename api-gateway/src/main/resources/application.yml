@@ -38,7 +38,7 @@ spring:
       globalcors:
         cors-configurations:
           '[/**]':
-            allowed-origins: "*"
+            allowed-origin-patterns: "*"
             allowed-methods:
               - GET
               - POST
@@ -48,13 +48,37 @@ spring:
             allowed-headers: "*"
             allow-credentials: true
 
+security:
+  jwt:
+    enabled: true
+    secret: smdMicroservicesSecretKeyForJWTTokenGenerationAndValidation2024
+    whitelist:
+      - /api/auth/**
+      - /actuator/prometheus
+      - /actuator/health
+      - /
+
+# Management endpoints
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: always
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+
 # Eureka Client Configuration
 eureka:
   client:
     service-url:
-      defaultZone: http://localhost:8761/eureka/
+      defaultZone: http://discovery-server:8761/eureka/
   instance:
     prefer-ip-address: true
 
 # Config Server Configuration
-spring.config.import: optional:configserver:http://localhost:8888
+spring.config.import: optional:configserver:http://config-server:8888
