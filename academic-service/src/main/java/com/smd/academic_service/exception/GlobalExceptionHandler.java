@@ -4,6 +4,7 @@ import com.smd.academic_service.model.dto.ApiResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
@@ -11,6 +12,26 @@ import org.springframework.web.context.request.WebRequest;
 @RestControllerAdvice
 @Slf4j
 public class GlobalExceptionHandler {
+    
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<ApiResponse<Object>> handleValidationException(
+        MethodArgumentNotValidException ex,
+        WebRequest request) {
+        String message = ex.getBindingResult().getFieldErrors()
+            .stream()
+            .map(error -> error.getField() + ": " + error.getDefaultMessage())
+            .reduce((a, b) -> a + ", " + b)
+            .orElse("Validation failed");
+        
+        log.warn("Validation error: {}", message);
+        
+        ApiResponse<Object> response = ApiResponse.error(
+            message,
+            "VALIDATION_ERROR"
+        );
+        
+        return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
+    }
     
     @ExceptionHandler(RuntimeException.class)
     public ResponseEntity<ApiResponse<Object>> handleRuntimeException(
