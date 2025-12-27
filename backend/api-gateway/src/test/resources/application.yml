@@ -1,0 +1,22 @@
+spring:
+  cloud:
+    discovery:
+      enabled: false
+  main:
+    web-application-type: reactive
+
+# Disable Eureka client interactions during tests
+# Prevents network calls and UnknownHost warnings when server isn't running
+# Spring Cloud Netflix properties
+# Note: 'enabled' may be ignored in some versions; the two below are sufficient
+# to avoid registration and registry fetch.
+eureka:
+  client:
+    enabled: false
+    register-with-eureka: false
+    fetch-registry: false
+
+logging:
+  level:
+    com.netflix.discovery: OFF
+    org.springframework.cloud.netflix.eureka: OFF

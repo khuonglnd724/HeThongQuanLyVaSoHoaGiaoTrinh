@@ -9,7 +9,7 @@ Write-Host "=" * 60 -ForegroundColor Cyan
 
 # Check .env file
 Write-Host "`nChecking environment configuration..." -ForegroundColor Yellow
-$envFile = Join-Path $PSScriptRoot "../docker/.env"
+$envFile = Join-Path $PSScriptRoot "../.env"
 if (-not (Test-Path $envFile)) {
   Write-Host "[ERROR] ERROR: .env file not found!" -ForegroundColor Red
   Write-Host "   Create .env file with GROQ_API_KEY before starting." -ForegroundColor Red
@@ -32,16 +32,16 @@ if ($envContent -match "GROQ_API_KEY=your-groq-api-key-here|GROQ_API_KEY=\s*$") 
   Write-Host "[OK] Environment configuration OK" -ForegroundColor Green
 }
 
-Push-Location $PSScriptRoot\..\docker
+Push-Location $PSScriptRoot\..
 
 # Build if requested
 if ($Build) {
   Write-Host "`nBuilding services..." -ForegroundColor Yellow
-  docker compose build
+  docker-compose build
 }
 
 Write-Host "`nStarting Docker Compose stack..." -ForegroundColor Green
-docker compose up -d
+docker-compose up -d
 
 Write-Host "`nWaiting for services to be ready..." -ForegroundColor Yellow
 Start-Sleep -Seconds 15
@@ -49,7 +49,7 @@ Start-Sleep -Seconds 15
 Write-Host "`n" + "=" * 60 -ForegroundColor Cyan
 Write-Host "Service Status" -ForegroundColor Cyan
 Write-Host "=" * 60 -ForegroundColor Cyan
-docker compose ps --format "table {{.Name}}\t{{.Status}}\t{{.Ports}}"
+docker-compose ps --format "table {{.Name}}\t{{.Status}}\t{{.Ports}}"
 
 Write-Host "`n" + "=" * 60 -ForegroundColor Green
 Write-Host "Key Endpoints" -ForegroundColor Green
