@@ -17,8 +17,15 @@ FastAPI-based AI service handling async tasks for syllabus management.
 3. **Diff Detection** - Compare syllabus versions
 4. **CLO-PLO Check** - Validate learning outcome mappings
 5. **Summary** - Generate content summaries
+6. **Suggest Similar CLOs** - Find similar CLOs based on current CLO description
 
 ## API Endpoints
+
+### Web UI
+- `GET /` - Web interface for interacting with AI service
+  - Interactive forms for all endpoints
+  - Real-time job status polling
+  - Result display with JSON formatting
 
 ### Submit Tasks (All return 202 with jobId)
 - `POST /ai/suggest` - Create suggestion task
@@ -26,6 +33,7 @@ FastAPI-based AI service handling async tasks for syllabus management.
 - `POST /ai/diff` - Create diff detection task
 - `POST /ai/clo-check` - Create CLO-PLO check task
 - `POST /ai/summary` - Create summary task
+- `POST /ai/suggest-similar-clos` - Find similar CLOs based on current CLO
 
 ### Job Management
 - `GET /ai/jobs/{jobId}` - Get job status and result
@@ -61,34 +69,79 @@ celery -A app.workers.celery_app worker --loglevel=info
 
 ### 🚀 One-Click Startup (Recommended)
 
-**Windows (PowerShell):**
+**Step 1: Start Infrastructure (Root Docker Compose)**
+```powershell
+# From root workspace directory
+docker-compose up -d
+```
+
+This starts:
+- PostgreSQL, RabbitMQ, Redis, Kafka, Zookeeper, Kafka UI
+- All Spring Boot services
+- AI Service container + Worker container
+
+**Verify infrastructure is running:**
+```powershell
+docker-compose ps
+```
+
+**Step 2: Start API + Worker Locally (Development)**
+
+Windows (PowerShell):
 ```powershell
 cd ai-service
 # Allow script execution temporarily
 Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope Process
 
-# Run startup script (opens API + Worker in new windows + browser)
+# Run startup script (opens API + Worker in new windows)
 .\startup-all.ps1
 ```
 
-**Windows (CMD):**
+Windows (CMD):
 ```cmd
+cd ai-service
 startup-all.bat
 ```
 
-**Linux/Mac:**
+Linux/Mac:
 ```bash
+cd ai-service
 chmod +x startup-all.sh
 ./startup-all.sh
 ```
 
 This will automatically:
-- ✅ Check Docker is running
-- ✅ Start RabbitMQ, Redis, Kafka, Zookeeper
+- ✅ Check RabbitMQ, Redis, Kafka are running
 - ✅ Start FastAPI server (port 8000)
 - ✅ Start Celery worker
-- ✅ Open browser to Swagger UI
 - ✅ Display all access points
+
+### 📱 Access Web UI
+
+Open browser: **http://localhost:8000**
+
+Features:
+- Interactive forms for all API endpoints
+- Real-time job status polling
+- JSON result formatting
+- Tab navigation for easy switching
+
+See [UI_README.md](UI_README.md) for detailed UI documentation.
+
+### Manual Setup
+
+If you prefer running without startup script:
+
+**Terminal 1: API Server**
+```bash
+pip install -r requirements.txt
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+```
+
+**Terminal 2: Celery Worker**
+```bash
+celery -A app.workers.celery_app worker --loglevel=info
+```
 
 ### Prerequisites
 - Python 3.11+
@@ -137,15 +190,39 @@ celery@<hostname> v5.3.4 (emerald-sea)
 
 ### Access Points
 
-Once all three components are running:
+Once all components are running:
 
-1. **API Documentation (Swagger UI)**: http://localhost:8000/docs
-2. **RabbitMQ Management**: http://localhost:15672 (guest/guest)
-3. **Kafka UI**: http://localhost:8089
-4. **Redis**: localhost:6379
+1. **🌐 Web UI (Recommended)**: http://localhost:8000
+   - Interactive interface for all endpoints
+   - Easy job status tracking
+   - JSON result display
+
+2. **📚 API Documentation (Swagger)**: http://localhost:8000/docs
+   - Full API exploration
+   - Interactive request testing
+   
+3. **🐰 RabbitMQ Management**: http://localhost:15672 (guest/guest)
+   - Message queue monitoring
+   - Task queue visualization
+
+4. **🔍 Kafka UI**: http://localhost:8089
+   - Event stream monitoring
+   - Topic inspection
+
+5. **💾 Redis**: localhost:6379
+   - Result cache storage
 
 ### Testing
 
+**Option 1: Use Web UI (Recommended)**
+1. Open http://localhost:8000
+2. Fill in any form (e.g., "Gợi Ý")
+3. Enter syllabus ID: "sys-001"
+4. Click submit button
+5. Watch status update in real-time
+6. View results in JSON format
+
+**Option 2: Use Swagger UI**
 1. Open http://localhost:8000/docs
 2. Try `/health` endpoint (should return 200 OK)
 3. Try POST `/ai/suggest`:
@@ -161,6 +238,11 @@ Once all three components are running:
 6. Wait 2-3 seconds and GET again → should show status: "succeeded" with results
 
 ### Troubleshooting
+
+**Web UI not loading**
+- Check API server running: `http://localhost:8000/api`
+- Check console (F12) for JavaScript errors
+- Clear browser cache: Ctrl+Shift+Delete
 
 **Worker can't connect to RabbitMQ:**
 ```powershell
