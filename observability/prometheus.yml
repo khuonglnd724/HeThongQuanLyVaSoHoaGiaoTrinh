@@ -1,0 +1,42 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  # Spring Boot services
+  - job_name: 'spring-boot-services'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets:
+          - 'api-gateway:8080'
+          - 'auth-service:8081'
+          - 'academic-service:8082'
+          - 'public-service:8083'
+          - 'workflow-service:8084'
+          - 'syllabus-service:8085'
+        labels:
+          service: 'microservices'
+  
+  # Discovery Server
+  - job_name: 'discovery-server'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets:
+          - 'discovery-server:8761'
+        labels:
+          service: 'eureka'
+  
+  # Config Server
+  - job_name: 'config-server'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets:
+          - 'config-server:8888'
+        labels:
+          service: 'config'
+  
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets:
+          - 'localhost:9090'
