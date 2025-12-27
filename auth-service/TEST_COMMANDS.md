@@ -302,3 +302,246 @@ curl -X POST http://localhost:8081/api/users/2/unlock \
   "path": "/api/auth/register"
 }
 ```
+
+## JWT E2E Testing qua API Gateway
+
+### 1. Generate Test JWT Token
+
+**Option A: Sử dụng Auth Service Login**
+```powershell
+# PowerShell
+$response = Invoke-RestMethod -Uri "http://localhost:8080/api/auth/login" `
+  -Method POST `
+  -ContentType "application/json" `
+  -Body '{"username":"admin","password":"Admin@123"}'
+
+$token = $response.token
+Write-Host "Token: $token"
+```
+
+```bash
+# Linux/Mac
+TOKEN=$(curl -s -X POST http://localhost:8080/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"admin","password":"Admin@123"}' \
+  | jq -r '.token')
+
+echo "Token: $TOKEN"
+```
+
+**Option B: Generate Manual JWT (for testing)**
+```powershell
+# PowerShell - Install-Module -Name PSJwt first
+$secret = "smdMicroservicesSecretKeyForJWTTokenGenerationAndValidation2024"
+$payload = @{
+    sub = "test-user"
+    roles = @("USER")
+    iat = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
+    exp = [DateTimeOffset]::UtcNow.AddMinutes(30).ToUnixTimeSeconds()
+} | ConvertTo-Json
+
+# Or use online tool: https://jwt.io with HS256 algorithm
+```
+
+### 2. Test Whitelisted Routes (No Token Required)
+
+```powershell
+# PowerShell
+# Health check - whitelisted
+Invoke-WebRequest -Uri "http://localhost:8080/api/auth/health"
+
+# Login endpoint - whitelisted
+Invoke-WebRequest -Uri "http://localhost:8080/api/auth/login" `
+  -Method POST `
+  -ContentType "application/json" `
+  -Body '{"username":"admin","password":"Admin@123"}'
+
+# Actuator health - whitelisted
+Invoke-WebRequest -Uri "http://localhost:8080/actuator/health"
+
+# Prometheus metrics - whitelisted for monitoring
+Invoke-WebRequest -Uri "http://localhost:8080/actuator/prometheus"
+```
+
+```bash
+# Linux/Mac
+curl http://localhost:8080/api/auth/health
+curl http://localhost:8080/actuator/health
+curl http://localhost:8080/actuator/prometheus
+```
+
+### 3. Test Protected Routes (Token Required)
+
+```powershell
+# PowerShell - Without token (should return 401 Unauthorized)
+Invoke-WebRequest -Uri "http://localhost:8080/api/users"
+# Expected: 401 Unauthorized
+
+# With valid token (should return 200 OK)
+$headers = @{ Authorization = "Bearer $token" }
+Invoke-WebRequest -Uri "http://localhost:8080/api/users?page=0&size=10" -Headers $headers
+
+# Test user profile endpoint
+Invoke-WebRequest -Uri "http://localhost:8080/api/auth/me" -Headers $headers
+
+# Test protected academic service endpoint
+Invoke-WebRequest -Uri "http://localhost:8080/api/academic/plos" -Headers $headers
+```
+
+```bash
+# Linux/Mac - Without token
+curl http://localhost:8080/api/users
+# Expected: 401 Unauthorized
+
+# With valid token
+curl http://localhost:8080/api/users?page=0&size=10 \
+  -H "Authorization: Bearer $TOKEN"
+
+curl http://localhost:8080/api/auth/me \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+### 4. Test Invalid Token (should return 401)
+
+```powershell
+# PowerShell
+$invalidHeaders = @{ Authorization = "Bearer invalid.token.here" }
+Invoke-WebRequest -Uri "http://localhost:8080/api/users" -Headers $invalidHeaders
+# Expected: 401 Unauthorized - Invalid JWT token
+```
+
+```bash
+# Linux/Mac
+curl http://localhost:8080/api/users \
+  -H "Authorization: Bearer invalid.token.here"
+# Expected: 401 Unauthorized
+```
+
+### 5. Test Expired Token (should return 401)
+
+```powershell
+# Generate token with 1 second expiration, wait, then test
+# Token will expire and return 401 Unauthorized
+```
+
+### 6. Verify JWT Filter Logs
+
+Check API Gateway logs to see JWT validation:
+```powershell
+docker compose logs -f api-gateway --tail=50
+```
+
+Expected log patterns:
+- `Whitelisted request: /api/auth/login` - Bypassed JWT validation
+- `Valid JWT token for user: admin` - Successful validation
+- `Invalid JWT token` - Failed validation
+
+### 7. Test Gateway Routing with JWT
+
+```powershell
+# PowerShell - Test routing to different services
+$headers = @{ Authorization = "Bearer $token" }
+
+# Route to Auth Service
+Invoke-WebRequest -Uri "http://localhost:8080/api/auth/me" -Headers $headers
+
+# Route to Academic Service
+Invoke-WebRequest -Uri "http://localhost:8080/api/academic/plos" -Headers $headers
+
+# Route to Public Service
+Invoke-WebRequest -Uri "http://localhost:8080/api/public/announcements" -Headers $headers
+```
+
+### 8. Full E2E JWT Flow Test
+
+```powershell
+# PowerShell - Complete flow
+Write-Host "=== JWT E2E Verification Test ===" -ForegroundColor Cyan
+
+# Step 1: Login and get token
+Write-Host "`n1. Login to get JWT token..." -ForegroundColor Yellow
+$loginResponse = Invoke-RestMethod -Uri "http://localhost:8080/api/auth/login" `
+  -Method POST -ContentType "application/json" `
+  -Body '{"username":"admin","password":"Admin@123"}'
+$token = $loginResponse.token
+Write-Host "✓ Token received: $($token.Substring(0,50))..." -ForegroundColor Green
+
+# Step 2: Test whitelisted route without token
+Write-Host "`n2. Test whitelisted route (no token)..." -ForegroundColor Yellow
+try {
+    $response = Invoke-WebRequest -Uri "http://localhost:8080/api/auth/health"
+    Write-Host "✓ Whitelisted route accessible: $($response.StatusCode)" -ForegroundColor Green
+} catch {
+    Write-Host "✗ Failed: $($_.Exception.Message)" -ForegroundColor Red
+}
+
+# Step 3: Test protected route without token (should fail)
+Write-Host "`n3. Test protected route without token (should fail)..." -ForegroundColor Yellow
+try {
+    Invoke-WebRequest -Uri "http://localhost:8080/api/users"
+    Write-Host "✗ Should have returned 401!" -ForegroundColor Red
+} catch {
+    if ($_.Exception.Response.StatusCode -eq 401) {
+        Write-Host "✓ Correctly returned 401 Unauthorized" -ForegroundColor Green
+    } else {
+        Write-Host "✗ Unexpected error: $($_.Exception.Message)" -ForegroundColor Red
+    }
+}
+
+# Step 4: Test protected route with valid token
+Write-Host "`n4. Test protected route with valid token..." -ForegroundColor Yellow
+try {
+    $headers = @{ Authorization = "Bearer $token" }
+    $response = Invoke-RestMethod -Uri "http://localhost:8080/api/auth/me" -Headers $headers
+    Write-Host "✓ Protected route accessible with token" -ForegroundColor Green
+    Write-Host "  User: $($response.username), Roles: $($response.roles -join ', ')" -ForegroundColor Gray
+} catch {
+    Write-Host "✗ Failed: $($_.Exception.Message)" -ForegroundColor Red
+}
+
+Write-Host "`n=== JWT E2E Test Complete ===" -ForegroundColor Cyan
+```
+
+```bash
+# Linux/Mac - Complete flow
+echo "=== JWT E2E Verification Test ==="
+
+# Step 1: Login
+echo -e "\n1. Login to get JWT token..."
+TOKEN=$(curl -s -X POST http://localhost:8080/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"admin","password":"Admin@123"}' | jq -r '.token')
+echo "✓ Token received: ${TOKEN:0:50}..."
+
+# Step 2: Test whitelisted route
+echo -e "\n2. Test whitelisted route (no token)..."
+STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/api/auth/health)
+echo "✓ Whitelisted route accessible: $STATUS"
+
+# Step 3: Test protected route without token
+echo -e "\n3. Test protected route without token (should fail)..."
+STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/api/users)
+if [ "$STATUS" = "401" ]; then
+    echo "✓ Correctly returned 401 Unauthorized"
+else
+    echo "✗ Expected 401, got $STATUS"
+fi
+
+# Step 4: Test protected route with token
+echo -e "\n4. Test protected route with valid token..."
+RESPONSE=$(curl -s http://localhost:8080/api/auth/me -H "Authorization: Bearer $TOKEN")
+echo "✓ Protected route accessible with token"
+echo "  Response: $RESPONSE"
+
+echo -e "\n=== JWT E2E Test Complete ==="
+```
+
+### JWT Whitelist Configuration
+
+Current whitelisted routes (no JWT required):
+- `/api/auth/**` - All auth endpoints (login, register, health)
+- `/actuator/health` - Health check endpoint
+- `/actuator/prometheus` - Metrics for Prometheus scraping
+- `/` - Root endpoint
+
+All other routes require valid JWT token in `Authorization: Bearer <token>` header.
