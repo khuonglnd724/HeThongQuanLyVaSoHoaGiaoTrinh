@@ -313,6 +313,7 @@ services:
     ports:
       - "8000:8000"
     environment:
+      DATABASE_URL: postgresql://postgres:123456@postgres:5432/ai_service_db
       RABBITMQ_HOST: rabbitmq
       RABBITMQ_PORT: 5672
       RABBITMQ_USER: guest
@@ -323,7 +324,13 @@ services:
       REDIS_DB: 0
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       KAFKA_TOPIC_AI_EVENTS: ai-events
+      GROQ_API_KEY: ${GROQ_API_KEY}
+      GROQ_MODEL: llama-3.3-70b-versatile
+      GROQ_TEMPERATURE: 0.7
+      GROQ_MAX_TOKENS: 2000
     depends_on:
+      postgres:
+        condition: service_healthy
       rabbitmq:
         condition: service_healthy
       redis:
@@ -341,6 +348,7 @@ services:
     container_name: ai-worker
     command: ["celery", "-A", "app.workers.celery_app", "worker", "--loglevel=info", "--pool=solo"]
     environment:
+      DATABASE_URL: postgresql://postgres:123456@postgres:5432/ai_service_db
       RABBITMQ_HOST: rabbitmq
       RABBITMQ_PORT: 5672
       RABBITMQ_USER: guest
@@ -351,7 +359,13 @@ services:
       REDIS_DB: 0
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       KAFKA_TOPIC_AI_EVENTS: ai-events
+      GROQ_API_KEY: ${GROQ_API_KEY}
+      GROQ_MODEL: llama-3.3-70b-versatile
+      GROQ_TEMPERATURE: 0.7
+      GROQ_MAX_TOKENS: 2000
     depends_on:
+      postgres:
+        condition: service_healthy
       rabbitmq:
         condition: service_healthy
       redis:

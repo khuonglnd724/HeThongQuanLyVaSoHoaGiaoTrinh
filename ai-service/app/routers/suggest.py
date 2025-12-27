@@ -2,6 +2,8 @@ from fastapi import APIRouter, HTTPException
 from app.schemas.suggest import SuggestRequest
 from app.schemas.jobs import JobCreateResponse, JobStatus
 from app.workers.celery_app import celery_app
+from app.database.connection import SessionLocal
+from app.repositories.job_repository import JobRepository
 import uuid
 
 router = APIRouter(prefix="/ai", tags=["ai-suggest"])
@@ -11,6 +13,8 @@ async def create_suggest_task(request: SuggestRequest):
     """
     Create a suggestion task for syllabus content
     Returns 202 with job ID for polling
+    
+    Store task in database for tracking
     """
     try:
         # Generate job ID
@@ -18,6 +22,20 @@ async def create_suggest_task(request: SuggestRequest):
         
         # Convert request to dict
         payload = request.dict()
+        
+        # Store job in database
+        db = SessionLocal()
+        try:
+            JobRepository.create_job(
+                db=db,
+                job_id=job_id,
+                task_type="suggest",
+                user_id=payload.get("userId"),
+                syllabus_id=payload.get("syllabusId"),
+                request_data=payload
+            )
+        finally:
+            db.close()
         
         # Send task to Celery via RabbitMQ
         task = celery_app.send_task(

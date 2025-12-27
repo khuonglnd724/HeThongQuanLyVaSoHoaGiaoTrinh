@@ -2,6 +2,58 @@
 
 Complete guide to build, configure, and run the SMD Microservices platform with observability stack.
 
+
+## Prerequisites
+- Docker Desktop (Windows/macOS/Linux)
+- PowerShell 5+ (Windows)
+- JDK 21 (recommended; auth-service requires JDK 17 minimum)
+- Maven is **optional** (project includes Maven Wrapper in each service)
+- **Groq API Key** (FREE) - Required for AI Service
+  - Get from: https://console.groq.com/keys
+  - No credit card required, ~14,000 tokens/minute free tier
+
+## Services & Ports
+- API Gateway: http://localhost:8080
+- Auth Service: http://localhost:8081
+- Academic Service: http://localhost:8082
+- Public Service: http://localhost:8083
+- Workflow Service: http://localhost:8084
+- Syllabus Service: http://localhost:8085
+- **AI Service (FastAPI)**: http://localhost:8000
+  - Interactive API Docs: http://localhost:8000/docs
+  - Health Check: http://localhost:8000/health
+- Discovery Server (Eureka): http://localhost:8761
+- Config Server: http://localhost:8888
+- PostgreSQL: localhost:5432 (user: `postgres`, pass: `123456`)
+- RabbitMQ Management: http://localhost:15672 (user: `guest`, pass: `guest`)
+- Kafka UI: http://localhost:8089
+- Redis: localhost:6379
+
+## Setup Environment
+
+**Configure AI Service API Key (Required):**
+```powershell
+# Navigate to project root
+cd smd-microservices
+
+# Run setup script (works in both PowerShell 5.x and 7+)
+.\scripts\setup-env.ps1
+```
+
+This script will:
+1. Create `.env` file from `.env.example`
+2. Prompt for your Groq API key (or you can skip and edit manually)
+3. Validate configuration
+
+**Alternative (manual):**
+```powershell
+# Copy example file
+Copy-Item .env.example .env
+
+# Edit .env and add your Groq API key
+# GROQ_API_KEY=gsk_your_actual_key_here
+```
+
 ## 📋 System Architecture
 
 ### Core Microservices
@@ -13,6 +65,7 @@ Complete guide to build, configure, and run the SMD Microservices platform with 
 | public-service | 8083 | Public content & announcements | Eureka, Config Server |
 | workflow-service | 8084 | Workflow engine | Eureka, Config Server |
 | syllabus-service | 8085 | Syllabus management | Eureka, Config Server |
+
 
 ### Infrastructure Services
 | Service | Port | Purpose |
@@ -66,11 +119,13 @@ Ensure these ports are free:
 ```powershell
 # Windows/PowerShell
 cd smd-microservices
+
 ./scripts/build-all.ps1
 
 # Linux/macOS
 cd smd-microservices
 ./scripts/build-all.sh
+
 ```
 
 **Step 2: Start the stack**
@@ -84,6 +139,7 @@ docker compose ps
 
 **Step 3: Verify all services are running**
 ```powershell
+
 docker compose ps --format "{{.Names}} - {{.Status}}"
 ```
 
@@ -327,6 +383,7 @@ docker compose exec postgres pg_dump -U postgres auth_db > backup.sql
 
 # Restore database
 docker compose exec -T postgres psql -U postgres auth_db < backup.sql
+
 ```
 
 ### Clean Up Storage
@@ -337,7 +394,30 @@ Get-ChildItem -Recurse -Directory -Include "target" | Remove-Item -Recurse -Forc
 # See CLEANUP.md for more options
 ```
 
+
+## Verify
+- PostgreSQL databases are auto-created from `init-scripts/init.sql`:
+  - `auth_db`, `academic_db`, `syllabus_db`, `workflow_db`, `public_db`, **`ai_service_db`**
+- Eureka dashboard lists registered services:
+  - Open http://localhost:8761
+- API Gateway is up:
+  - `curl http://localhost:8080` (or open in browser)
+- **AI Service is healthy:**
+  - `curl http://localhost:8000/health` → should return `{"status":"ok"}`
+  - Interactive docs: http://localhost:8000/docs
+- **Test AI Service:**
+  ```powershell
+  # Submit a suggestion task
+  curl -X POST http://localhost:8000/ai/suggest `
+    -H "Content-Type: application/json" `
+    -d '{\"userId\":\"test\",\"syllabusId\":\"test\",\"content\":\"Test content\",\"focusArea\":\"objective\"}'
+  
+  # Check job status (replace {jobId} with actual ID from above)
+  curl http://localhost:8000/ai/jobs/{jobId}
+  ```
+
 ## 🐛 Troubleshooting
+
 
 ### Services not starting
 ```powershell
@@ -362,6 +442,7 @@ $response = Invoke-RestMethod -Uri "http://localhost:8080/api/auth/login" `
 
 Write-Host $response.token
 ```
+
 
 ### Database connection refused
 ```powershell
@@ -433,3 +514,4 @@ If services fail to start:
 3. Review configuration: `docker-compose config`
 4. Check database: `docker compose exec postgres psql -U postgres -l`
 5. See troubleshooting section above
+
