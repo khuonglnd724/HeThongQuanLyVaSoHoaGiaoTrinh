@@ -1,4 +1,4 @@
-﻿Param()
+Param()
 $ErrorActionPreference = "Stop"
 
 # Check .env file for AI service
@@ -85,5 +85,4 @@ if (Test-Path (Join-Path $aiServicePath "Dockerfile")) {
 } else {
   Write-Host "[ERROR] Skipping ai-service Docker build (Dockerfile not found)" -ForegroundColor Red
 }
-
 
