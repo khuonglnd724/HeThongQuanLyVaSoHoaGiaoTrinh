@@ -27,8 +27,11 @@ ENV RABBITMQ_HOST=rabbitmq \
     REDIS_PORT=6379 \
     REDIS_DB=0 \
     KAFKA_BOOTSTRAP_SERVERS=kafka:29092 \
-    KAFKA_TOPIC_AI_EVENTS=ai-events
+    KAFKA_TOPIC_AI_EVENTS=ai-events \
+    DATABASE_URL=postgresql://postgres:123456@postgres:5432/ai_service_db
 
+# Expose API port
 EXPOSE 8000
 
+# Run FastAPI server
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
