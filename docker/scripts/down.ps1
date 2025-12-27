@@ -7,7 +7,7 @@ Write-Host "=" * 60 -ForegroundColor Cyan
 Write-Host "SMD Microservices Shutdown Script" -ForegroundColor Cyan
 Write-Host "=" * 60 -ForegroundColor Cyan
 
-Push-Location $PSScriptRoot\..\docker
+Push-Location $PSScriptRoot\..
 
 if ($RemoveVolumes) {
   Write-Host "`n[WARNING] WARNING: This will remove all volumes (data will be lost)!" -ForegroundColor Yellow
@@ -19,11 +19,11 @@ if ($RemoveVolumes) {
   }
   
   Write-Host "`nStopping services and removing volumes..." -ForegroundColor Red
-  docker compose down -v
+  docker-compose down -v
   Write-Host "[OK] Services stopped and volumes removed" -ForegroundColor Green
 } else {
   Write-Host "`nStopping services (data will be preserved)..." -ForegroundColor Yellow
-  docker compose down
+  docker-compose down
   Write-Host "[OK] Services stopped" -ForegroundColor Green
 }
 
