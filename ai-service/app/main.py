@@ -1,7 +1,18 @@
 # ai-service/app/main.py
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routers import health, jobs, suggest, chat, diff, clo_check, summary
+from fastapi.staticfiles import StaticFiles
+from pathlib import Path
+import logging
+import threading
+
+from app.routers import health, jobs, suggest, chat, diff, clo_check, summary, notifications, suggest_clo
+from app.database.connection import init_db, check_db_connection
+from app.consumers.kafka_consumer import kafka_consumer
+
+# Setup logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 app = FastAPI(
     title="AI Service",
@@ -18,17 +29,22 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include routers
-app.include_router(health.router)
-app.include_router(jobs.router)
-app.include_router(suggest.router)
-app.include_router(chat.router)
-app.include_router(diff.router)
-app.include_router(clo_check.router)
-app.include_router(summary.router)
+# Mount static files (HTML/CSS/JS)
+static_path = Path(__file__).parent.parent / "static"
+if static_path.exists():
+    app.mount("/static", StaticFiles(directory=str(static_path)), name="static")
 
-@app.get("/")
-async def root():
+# Serve index.html on root
+@app.get("/", include_in_schema=False)
+async def serve_ui():
+    """Serve the web UI (redirects to index.html)"""
+    from fastapi.responses import FileResponse
+    static_path = Path(__file__).parent.parent / "static"
+    return FileResponse(static_path / "index.html")
+
+# API root endpoint
+@app.get("/api")
+async def api_root():
     return {
         "service": "AI Service",
         "version": "1.0.0",
@@ -40,6 +56,60 @@ async def root():
             "chat": "POST /ai/chat",
             "diff": "POST /ai/diff",
             "clo_check": "POST /ai/clo-check",
-            "summary": "POST /ai/summary"
+            "summary": "POST /ai/summary",
+            "suggest_clo": "POST /ai/suggest-similar-clos",
+            "notifications": {
+                "websocket": "WS /notifications/ws/{user_id}",
+                "rest": "GET /notifications"
+            }
         }
     }
+
+# Include routers
+app.include_router(health.router)
+app.include_router(jobs.router)
+app.include_router(suggest.router)
+app.include_router(chat.router)
+app.include_router(diff.router)
+app.include_router(clo_check.router)
+app.include_router(summary.router)
+app.include_router(suggest_clo.router)
+app.include_router(notifications.router)
+
+# Startup event
+@app.on_event("startup")
+async def startup_event():
+    """Initialize database and start Kafka consumer"""
+    logger.info("Starting AI Service...")
+    
+    # Initialize database
+    try:
+        init_db()
+        logger.info("✅ Database initialized")
+    except Exception as e:
+        logger.error(f"❌ Failed to initialize database: {e}")
+    
+    # Check database connection
+    if not check_db_connection():
+        logger.warning("⚠️  Database connection failed - some features may not work")
+    else:
+        logger.info("✅ Database connection OK")
+    
+    # Start Kafka consumer in background thread
+    try:
+        kafka_thread = threading.Thread(target=kafka_consumer.start, daemon=True)
+        kafka_thread.start()
+        logger.info("✅ Kafka consumer started")
+    except Exception as e:
+        logger.error(f"❌ Failed to start Kafka consumer: {e}")
+    
+    logger.info("✅ AI Service started successfully")
+
+# Shutdown event
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Cleanup on shutdown"""
+    logger.info("Shutting down AI Service...")
+    kafka_consumer.stop()
+    logger.info("✅ AI Service shut down")
+

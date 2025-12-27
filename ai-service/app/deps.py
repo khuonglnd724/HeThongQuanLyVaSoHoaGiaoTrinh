@@ -2,6 +2,9 @@ import os
 from functools import lru_cache
 
 class Settings:
+    # Database
+    DATABASE_URL: str = os.getenv("DATABASE_URL", "postgresql://postgres:123456@localhost:5432/ai_service_db")
+    
     # RabbitMQ for Celery
     RABBITMQ_HOST: str = os.getenv("RABBITMQ_HOST", "localhost")
     RABBITMQ_PORT: int = int(os.getenv("RABBITMQ_PORT", "5672"))
