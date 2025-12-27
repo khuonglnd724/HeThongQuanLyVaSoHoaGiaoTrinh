@@ -56,6 +56,36 @@ Copy-Item .env.example .env
 
 ## 📋 System Architecture
 
+### Project Structure
+```
+smd-microservices/
+├── backend/              # All Spring Boot microservices & AI Service
+│   ├── api-gateway/
+│   ├── auth-service/
+│   ├── academic-service/
+│   ├── public-service/
+│   ├── workflow-service/
+│   ├── syllabus-service/
+│   ├── discovery-server/
+│   ├── config-server/
+│   ├── common-lib/
+│   ├── config-repo/
+│   └── ai-service/       # FastAPI + Celery
+├── frontend/             # Future frontend applications
+├── docker/               # Docker Compose & Infrastructure
+│   ├── docker-compose.yml
+│   ├── init-scripts/     # Database initialization
+│   ├── observability/    # Prometheus, Loki configs
+│   ├── .env              # Environment variables (AI API keys)
+│   └── .env.example
+└── scripts/              # Build & deployment scripts
+    ├── build-all.ps1
+    ├── up.ps1
+    ├── down.ps1
+    ├── health-check.ps1
+    └── setup-env.ps1
+```
+
 ### Core Microservices
 | Service | Port | Purpose | Dependencies |
 |---------|------|---------|--------------|
@@ -120,75 +150,164 @@ Ensure these ports are free:
 # Windows/PowerShell
 cd smd-microservices
 
-./scripts/build-all.ps1
+.\scripts\build-all.ps1
 
 # Linux/macOS
 cd smd-microservices
 ./scripts/build-all.sh
-
 ```
 
-**Step 2: Start the stack**
-```powershell
-# Full stack with observability
-docker compose up -d
+> **Note**: Academic-service requires Lombok and uses SuperBuilder pattern. The build script handles this automatically.
 
-# Wait for services to start (30-60 seconds)
-docker compose ps
+**Step 2: Initialize databases**
+```powershell
+# Start PostgreSQL first
+cd docker
+docker compose up -d postgres
+
+# Wait 15 seconds for PostgreSQL to be ready
+Start-Sleep -Seconds 15
+
+# Initialize databases (run only once)
+docker exec -i smd-postgres psql -U postgres -f /docker-entrypoint-initdb.d/init.sql
+docker exec -i smd-postgres psql -U postgres -d academic_db -f /docker-entrypoint-initdb.d/academic_schema.sql
 ```
 
-**Step 3: Verify all services are running**
+**Step 3: Start the full stack**
 ```powershell
+# From docker/ directory
+docker compose up -d --build
 
-docker compose ps --format "{{.Names}} - {{.Status}}"
+# Or use the script from project root
+cd ..
+.\scripts\up.ps1
+
+# Wait for services to start (60-90 seconds)
+Start-Sleep -Seconds 60
+```
+
+**Step 4: Verify all services are registered**
+```powershell
+# Check Eureka registry
+Invoke-RestMethod -Uri "http://localhost:8761/eureka/apps" -Headers @{"Accept"="application/json"} | 
+  Select-Object -ExpandProperty applications | 
+  Select-Object -ExpandProperty application | 
+  Select name
+
+# Expected output:
+# AUTH-SERVICE
+# ACADEMIC-SERVICE
+# PUBLIC-SERVICE
+# WORKFLOW-SERVICE
+# SYLLABUS-SERVICE
+# API-GATEWAY
+```
+
+**Step 5: Run health check**
+```powershell
+.\scripts\health-check.ps1
 ```
 
 ### Option 2: Manual Build & Deploy
 
 **Build individual services:**
 ```powershell
-cd api-gateway
-./mvnw.cmd clean package -DskipTests
+# Common-lib (must build first as it's a dependency)
+cd backend\common-lib
+..\..\mvnw.cmd clean install -DskipTests
 
-cd ../auth-service
-./mvnw.cmd clean package -DskipTests
+# API Gateway
+cd ..\api-gateway
+..\..\mvnw.cmd clean package -DskipTests
 
-# Repeat for other services...
+# Auth Service
+cd ..\auth-service
+..\..\mvnw.cmd clean package -DskipTests
+
+# Academic Service (requires Lombok + SuperBuilder)
+cd ..\academic-service
+..\..\mvnw.cmd clean package -DskipTests
+
+# Other services...
+cd ..\public-service
+..\..\mvnw.cmd clean package -DskipTests
+
+cd ..\workflow-service
+..\..\mvnw.cmd clean package -DskipTests
+
+cd ..\syllabus-service
+..\..\mvnw.cmd clean package -DskipTests
 ```
 
-**Start services:**
+**Start services in order:**
 ```powershell
-# Start core infrastructure first
-docker compose up -d postgres redis rabbitmq kafka
-
-# Wait 15 seconds for databases to initialize
+# 1. Start PostgreSQL and initialize databases
+cd docker
+docker compose up -d postgres
 Start-Sleep -Seconds 15
 
-# Start infrastructure services
+# Initialize databases (IMPORTANT - run once)
+docker exec -i smd-postgres psql -U postgres -f /docker-entrypoint-initdb.d/init.sql
+docker exec -i smd-postgres psql -U postgres -d academic_db -f /docker-entrypoint-initdb.d/academic_schema.sql
+
+# 2. Start core infrastructure
+docker compose up -d redis rabbitmq kafka zookeeper
+
+# 3. Start Spring Cloud infrastructure
 docker compose up -d discovery-server config-server
+Start-Sleep -Seconds 30
 
-# Wait 20 seconds for registry
-Start-Sleep -Seconds 20
+# 4. Start microservices
+docker compose up -d api-gateway auth-service academic-service public-service workflow-service syllabus-service ai-service ai-worker
 
-# Start microservices
-docker compose up -d api-gateway auth-service academic-service public-service workflow-service syllabus-service
-
-# Start observability stack
+# 5. Start observability stack (optional)
 docker compose up -d prometheus grafana loki promtail
+
+# 6. Verify services in Eureka
+Start-Sleep -Seconds 60
+Invoke-RestMethod -Uri "http://localhost:8761/eureka/apps" -Headers @{"Accept"="application/json"} | 
+  Select-Object -ExpandProperty applications | 
+  Select-Object -ExpandProperty application | 
+  Select name
 ```
 
 ### Option 3: Full Reset (Clean Start)
 
 **Remove all containers, volumes, and networks:**
 ```powershell
+# From project root
+cd docker
+
 # Stop and remove all
 docker compose down -v
 
-# Rebuild images
-docker compose build --no-cache
+# Clean build artifacts (optional, saves ~435MB disk space)
+cd ..
+Get-ChildItem backend\ -Recurse -Directory -Include "target" | Remove-Item -Recurse -Force
 
-# Start fresh
-docker compose up -d
+# Rebuild all services
+.\scripts\build-all.ps1
+
+# Start PostgreSQL and initialize databases
+cd docker
+docker compose up -d postgres
+Start-Sleep -Seconds 15
+
+# IMPORTANT: Initialize databases (required on fresh start)
+docker exec -i smd-postgres psql -U postgres -f /docker-entrypoint-initdb.d/init.sql
+docker exec -i smd-postgres psql -U postgres -d academic_db -f /docker-entrypoint-initdb.d/academic_schema.sql
+
+# Start full stack
+docker compose up -d --build
+
+# Wait for services to register
+Start-Sleep -Seconds 60
+
+# Verify all services in Eureka
+Invoke-RestMethod -Uri "http://localhost:8761/eureka/apps" -Headers @{"Accept"="application/json"} | 
+  Select-Object -ExpandProperty applications | 
+  Select-Object -ExpandProperty application | 
+  Select name
 ```
 
 ## ✅ Verification
@@ -200,23 +319,53 @@ docker compose ps --all
 
 Expected output: All containers should show `Up` status.
 
-### 2. Test Service Discovery (Eureka)
+### 2. Test Service Discovery (Eureka) - **RECOMMENDED**
 ```powershell
 # Browser
 http://localhost:8761
 
-# Or via curl
-curl http://localhost:8761/eureka/apps
+# Or via PowerShell - Check which services are registered
+Invoke-RestMethod -Uri "http://localhost:8761/eureka/apps" -Headers @{"Accept"="application/json"} | 
+  Select-Object -ExpandProperty applications | 
+  Select-Object -ExpandProperty application | 
+  Select name
+
+# Expected output (all 6 services):
+# AUTH-SERVICE
+# ACADEMIC-SERVICE
+# PUBLIC-SERVICE  
+# WORKFLOW-SERVICE
+# SYLLABUS-SERVICE
+# API-GATEWAY
 ```
 
-Expected: API Gateway, Auth Service, and other microservices listed.
+> **Note**: If all 6 services appear in Eureka, they are healthy regardless of actuator endpoint responses.
 
 ### 3. Test API Gateway
 ```powershell
-# Health check (whitelisted route)
-curl http://localhost:8080/actuator/health
+# Health check (publicly accessible)
+Invoke-RestMethod -Uri http://localhost:8080/actuator/health
 
-# Expected: 200 OK with health status
+# Expected: status = "UP"
+```
+
+### 4. Test Database Initialization
+```powershell
+# List all databases
+docker exec smd-postgres psql -U postgres -l
+
+# Expected databases:
+# - auth_db
+# - academic_db  
+# - syllabus_db
+# - workflow_db
+# - public_db
+# - ai_service_db
+
+# Check academic tables created
+docker exec smd-postgres psql -U postgres -d academic_db -c "\dt"
+
+# Expected: subject, program, plo, clo, syllabus, clo_mapping tables
 ```
 
 ### 4. Test JWT Authentication
@@ -396,12 +545,16 @@ Get-ChildItem -Recurse -Directory -Include "target" | Remove-Item -Recurse -Forc
 
 
 ## Verify
-- PostgreSQL databases are auto-created from `init-scripts/init.sql`:
+- PostgreSQL databases must be manually initialized (see Build & Deploy section):
   - `auth_db`, `academic_db`, `syllabus_db`, `workflow_db`, `public_db`, **`ai_service_db`**
-- Eureka dashboard lists registered services:
+  - Run: `docker exec -i smd-postgres psql -U postgres -f /docker-entrypoint-initdb.d/init.sql`
+  - Run: `docker exec -i smd-postgres psql -U postgres -d academic_db -f /docker-entrypoint-initdb.d/academic_schema.sql`
+- **Eureka registry is the primary health indicator** - all 6 services should be registered:
   - Open http://localhost:8761
+  - Or run: `Invoke-RestMethod -Uri "http://localhost:8761/eureka/apps" -Headers @{"Accept"="application/json"} | Select-Object -ExpandProperty applications | Select-Object -ExpandProperty application | Select name`
 - API Gateway is up:
-  - `curl http://localhost:8080` (or open in browser)
+  - `Invoke-RestMethod http://localhost:8080/actuator/health` → status: "UP"
+- **Note**: Some services return 403 Forbidden on actuator endpoints due to security config - this is normal
 - **AI Service is healthy:**
   - `curl http://localhost:8000/health` → should return `{"status":"ok"}`
   - Interactive docs: http://localhost:8000/docs
@@ -418,6 +571,29 @@ Get-ChildItem -Recurse -Directory -Include "target" | Remove-Item -Recurse -Forc
 
 ## 🐛 Troubleshooting
 
+### ⚠️ Important Notes
+
+**Database Initialization:**
+- Databases are **NOT** auto-created on first startup
+- You **MUST** manually run init scripts after first `docker compose up -d postgres`
+- Run these commands once:
+  ```powershell
+  docker exec -i smd-postgres psql -U postgres -f /docker-entrypoint-initdb.d/init.sql
+  docker exec -i smd-postgres psql -U postgres -d academic_db -f /docker-entrypoint-initdb.d/academic_schema.sql
+  ```
+- Then restart services: `docker compose restart auth-service academic-service public-service workflow-service syllabus-service`
+
+**Academic Service Build Issues:**
+- Requires Lombok dependency (scope: provided)
+- Uses Lombok SuperBuilder for entity inheritance (BaseEntity)
+- Maven compiler needs annotation processor configuration
+- Tests use H2 in-memory database (no external Postgres needed)
+
+**Actuator Security:**
+- Some services return 403 Forbidden on `/actuator/health` endpoints
+- This is by design for security
+- Services are healthy if registered in Eureka (check http://localhost:8761)
+- API Gateway actuator is accessible at http://localhost:8080/actuator/health
 
 ### Services not starting
 ```powershell
@@ -426,8 +602,50 @@ docker compose logs api-gateway
 
 # Common issues:
 # - Port already in use: Change port mapping in docker-compose.yml
-# - Database not ready: Wait 30 seconds and restart
-# - Config server not available: Check discovery-server is running
+# - Database not initialized: Run init scripts (see Database Initialization above)
+# - Database connection errors: Services started before DB init - restart them
+# - Config server not available: Check discovery-server is running first
+```
+
+### Database "does not exist" error
+```powershell
+# This happens when services start before DB initialization
+# Solution 1: Run init scripts (if not done yet)
+docker exec -i smd-postgres psql -U postgres -f /docker-entrypoint-initdb.d/init.sql
+
+# Solution 2: Restart services after DB init
+docker compose restart auth-service academic-service public-service workflow-service syllabus-service
+
+# Solution 3: Verify databases exist
+docker exec smd-postgres psql -U postgres -l
+```
+
+### Academic Service "missing table [clo]" error
+```powershell
+# Run academic schema initialization
+docker exec -i smd-postgres psql -U postgres -d academic_db -f /docker-entrypoint-initdb.d/academic_schema.sql
+
+# Restart academic-service
+docker compose restart academic-service
+
+# Note: May have minor SQL errors (ROUND function, strength_level column) 
+# but core tables should be created successfully
+```
+
+### Build failures with "package lombok does not exist"
+```powershell
+# Academic-service requires Lombok with annotation processing
+# This is fixed in pom.xml with:
+# - Lombok dependency (scope: provided)
+# - Maven Compiler annotationProcessorPaths
+
+# Rebuild academic-service
+cd academic-service
+./mvnw.cmd clean package -DskipTests
+
+# Or use build-all script which handles this automatically
+cd ..
+./scripts/build-all.ps1
 ```
 
 ### JWT token invalid

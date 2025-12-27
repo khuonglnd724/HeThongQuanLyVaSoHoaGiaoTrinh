@@ -7,8 +7,8 @@ Write-Host "=" * 60 -ForegroundColor Cyan
 Write-Host "Environment Setup Script" -ForegroundColor Cyan
 Write-Host "=" * 60 -ForegroundColor Cyan
 
-$envFile = Join-Path $PSScriptRoot "../docker/.env"
-$envExample = Join-Path $PSScriptRoot "../docker/.env.example"
+$envFile = Join-Path $PSScriptRoot "../.env"
+$envExample = Join-Path $PSScriptRoot "../.env.example"
 
 # Check if .env already exists
 if (Test-Path $envFile) {
