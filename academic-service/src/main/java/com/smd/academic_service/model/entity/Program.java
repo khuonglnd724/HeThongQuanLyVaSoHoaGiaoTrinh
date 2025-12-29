@@ -5,6 +5,8 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import lombok.EqualsAndHashCode;
+import lombok.Builder.Default;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -21,6 +23,7 @@ import java.util.Set;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@EqualsAndHashCode(callSuper = true)
 public class Program extends BaseEntity {
     
     @Column(name = "program_code", nullable = false, length = 50, unique = true)
@@ -48,8 +51,10 @@ public class Program extends BaseEntity {
     private String accreditationStatus;  // Accredited, Not Accredited, Pending
     
     @OneToMany(mappedBy = "program", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Default
     private Set<Plo> plos = new HashSet<>();
     
     @OneToMany(mappedBy = "program", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Default
     private Set<Subject> subjects = new HashSet<>();
 }

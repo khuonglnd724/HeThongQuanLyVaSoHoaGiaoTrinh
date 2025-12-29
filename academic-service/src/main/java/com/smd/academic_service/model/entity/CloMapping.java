@@ -5,6 +5,8 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import lombok.EqualsAndHashCode;
+import lombok.Builder.Default;
 
 /**
  * CLO-PLO Mapping (Bản đồ liên kết giữa chuẩn đầu ra môn học và chương trình)
@@ -20,6 +22,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@EqualsAndHashCode(callSuper = true)
 public class CloMapping extends BaseEntity {
     
     @ManyToOne(fetch = jakarta.persistence.FetchType.LAZY)
@@ -43,5 +46,6 @@ public class CloMapping extends BaseEntity {
     private String notes;  // Ghi chú
     
     @Column(name = "strength_level", nullable = false)
+    @Default
     private Integer strengthLevel = 1;  // 1-5: Độ mạnh của liên kết (1 yếu, 5 mạnh)
 }

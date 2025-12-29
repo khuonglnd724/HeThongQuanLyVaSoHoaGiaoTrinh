@@ -5,6 +5,8 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import lombok.EqualsAndHashCode;
+import lombok.Builder.Default;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -21,6 +23,7 @@ import java.util.Set;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@EqualsAndHashCode(callSuper = true)
 public class Syllabus extends BaseEntity {
     
     @Column(name = "syllabus_code", nullable = false, length = 50)
@@ -64,5 +67,6 @@ public class Syllabus extends BaseEntity {
     private String approvalComments;  // Nhận xét phê duyệt
     
     @OneToMany(mappedBy = "syllabus", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Default
     private Set<Clo> clos = new HashSet<>();
 }

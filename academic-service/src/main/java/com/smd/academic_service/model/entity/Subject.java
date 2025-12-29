@@ -5,6 +5,8 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import lombok.EqualsAndHashCode;
+import lombok.Builder.Default;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -21,6 +23,7 @@ import java.util.Set;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@EqualsAndHashCode(callSuper = true)
 public class Subject extends BaseEntity {
     
     @Column(name = "subject_code", nullable = false, length = 50)
@@ -52,11 +55,14 @@ public class Subject extends BaseEntity {
     private String subjectType;  // Required, Elective, Optional
     
     @Column(name = "is_foundational", nullable = false)
+    @Default
     private Boolean isFoundational = false;  // Là môn nền tảng?
     
     @OneToMany(mappedBy = "subject", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Default
     private Set<Clo> clos = new HashSet<>();
     
     @OneToMany(mappedBy = "subject", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Default
     private Set<Syllabus> syllabuses = new HashSet<>();
 }
