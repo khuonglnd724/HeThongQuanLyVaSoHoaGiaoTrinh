@@ -1,5 +1,6 @@
 import time
 import json
+import logging
 from app.workers.celery_app import celery_app
 from app.deps import get_settings
 from kafka import KafkaProducer
@@ -11,13 +12,24 @@ from app.services.ai_client import get_ai_client
 from app.services import prompts
 
 settings = get_settings()
+logger = logging.getLogger(__name__)
+
+# Kafka producer singleton (reuse connection)
+_kafka_producer = None
 
 def get_kafka_producer():
-    """Get Kafka producer for publishing events"""
-    return KafkaProducer(
-        bootstrap_servers=settings.KAFKA_BOOTSTRAP_SERVERS,
-        value_serializer=lambda v: json.dumps(v).encode('utf-8')
-    )
+    """Get or create Kafka producer singleton to avoid connection overhead"""
+    global _kafka_producer
+    if _kafka_producer is None:
+        _kafka_producer = KafkaProducer(
+            bootstrap_servers=settings.KAFKA_BOOTSTRAP_SERVERS,
+            value_serializer=lambda v: json.dumps(v).encode('utf-8'),
+            retries=3,
+            request_timeout_ms=10000,
+            acks='all'
+        )
+        logger.info("Kafka producer initialized")
+    return _kafka_producer
 
 def publish_completion_event(job_id: str, task_type: str, status: str, user_id: str = None, syllabus_id: str = None, error: str = None):
     """Publish AI task completion event to Kafka"""
@@ -40,9 +52,9 @@ def publish_completion_event(job_id: str, task_type: str, status: str, user_id: 
         print(f"Failed to publish event: {e}")
 
 def update_job_in_db(job_id: str, status: AIJobStatus, progress: int = None, result: dict = None, error: str = None):
-    """Update job status in database"""
+    """Update job status in database with proper session management and transaction control"""
+    db = SessionLocal()
     try:
-        db = SessionLocal()
         JobRepository.update_job_status(
             db=db,
             job_id=job_id,
@@ -51,9 +63,14 @@ def update_job_in_db(job_id: str, status: AIJobStatus, progress: int = None, res
             result_data=result,
             error_message=error
         )
-        db.close()
+        db.commit()  # Explicitly commit transaction
+        logger.info(f"Job {job_id} updated to {status.value}")
     except Exception as e:
-        print(f"Failed to update job in DB: {e}")
+        db.rollback()  # Rollback on error to maintain consistency
+        logger.error(f"Failed to update job in DB: {e}")
+        raise
+    finally:
+        db.close()  # Always close connection
 
 @celery_app.task(bind=True, name='tasks.suggest')
 def suggest_task(self, payload: dict, job_id: str):

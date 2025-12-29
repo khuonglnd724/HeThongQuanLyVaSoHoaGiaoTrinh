@@ -33,6 +33,13 @@ spring:
           uri: lb://public-service
           predicates:
             - Path=/api/public/**
+        
+        - id: ai-service
+          uri: http://ai-service:8000
+          predicates:
+            - Path=/api/ai/**
+          filters:
+            - RewritePath=/api/ai(?<segment>/?.*), $\{segment}
 
       default-filters:
         - name: CircuitBreaker
@@ -60,6 +67,7 @@ security:
     secret: smdMicroservicesSecretKeyForJWTTokenGenerationAndValidation2024
     whitelist:
       - /api/auth/**
+      - /api/ai/health
       - /actuator/prometheus
       - /actuator/health
       - /
