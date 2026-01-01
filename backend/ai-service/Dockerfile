@@ -1,18 +1,35 @@
-FROM python:3.11-slim
-
-ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1
+# Stage 1: Builder
+FROM python:3.11-slim as builder
 
 WORKDIR /app
 
-# Install system dependencies (if needed for Kafka/Redis SSL, etc.)
-RUN apt-get update && apt-get install -y \
+# Install build dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    gcc \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy and install requirements to --user directory
+COPY requirements.txt .
+RUN pip install --user --no-cache-dir -r requirements.txt
+
+# Stage 2: Runtime (minimal)
+FROM python:3.11-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PATH=/root/.local/bin:$PATH \
+    PYTHONPATH=/app
+
+WORKDIR /app
+
+# Install only runtime dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Python dependencies
-COPY requirements.txt ./
-RUN pip install --no-cache-dir -r requirements.txt
+# Copy installed packages from builder
+COPY --from=builder /root/.local /root/.local
 
 # Copy application code
 COPY app ./app
