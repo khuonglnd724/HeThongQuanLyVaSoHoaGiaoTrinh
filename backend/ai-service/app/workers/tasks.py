@@ -9,6 +9,7 @@ from app.database.models import AIJobStatus
 from app.repositories.job_repository import JobRepository
 from app.repositories.conversation_repository import ConversationRepository
 from app.services.ai_client import get_ai_client
+from app.services.rag_service import VectorStore
 from app.services import prompts
 
 settings = get_settings()
@@ -101,7 +102,7 @@ def suggest_task(self, payload: dict, job_id: str):
             ai_client.create_user_message(user_prompt)
         ]
         
-        # Call OpenAI API
+        # Call Groq API
         update_job_in_db(job_id, AIJobStatus.RUNNING, progress=50)
         self.update_state(state='PROGRESS', meta={'progress': 50})
         
@@ -113,16 +114,51 @@ def suggest_task(self, payload: dict, job_id: str):
         )
         
         # Parse AI response
-        update_job_in_db(job_id, AIJobStatus.RUNNING, progress=80)
-        self.update_state(state='PROGRESS', meta={'progress': 80})
+        update_job_in_db(job_id, AIJobStatus.RUNNING, progress=70)
+        self.update_state(state='PROGRESS', meta={'progress': 70})
         
         suggestions_data = json.loads(ai_response["content"])
+        suggestions = suggestions_data.get("suggestions", [])
+        
+        # Filter duplicate CLOs using RAG if syllabus_id provided
+        filtered_suggestions = suggestions
+        if syllabus_id:
+            try:
+                vector_store = VectorStore()
+                collection_name = f"syllabus_{syllabus_id}".lower()
+                
+                filtered_suggestions = []
+                for suggestion in suggestions:
+                    clo_text = suggestion.get("clo", "")
+                    
+                    # Search for similar CLOs in existing syllabus
+                    try:
+                        similar = vector_store.search(
+                            collection_name=collection_name,
+                            query=clo_text,
+                            limit=1
+                        )
+                        
+                        # If similarity score > 0.8, it's a duplicate - skip it
+                        if similar and similar[0].get('distance', 0) > 0.8:
+                            logger.info(f"Skipping duplicate CLO: {clo_text[:50]}")
+                            continue
+                    except:
+                        pass  # If search fails, include the suggestion anyway
+                    
+                    filtered_suggestions.append(suggestion)
+                
+                logger.info(f"Filtered {len(suggestions) - len(filtered_suggestions)} duplicate CLOs")
+            except Exception as e:
+                logger.warning(f"RAG duplicate check failed: {e}, using all suggestions")
+                filtered_suggestions = suggestions
         
         # Build result
         result = {
             "jobId": job_id,
-            "suggestions": suggestions_data.get("suggestions", []),
+            "suggestions": filtered_suggestions,
             "summary": suggestions_data.get("summary", ""),
+            "duplicateCheckEnabled": bool(syllabus_id),
             "tokens": ai_response["usage"]["total_tokens"],
             "model": ai_response["model"]
         }
@@ -144,6 +180,7 @@ def suggest_task(self, payload: dict, job_id: str):
         
     except Exception as e:
         error_msg = str(e)
+        logger.error(f"Suggest task failed: {error_msg}")
         
         # Update DB status: FAILED
         update_job_in_db(job_id, AIJobStatus.FAILED, error=error_msg)
@@ -161,22 +198,46 @@ def suggest_task(self, payload: dict, job_id: str):
 
 @celery_app.task(bind=True, name='tasks.chat')
 def chat_task(self, payload: dict, job_id: str):
-    """AI Chat task - Real AI implementation with OpenAI"""
+    """AI Chat task - Real AI implementation with RAG context from syllabus"""
     user_id = payload.get("userId")
     syllabus_id = payload.get("syllabusId")
     conversation_id = payload.get("conversationId", f"conv_{job_id}")
     message = payload.get("message", "")
-    syllabus_context = payload.get("syllabusContext", "")
     
     try:
         # Update DB status: RUNNING
-        update_job_in_db(job_id, AIJobStatus.RUNNING, progress=20)
-        self.update_state(state='PROGRESS', meta={'progress': 20})
+        update_job_in_db(job_id, AIJobStatus.RUNNING, progress=10)
+        self.update_state(state='PROGRESS', meta={'progress': 10})
         
         # Get AI client
         ai_client = get_ai_client()
         
+        # Search RAG for syllabus context
+        rag_context = ""
+        if syllabus_id:
+            try:
+                vector_store = VectorStore()
+                collection_name = f"syllabus_{syllabus_id}".lower()
+                search_results = vector_store.search(
+                    collection_name=collection_name,
+                    query=message,
+                    limit=3
+                )
+                
+                if search_results:
+                    rag_context = "\n".join([
+                        f"[{r['metadata'].get('subject', 'Content')}] {r['document']}"
+                        for r in search_results
+                    ])
+                    logger.info(f"Found RAG context for {syllabus_id}")
+            except Exception as e:
+                logger.warning(f"RAG search failed for {syllabus_id}: {e}")
+                rag_context = ""
+        
         # Get chat history from DB
+        update_job_in_db(job_id, AIJobStatus.RUNNING, progress=30)
+        self.update_state(state='PROGRESS', meta={'progress': 30})
+        
         db = SessionLocal()
         try:
             messages_history = ConversationRepository.get_conversation_messages(db, conversation_id)
@@ -187,15 +248,19 @@ def chat_task(self, payload: dict, job_id: str):
         finally:
             db.close()
         
-        # Build messages for AI
-        update_job_in_db(job_id, AIJobStatus.RUNNING, progress=40)
-        self.update_state(state='PROGRESS', meta={'progress': 40})
+        # Build messages for AI with RAG context
+        update_job_in_db(job_id, AIJobStatus.RUNNING, progress=50)
+        self.update_state(state='PROGRESS', meta={'progress': 50})
         
-        messages = prompts.build_chat_prompt(message, syllabus_context, chat_history)
+        messages = prompts.build_chat_prompt(
+            message, 
+            rag_context or payload.get("syllabusContext", ""),
+            chat_history
+        )
         
-        # Call OpenAI API
-        update_job_in_db(job_id, AIJobStatus.RUNNING, progress=60)
-        self.update_state(state='PROGRESS', meta={'progress': 60})
+        # Call Groq API with RAG context
+        update_job_in_db(job_id, AIJobStatus.RUNNING, progress=70)
+        self.update_state(state='PROGRESS', meta={'progress': 70})
         
         ai_response = ai_client.chat_completion(
             messages=messages,
@@ -205,10 +270,9 @@ def chat_task(self, payload: dict, job_id: str):
         
         answer_content = ai_response["content"]
         
-        # Extract citations (if any) - simple implementation
+        # Extract citations (if any)
         citations = []
         if "Section" in answer_content or "Chapter" in answer_content:
-            # Simple citation extraction
             import re
             sections = re.findall(r'Section \d+\.?\d*', answer_content)
             chapters = re.findall(r'Chapter \d+', answer_content)
@@ -220,7 +284,8 @@ def chat_task(self, payload: dict, job_id: str):
             "conversationId": conversation_id,
             "answer": {
                 "content": answer_content,
-                "citations": citations
+                "citations": citations,
+                "ragUsed": bool(rag_context)
             },
             "usage": {
                 "promptTokens": ai_response["usage"]["prompt_tokens"],
@@ -262,6 +327,7 @@ def chat_task(self, payload: dict, job_id: str):
         return result
     except Exception as e:
         error_msg = str(e)
+        logger.error(f"Chat task failed: {error_msg}")
         
         # Update DB status: FAILED
         update_job_in_db(job_id, AIJobStatus.FAILED, error=error_msg)
@@ -279,7 +345,7 @@ def chat_task(self, payload: dict, job_id: str):
 
 @celery_app.task(bind=True, name='tasks.diff')
 def diff_task(self, payload: dict, job_id: str):
-    """AI Diff task - Real AI implementation with OpenAI"""
+    """AI Diff task - Analyzes differences with RAG context from syllabus"""
     user_id = payload.get("userId")
     syllabus_id = payload.get("syllabusId")
     old_content = payload.get("oldContent", "")
@@ -287,23 +353,53 @@ def diff_task(self, payload: dict, job_id: str):
     
     try:
         # Update DB status: RUNNING
-        update_job_in_db(job_id, AIJobStatus.RUNNING, progress=20)
-        self.update_state(state='PROGRESS', meta={'progress': 20})
+        update_job_in_db(job_id, AIJobStatus.RUNNING, progress=10)
+        self.update_state(state='PROGRESS', meta={'progress': 10})
         
         # Get AI client
         ai_client = get_ai_client()
+        
+        # Search RAG for context on what's being changed
+        rag_context = ""
+        if syllabus_id:
+            try:
+                vector_store = VectorStore()
+                collection_name = f"syllabus_{syllabus_id}".lower()
+                
+                # Search for context about changes
+                changes_text = f"{old_content[:200]} {new_content[:200]}"
+                search_results = vector_store.search(
+                    collection_name=collection_name,
+                    query=changes_text,
+                    limit=2
+                )
+                
+                if search_results:
+                    rag_context = "Previous context:\n" + "\n".join([
+                        f"- {r['document'][:100]}"
+                        for r in search_results
+                    ])
+                    logger.info(f"Found RAG context for diff in syllabus {syllabus_id}")
+            except Exception as e:
+                logger.warning(f"RAG search for diff context failed: {e}")
+                rag_context = ""
         
         # Build prompt and call AI
         update_job_in_db(job_id, AIJobStatus.RUNNING, progress=40)
         self.update_state(state='PROGRESS', meta={'progress': 40})
         
         user_prompt = prompts.build_diff_prompt(old_content, new_content)
+        
+        # Add RAG context if available
+        if rag_context:
+            user_prompt = f"{rag_context}\n\n{user_prompt}"
+        
         messages = [
             ai_client.create_system_message(prompts.DIFF_SYSTEM_PROMPT),
             ai_client.create_user_message(user_prompt)
         ]
         
-        # Call OpenAI API
+        # Call Groq API
         update_job_in_db(job_id, AIJobStatus.RUNNING, progress=60)
         self.update_state(state='PROGRESS', meta={'progress': 60})
         
@@ -326,6 +422,7 @@ def diff_task(self, payload: dict, job_id: str):
             "diffs": diff_data.get("diffs", []),
             "summary": diff_data.get("summary", ""),
             "impactLevel": diff_data.get("impactLevel", "medium"),
+            "ragContextUsed": bool(rag_context),
             "tokens": ai_response["usage"]["total_tokens"],
             "model": ai_response["model"]
         }

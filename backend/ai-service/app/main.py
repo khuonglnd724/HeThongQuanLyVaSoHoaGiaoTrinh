@@ -6,7 +6,7 @@ from pathlib import Path
 import logging
 import threading
 
-from app.routers import health, jobs, suggest, chat, diff, clo_check, summary, notifications, suggest_clo
+from app.routers import health, jobs, suggest, chat, diff, clo_check, summary, notifications, suggest_clo, documents
 from app.database.connection import init_db, check_db_connection
 from app.consumers.kafka_consumer import kafka_consumer
 
@@ -51,6 +51,12 @@ async def api_root():
         "status": "running",
         "endpoints": {
             "health": "/health",
+            "documents": {
+                "ingest": "POST /ai/documents/ingest",
+                "search": "GET /ai/documents/search",
+                "collections": "GET /ai/documents/collections",
+                "delete": "DELETE /ai/documents/{syllabus_id}"
+            },
             "jobs": "/ai/jobs/{job_id}",
             "suggest": "POST /ai/suggest",
             "chat": "POST /ai/chat",
@@ -68,6 +74,7 @@ async def api_root():
 # Include routers
 app.include_router(health.router)
 app.include_router(jobs.router)
+app.include_router(documents.router)
 app.include_router(suggest.router)
 app.include_router(chat.router)
 app.include_router(diff.router)
