@@ -52,7 +52,7 @@ class AIConversation(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     conversation_id = Column(String(255), unique=True, nullable=False, index=True)
-    user_id = Column(String(255), nullable=False, index=True)
+    user_id = Column(String(255), nullable=True, index=True)  # Allow NULL for anonymous chats
     syllabus_id = Column(String(255), nullable=True, index=True)
     
     title = Column(String(255), nullable=True)

@@ -179,7 +179,7 @@ def chat_task(self, payload: dict, job_id: str):
         # Get chat history from DB
         db = SessionLocal()
         try:
-            messages_history = ConversationRepository.get_messages(db, conversation_id)
+            messages_history = ConversationRepository.get_conversation_messages(db, conversation_id)
             chat_history = [
                 {"role": msg.role, "content": msg.content}
                 for msg in messages_history[-5:]  # Last 5 messages

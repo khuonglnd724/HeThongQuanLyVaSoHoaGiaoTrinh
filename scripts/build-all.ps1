@@ -20,15 +20,15 @@ if (-not (Test-Path $envFile)) {
 }
 
 $projects = @(
-  "common-lib",
-  "discovery-server",
-  "config-server",
-  "api-gateway",
-  "auth-service",
-  "academic-service",
-  "public-service",
-  "workflow-service",
-  "syllabus-service"
+  "backend/common-lib",
+  "backend/discovery-server",
+  "backend/config-server",
+  "backend/api-gateway",
+  "backend/auth-service",
+  "backend/academic-service",
+  "backend/public-service",
+  "backend/workflow-service",
+  "backend/syllabus-service"
 )
 
 Write-Host "Building services..." -ForegroundColor Green
@@ -66,14 +66,13 @@ Write-Host "`n" + "="*60 -ForegroundColor Cyan
 Write-Host "Building AI Service (Python + FastAPI + Celery)" -ForegroundColor Cyan
 Write-Host "="*60 -ForegroundColor Cyan
 
-$aiServicePath = Join-Path $PSScriptRoot "..\ai-service"
+$aiServicePath = Join-Path $PSScriptRoot "..\backend\ai-service"
 if (Test-Path (Join-Path $aiServicePath "Dockerfile")) {
   Write-Host "Building ai-service and ai-worker Docker images..." -ForegroundColor Yellow
-  Push-Location (Join-Path $PSScriptRoot "..")
-  
-  # Use docker-compose to build AI services
-  docker-compose build ai-service ai-worker
-  
+  Push-Location (Join-Path $PSScriptRoot "..\docker")
+
+  docker compose build ai-service ai-worker
+
   if ($LASTEXITCODE -eq 0) {
     Write-Host "[OK] AI service images built successfully" -ForegroundColor Green
   } else {
