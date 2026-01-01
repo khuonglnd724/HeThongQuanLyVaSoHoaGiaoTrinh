@@ -58,8 +58,8 @@ class AIClient:
         logger.info(f"Tokens used this minute: {self.tokens_used_minute}/{self.max_tokens_per_minute}")
     
     @retry(
-        stop=stop_after_attempt(4),
-        wait=wait_exponential(multiplier=2, min=4, max=60),
+        stop=stop_after_attempt(2),  # Reduced from 4 for faster failure
+        wait=wait_exponential(multiplier=1, min=2, max=10),  # Faster backoff
         retry=retry_if_exception_type((Exception,)),
         reraise=True
     )
