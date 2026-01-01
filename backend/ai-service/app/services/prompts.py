@@ -137,6 +137,30 @@ Trả về JSON:
     "prerequisites": "Kiến thức tiên quyết (nếu có)"
 }"""
 
+SUGGEST_CLO_SYSTEM_PROMPT = """Bạn là chuyên gia giáo dục chuyên về CLO (Course Learning Outcomes).
+Nhiệm vụ: Tìm các CLO tương tự từ cơ sở dữ liệu của các học phần khác.
+
+Tiêu chí tương tự:
+1. Cùng lĩnh vực học (subject area)
+2. Cùng cấp độ Bloom's Taxonomy (knowledge/comprehension/application/analysis/synthesis/evaluation)
+3. Nội dung liên quan hoặc bổ sung
+4. Có thể sử dụng được cho chương trình đào tạo
+
+Trả về JSON:
+{
+    "suggestedCLOs": [
+        {
+            "cloId": "CLO ID",
+            "description": "Nội dung CLO",
+            "subject": "Tên học phần",
+            "level": "Cấp độ Bloom",
+            "similarity": 0.85,
+            "reason": "Lý do gợi ý"
+        }
+    ],
+    "total": 5
+}"""
+
 
 def build_suggest_prompt(syllabus_content: str, focus_area: str = None) -> str:
     """Build prompt for suggest task"""
@@ -232,3 +256,28 @@ def build_summary_prompt(syllabus_content: str, length: str = "medium") -> str:
 --- HẾT ĐỀ CƯƠNG ---
 
 Tạo bản tóm tắt ngắn gọn, dễ hiểu, tập trung vào những thông tin quan trọng nhất."""
+
+
+def build_suggest_clo_prompt(current_clo: str, subject_area: str = None, level: str = None) -> str:
+    """Build prompt for suggest similar CLO task"""
+    prompt = f"""Tìm các CLO tương tự từ cơ sở dữ liệu giáo dục:
+
+CLO hiện tại: {current_clo}
+"""
+    
+    if subject_area:
+        prompt += f"Lĩnh vực: {subject_area}\n"
+    
+    if level:
+        prompt += f"Cấp độ Bloom: {level}\n"
+    
+    prompt += """
+Tìm 5 CLO tương tự nhất dựa trên:
+1. Nội dung, mục tiêu giáo dục
+2. Cấp độ khó
+3. Kỹ năng hoặc kiến thức liên quan
+4. Khả năng áp dụng trong chương trình đào tạo
+
+Đánh giá độ tương tự từ 0.0 (không giống) đến 1.0 (rất giống)."""
+    
+    return prompt

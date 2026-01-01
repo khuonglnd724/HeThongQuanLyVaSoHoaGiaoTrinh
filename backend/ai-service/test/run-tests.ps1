@@ -25,6 +25,10 @@ param(
   [switch]$Verbose
 )
 
+# Set UTF-8 encoding for Vietnamese display
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+$PSDefaultParameterValues['*:Encoding'] = 'utf8'
+
 $ErrorActionPreference = "Continue"
 
 # Colors
@@ -151,8 +155,12 @@ try {
       
       if ($status.status -eq "succeeded") {
         Write-TestPass "Suggest task completed in ${elapsed}s"
-        $suggestions = $status.result.suggestions | Measure-Object
+        $suggestions = $status.result.suggestions
         Write-TestInfo "  Suggestions generated: $($suggestions.Count)"
+        Write-Host "`n  Sample suggestions:" -ForegroundColor DarkCyan
+        $suggestions | Select-Object -First 3 | ForEach-Object {
+          Write-Host "  - $($_.suggestion)" -ForegroundColor Gray
+        }
         Record-Test "Suggest Task" "passed"
         $completed = $true
         break
@@ -176,11 +184,70 @@ try {
 }
 
 # ============================================================================
-Write-TestHeader "TEST 3: CHAT TASK (SKIPPED - ENDPOINT ISSUE)"
+Write-TestHeader "TEST 3: CHAT TASK"
 
-Write-TestInfo "Chat endpoint has compatibility issues - skipping for now"
-Write-TestWarn "The /ai/chat endpoint needs to be updated to match ChatRequest schema"
-Record-Test "Chat Task" "skipped" "Endpoint needs fixes"
+$chatRequest = @{
+  messages = @(
+    @{
+      role = "user"
+      content = "Explain the difference between lists and tuples in Python. Answer in English, max 100 words."
+    }
+  )
+  syllabusId = "test-syll-chat-001"
+} | ConvertTo-Json -Depth 3
+
+Write-TestInfo "Submitting chat task..."
+
+try {
+  $job = Invoke-RestMethod "$ApiBaseUrl/ai/chat" -Method Post `
+    -ContentType "application/json" -Body $chatRequest -ErrorAction Stop
+  
+  $jobId = $job.jobId
+  Write-TestPass "Task submitted - Job ID: $jobId"
+  
+  # Poll for result
+  $maxWait = 30
+  $elapsed = 0
+  $completed = $false
+  
+  while ($elapsed -lt $maxWait) {
+    Start-Sleep -Seconds 2
+    $elapsed += 2
+    
+    try {
+      $status = Invoke-RestMethod "$ApiBaseUrl/ai/jobs/$jobId" -ErrorAction Stop
+      
+      Write-TestInfo "  Status: $($status.status) | Progress: $($status.progress)%"
+      
+      if ($status.status -eq "succeeded") {
+        Write-TestPass "Chat task completed in ${elapsed}s"
+        $answer = $status.result.answer.content
+        Write-TestInfo "  Response length: $($answer.Length) chars"
+        Write-Host "`n  AI Response:" -ForegroundColor DarkCyan
+        $preview = if ($answer.Length -gt 200) { $answer.Substring(0, 200) + "..." } else { $answer }
+        Write-Host "  $preview" -ForegroundColor Gray
+        Write-TestInfo "  Model: $($status.result.model) | Tokens: $($status.result.usage.totalTokens)"
+        Record-Test "Chat Task" "passed"
+        $completed = $true
+        break
+      } elseif ($status.status -eq "failed") {
+        Write-TestFail "Task failed: $($status.error)"
+        Record-Test "Chat Task" "failed" $status.error
+        break
+      }
+    } catch {
+      # Ignore polling errors
+    }
+  }
+  
+  if (-not $completed) {
+    Write-TestWarn "Task timeout after ${maxWait}s"
+    Record-Test "Chat Task" "skipped" "Timeout"
+  }
+} catch {
+  Write-TestFail "Submit chat task: $($_.Exception.Message)"
+  Record-Test "Chat Task" "failed" $_.Exception.Message
+}
 
 # ============================================================================
 Write-TestHeader "TEST 4: DIFF TASK"
@@ -215,8 +282,14 @@ try {
       
       if ($status.status -eq "succeeded") {
         Write-TestPass "Diff task completed in ${elapsed}s"
-        $changes = $status.result.diffs | Measure-Object
+        $changes = $status.result.changes
         Write-TestInfo "  Changes detected: $($changes.Count)"
+        if ($changes.Count -gt 0) {
+          Write-Host "`n  Sample changes:" -ForegroundColor DarkCyan
+          $changes | Select-Object -First 2 | ForEach-Object {
+            Write-Host "  - [$($_.type)] $($_.section): $($_.description)" -ForegroundColor Gray
+          }
+        }
         Record-Test "Diff Task" "passed"
         $completed = $true
         break
@@ -256,7 +329,7 @@ try {
     -Method Post -Body ($cloRequest | ConvertTo-Json) `
     -ContentType "application/json" -ErrorAction Stop
   
-  $jobId = $job.job_id
+  $jobId = $job.jobId
   Write-TestPass "Task submitted - Job ID: $jobId"
   
   # Poll for result
@@ -271,14 +344,18 @@ try {
     try {
       $status = Invoke-RestMethod "$ApiBaseUrl/ai/jobs/$jobId" -ErrorAction Stop
       
-      if ($status.status -eq "SUCCEEDED") {
+      if ($status.status -eq "succeeded") {
         Write-TestPass "Suggest CLO task completed in ${elapsed}s"
-        $clos = $status.result.similarCLOs | Measure-Object
+        $clos = $status.result.similarCLOs
         Write-TestInfo "  Similar CLOs found: $($clos.Count)"
+        Write-Host "`n  Sample similar CLOs:" -ForegroundColor DarkCyan
+        $clos | Select-Object -First 2 | ForEach-Object {
+          Write-Host "  - $($_.clo) (Similarity: $($_.similarity))" -ForegroundColor Gray
+        }
         Record-Test "Suggest Similar CLOs" "passed"
         $completed = $true
         break
-      } elseif ($status.status -eq "FAILED") {
+      } elseif ($status.status -eq "failed") {
         Write-TestFail "Task failed: $($status.error)"
         Record-Test "Suggest Similar CLOs" "failed" $status.error
         break

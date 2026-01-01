@@ -5,6 +5,39 @@ spring:
     name: api-gateway
   cloud:
     gateway:
+      routes:
+        - id: auth-service
+          uri: lb://auth-service
+          predicates:
+            - Path=/api/auth/**
+        
+        - id: academic-service
+          uri: lb://academic-service
+          predicates:
+            - Path=/api/academic/**
+        
+        - id: syllabus-service
+          uri: lb://syllabus-service
+          predicates:
+            - Path=/api/syllabus/**
+        
+        - id: workflow-service
+          uri: lb://workflow-service
+          predicates:
+            - Path=/api/workflow/**
+        
+        - id: public-service
+          uri: lb://public-service
+          predicates:
+            - Path=/api/public/**
+        
+        - id: ai-service
+          uri: http://ai-service:8000
+          predicates:
+            - Path=/api/ai/**
+          filters:
+            - RewritePath=/api/ai(?<segment>/?.*), $\{segment}
+      
       default-filters:
         - RemoveRequestHeader=Cookie
       httpclient:
@@ -31,6 +64,7 @@ security:
     secret: smdMicroservicesSecretKeyForJWTTokenGenerationAndValidation2024
     whitelist:
       - /api/auth/**
+      - /api/ai/health
       - /actuator/prometheus
       - /actuator/health
       - /

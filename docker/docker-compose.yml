@@ -307,7 +307,7 @@ services:
   # AI Service (FastAPI + Celery producer)
   ai-service:
     build:
-      context: ./ai-service
+      context: ../backend/ai-service
       dockerfile: Dockerfile
     container_name: ai-service
     ports:
@@ -343,7 +343,7 @@ services:
   # AI Celery Worker
   ai-worker:
     build:
-      context: ./ai-service
+      context: ../backend/ai-service
       dockerfile: Dockerfile
     container_name: ai-worker
     command: ["celery", "-A", "app.workers.celery_app", "worker", "--loglevel=info", "--pool=solo"]
