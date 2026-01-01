@@ -67,11 +67,11 @@ Find {limit} similar CLOs that:
                 {"role": "user", "content": user_prompt}
             ]
             
-            # Call AI
+            # Call AI with reduced tokens for faster response
             response = self.ai_client.chat_completion(
                 messages=messages,
                 temperature=0.7,
-                max_tokens=1500,
+                max_tokens=800,  # Reduced from 1500 for faster response
                 json_mode=True
             )
             

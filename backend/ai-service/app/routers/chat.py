@@ -19,7 +19,18 @@ async def create_chat_task(request: ChatRequest):
     """
     try:
         job_id = str(uuid.uuid4())
+        
+        # Extract message from messages list (fix schema compatibility)
+        messages = request.messages  # Access Pydantic field directly
+        if messages:
+            last_message = messages[-1]  # ChatMessage object
+            user_message = last_message.content  # Access content attribute
+        else:
+            user_message = ""
+        
+        # Build payload dict for worker
         payload = request.dict()
+        payload["message"] = user_message
         
         # Store job and conversation in database
         db = SessionLocal()
@@ -29,20 +40,20 @@ async def create_chat_task(request: ChatRequest):
                 db=db,
                 job_id=job_id,
                 task_type="chat",
-                user_id=payload.get("userId"),
-                syllabus_id=payload.get("syllabusId"),
+                user_id=None,  # Not in ChatRequest schema
+                syllabus_id=request.syllabusId,  # Access directly
                 request_data=payload
             )
             
             # Create or get conversation
-            conversation_id = payload.get("conversationId")
+            conversation_id = request.conversationId
             if conversation_id:
                 # Add message to existing conversation
                 ConversationRepository.add_message(
                     db=db,
                     conversation_id=conversation_id,
                     role="user",
-                    content=payload.get("message")
+                    content=user_message
                 )
             else:
                 # Create new conversation
@@ -50,15 +61,15 @@ async def create_chat_task(request: ChatRequest):
                 ConversationRepository.create_conversation(
                     db=db,
                     conversation_id=conversation_id,
-                    user_id=payload.get("userId"),
-                    syllabus_id=payload.get("syllabusId"),
-                    title=payload.get("message", "Chat")[:50]
+                    user_id=None,  # Allow NULL
+                    syllabus_id=request.syllabusId,
+                    title=user_message[:50] if user_message else "Chat"
                 )
                 ConversationRepository.add_message(
                     db=db,
                     conversation_id=conversation_id,
                     role="user",
-                    content=payload.get("message")
+                    content=user_message
                 )
                 # Update payload with conversation_id
                 payload["conversationId"] = conversation_id
