@@ -73,7 +73,8 @@ public class SyllabusVersionService {
         
         // Verify syllabus exists
         syllabusRepository.findByIdAndIsActiveTrue(syllabusId)
-            .orElseThrow(() -> new RuntimeException("Syllabus not found with id: " + syllabusId));
+            .orElseThrow(() -> new com.smd.academic_service.exception.ResourceNotFoundException(
+                "Syllabus not found with id: " + syllabusId));
         
         return syllabusAuditRepository.findBySyllabusIdOrderByVersionNumberDesc(syllabusId)
             .stream()
@@ -89,7 +90,8 @@ public class SyllabusVersionService {
         log.debug("Fetching version {} for syllabus id: {}", versionNumber, syllabusId);
         
         SyllabusAudit audit = syllabusAuditRepository.findBySyllabusIdAndVersionNumber(syllabusId, versionNumber)
-            .orElseThrow(() -> new RuntimeException("Version not found - Syllabus: " + syllabusId + ", Version: " + versionNumber));
+            .orElseThrow(() -> new com.smd.academic_service.exception.ResourceNotFoundException(
+                "Version not found - Syllabus: " + syllabusId + ", Version: " + versionNumber));
         
         return mapToVersionDto(audit);
     }
@@ -102,7 +104,8 @@ public class SyllabusVersionService {
         log.debug("Fetching latest version for syllabus id: {}", syllabusId);
         
         SyllabusAudit audit = syllabusAuditRepository.findLatestAuditBySyllabusId(syllabusId)
-            .orElseThrow(() -> new RuntimeException("No version history found for syllabus: " + syllabusId));
+            .orElseThrow(() -> new com.smd.academic_service.exception.ResourceNotFoundException(
+                "No version history found for syllabus: " + syllabusId));
         
         return mapToVersionDto(audit);
     }
@@ -116,14 +119,17 @@ public class SyllabusVersionService {
         
         // Verify syllabus exists
         Syllabus syllabus = syllabusRepository.findByIdAndIsActiveTrue(syllabusId)
-            .orElseThrow(() -> new RuntimeException("Syllabus not found with id: " + syllabusId));
+            .orElseThrow(() -> new com.smd.academic_service.exception.ResourceNotFoundException(
+                "Syllabus not found with id: " + syllabusId));
         
         // Get both versions
         SyllabusAudit audit1 = syllabusAuditRepository.findBySyllabusIdAndVersionNumber(syllabusId, version1)
-            .orElseThrow(() -> new RuntimeException("Version " + version1 + " not found"));
+            .orElseThrow(() -> new com.smd.academic_service.exception.ResourceNotFoundException(
+                "Version " + version1 + " not found"));
         
         SyllabusAudit audit2 = syllabusAuditRepository.findBySyllabusIdAndVersionNumber(syllabusId, version2)
-            .orElseThrow(() -> new RuntimeException("Version " + version2 + " not found"));
+            .orElseThrow(() -> new com.smd.academic_service.exception.ResourceNotFoundException(
+                "Version " + version2 + " not found"));
         
         // Ensure version1 < version2 for comparison
         if (version1 > version2) {

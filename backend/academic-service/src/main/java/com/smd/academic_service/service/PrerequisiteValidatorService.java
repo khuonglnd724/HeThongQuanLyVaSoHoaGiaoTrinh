@@ -32,7 +32,8 @@ public class PrerequisiteValidatorService {
         log.info("Validating prerequisites for subject id: {}", subjectId);
         
         Subject subject = subjectRepository.findByIdAndIsActiveTrue(subjectId)
-            .orElseThrow(() -> new RuntimeException("Subject not found with id: " + subjectId));
+            .orElseThrow(() -> new com.smd.academic_service.exception.ResourceNotFoundException(
+                "Subject not found with id: " + subjectId));
         
         PrerequisiteValidationResult result = PrerequisiteValidationResult.builder()
             .subjectId(subject.getId())
