@@ -13,8 +13,50 @@ import org.springframework.web.context.request.WebRequest;
 @Slf4j
 public class GlobalExceptionHandler {
     
-    @ExceptionHandler(MethodArgumentNotValidException.class)
+    @ExceptionHandler(ResourceNotFoundException.class)
+    public ResponseEntity<ApiResponse<Object>> handleResourceNotFoundException(
+        ResourceNotFoundException ex,
+        WebRequest request) {
+        log.error("Resource not found: {}", ex.getMessage());
+        
+        ApiResponse<Object> response = ApiResponse.error(
+            ex.getMessage(),
+            "RESOURCE_NOT_FOUND"
+        );
+        
+        return new ResponseEntity<>(response, HttpStatus.NOT_FOUND);
+    }
+    
+    @ExceptionHandler(ValidationException.class)
     public ResponseEntity<ApiResponse<Object>> handleValidationException(
+        ValidationException ex,
+        WebRequest request) {
+        log.warn("Validation failed: {}", ex.getMessage());
+        
+        ApiResponse<Object> response = ApiResponse.error(
+            ex.getMessage(),
+            "VALIDATION_ERROR"
+        );
+        
+        return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
+    }
+    
+    @ExceptionHandler(BusinessException.class)
+    public ResponseEntity<ApiResponse<Object>> handleBusinessException(
+        BusinessException ex,
+        WebRequest request) {
+        log.error("Business rule violation: {}", ex.getMessage());
+        
+        ApiResponse<Object> response = ApiResponse.error(
+            ex.getMessage(),
+            ex.getErrorCode()
+        );
+        
+        return new ResponseEntity<>(response, HttpStatus.UNPROCESSABLE_ENTITY);
+    }
+    
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<ApiResponse<Object>> handleMethodArgumentNotValidException(
         MethodArgumentNotValidException ex,
         WebRequest request) {
         String message = ex.getBindingResult().getFieldErrors()
@@ -23,39 +65,11 @@ public class GlobalExceptionHandler {
             .reduce((a, b) -> a + ", " + b)
             .orElse("Validation failed");
         
-        log.warn("Validation error: {}", message);
+        log.warn("Method argument validation error: {}", message);
         
         ApiResponse<Object> response = ApiResponse.error(
             message,
             "VALIDATION_ERROR"
-        );
-        
-        return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
-    }
-    
-    @ExceptionHandler(RuntimeException.class)
-    public ResponseEntity<ApiResponse<Object>> handleRuntimeException(
-        RuntimeException ex,
-        WebRequest request) {
-        log.error("RuntimeException: {}", ex.getMessage(), ex);
-        
-        ApiResponse<Object> response = ApiResponse.error(
-            ex.getMessage() != null ? ex.getMessage() : "An error occurred",
-            "RUNTIME_ERROR"
-        );
-        
-        return new ResponseEntity<>(response, HttpStatus.INTERNAL_SERVER_ERROR);
-    }
-    
-    @ExceptionHandler(IllegalArgumentException.class)
-    public ResponseEntity<ApiResponse<Object>> handleIllegalArgumentException(
-        IllegalArgumentException ex,
-        WebRequest request) {
-        log.error("IllegalArgumentException: {}", ex.getMessage(), ex);
-        
-        ApiResponse<Object> response = ApiResponse.error(
-            ex.getMessage() != null ? ex.getMessage() : "Invalid argument",
-            "INVALID_ARGUMENT"
         );
         
         return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);

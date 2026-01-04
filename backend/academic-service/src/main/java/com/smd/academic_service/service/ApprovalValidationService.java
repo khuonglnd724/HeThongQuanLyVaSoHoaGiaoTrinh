@@ -49,7 +49,8 @@ public class ApprovalValidationService {
         log.info("Validating syllabus for approval: {}", syllabusId);
         
         Syllabus syllabus = syllabusRepository.findByIdAndIsActiveTrue(syllabusId)
-            .orElseThrow(() -> new RuntimeException("Syllabus not found with id: " + syllabusId));
+            .orElseThrow(() -> new com.smd.academic_service.exception.ResourceNotFoundException(
+                "Syllabus not found with id: " + syllabusId));
         
         ApprovalValidationResult result = ApprovalValidationResult.builder()
             .syllabusId(syllabus.getId())
