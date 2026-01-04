@@ -23,6 +23,8 @@ public interface SubjectRepository extends JpaRepository<Subject, Long> {
     
     Optional<Subject> findBySubjectCodeAndProgramId(String subjectCode, Long programId);
     
+    Optional<Subject> findBySubjectCodeAndIsActiveTrue(String subjectCode);
+    
     List<Subject> findBySubjectCodeContainingIgnoreCase(String subjectCode);
     
     Long countByProgramIdAndIsActiveTrue(Long programId);
