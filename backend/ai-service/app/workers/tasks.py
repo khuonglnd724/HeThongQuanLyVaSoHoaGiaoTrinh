@@ -46,11 +46,12 @@ def publish_completion_event(job_id: str, task_type: str, status: str, user_id: 
             "error": error,
             "timestamp": time.time()
         }
+        # Send and flush but do NOT close - producer is singleton
         producer.send(settings.KAFKA_TOPIC_AI_EVENTS, value=event)
         producer.flush()
-        producer.close()
+        logger.debug(f"Published event for job {job_id}")
     except Exception as e:
-        print(f"Failed to publish event: {e}")
+        logger.error(f"Failed to publish event: {e}")
 
 def update_job_in_db(job_id: str, status: AIJobStatus, progress: int = None, result: dict = None, error: str = None):
     """Update job status in database with proper session management and transaction control"""
@@ -117,7 +118,12 @@ def suggest_task(self, payload: dict, job_id: str):
         update_job_in_db(job_id, AIJobStatus.RUNNING, progress=70)
         self.update_state(state='PROGRESS', meta={'progress': 70})
         
-        suggestions_data = json.loads(ai_response["content"])
+        try:
+            suggestions_data = json.loads(ai_response["content"])
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to parse AI response as JSON: {e}")
+            raise ValueError(f"AI returned invalid JSON: {ai_response['content'][:100]}")
+        
         suggestions = suggestions_data.get("suggestions", [])
         
         # Filter duplicate CLOs using RAG if syllabus_id provided
@@ -129,14 +135,17 @@ def suggest_task(self, payload: dict, job_id: str):
                 
                 filtered_suggestions = []
                 for suggestion in suggestions:
-                    clo_text = suggestion.get("clo", "")
+                    clo_text = suggestion.get("text", "")  # AI returns 'text' not 'clo'
+                    if not clo_text:
+                        filtered_suggestions.append(suggestion)
+                        continue
                     
                     # Search for similar CLOs in existing syllabus
                     try:
                         similar = vector_store.search(
                             collection_name=collection_name,
                             query=clo_text,
-                            limit=1
+                            top_k=1
                         )
                         
                         # If similarity score > 0.8, it's a duplicate - skip it
@@ -153,14 +162,15 @@ def suggest_task(self, payload: dict, job_id: str):
                 logger.warning(f"RAG duplicate check failed: {e}, using all suggestions")
                 filtered_suggestions = suggestions
         
-        # Build result
+        # Build result with safe access
+        usage_data = ai_response.get("usage", {})
         result = {
             "jobId": job_id,
             "suggestions": filtered_suggestions,
             "summary": suggestions_data.get("summary", ""),
             "duplicateCheckEnabled": bool(syllabus_id),
-            "tokens": ai_response["usage"]["total_tokens"],
-            "model": ai_response["model"]
+            "tokens": usage_data.get("total_tokens", 0),
+            "model": ai_response.get("model", "unknown")
         }
         
         # Update DB status: SUCCEEDED with result
@@ -221,7 +231,7 @@ def chat_task(self, payload: dict, job_id: str):
                 search_results = vector_store.search(
                     collection_name=collection_name,
                     query=message,
-                    limit=3
+                    top_k=3
                 )
                 
                 if search_results:
@@ -234,16 +244,36 @@ def chat_task(self, payload: dict, job_id: str):
                 logger.warning(f"RAG search failed for {syllabus_id}: {e}")
                 rag_context = ""
         
-        # Get chat history from DB
+        # Ensure conversation exists and save user message
         update_job_in_db(job_id, AIJobStatus.RUNNING, progress=30)
         self.update_state(state='PROGRESS', meta={'progress': 30})
-        
+
         db = SessionLocal()
         try:
+            conv = ConversationRepository.get_conversation(db, conversation_id)
+            if not conv:
+                # Generate title from message if not provided
+                title = payload.get("title") or f"{message[:50]}..."
+                ConversationRepository.create_conversation(
+                    db=db,
+                    conversation_id=conversation_id,
+                    user_id=user_id,
+                    syllabus_id=syllabus_id,
+                    title=title
+                )
+            # Store incoming user message for history
+            ConversationRepository.add_message(
+                db=db,
+                conversation_id=conversation_id,
+                role="user",
+                content=message
+            )
+
             messages_history = ConversationRepository.get_conversation_messages(db, conversation_id)
+            # Take last 4 previous messages (last 5 excluding current message)
             chat_history = [
                 {"role": msg.role, "content": msg.content}
-                for msg in messages_history[-5:]  # Last 5 messages
+                for msg in messages_history[:-1][-4:]  # Exclude last (current) message, take last 4
             ]
         finally:
             db.close()
@@ -278,7 +308,8 @@ def chat_task(self, payload: dict, job_id: str):
             chapters = re.findall(r'Chapter \d+', answer_content)
             citations = list(set(sections + chapters))
         
-        # Build result
+        # Build result with safe access to usage data
+        usage_data = ai_response.get("usage", {})
         result = {
             "jobId": job_id,
             "conversationId": conversation_id,
@@ -288,11 +319,11 @@ def chat_task(self, payload: dict, job_id: str):
                 "ragUsed": bool(rag_context)
             },
             "usage": {
-                "promptTokens": ai_response["usage"]["prompt_tokens"],
-                "completionTokens": ai_response["usage"]["completion_tokens"],
-                "totalTokens": ai_response["usage"]["total_tokens"]
+                "promptTokens": usage_data.get("prompt_tokens", 0),
+                "completionTokens": usage_data.get("completion_tokens", 0),
+                "totalTokens": usage_data.get("total_tokens", 0)
             },
-            "model": ai_response["model"]
+            "model": ai_response.get("model", "unknown")
         }
         
         # Update progress
@@ -371,7 +402,7 @@ def diff_task(self, payload: dict, job_id: str):
                 search_results = vector_store.search(
                     collection_name=collection_name,
                     query=changes_text,
-                    limit=2
+                    top_k=2
                 )
                 
                 if search_results:
@@ -414,17 +445,22 @@ def diff_task(self, payload: dict, job_id: str):
         update_job_in_db(job_id, AIJobStatus.RUNNING, progress=85)
         self.update_state(state='PROGRESS', meta={'progress': 85})
         
-        diff_data = json.loads(ai_response["content"])
+        try:
+            diff_data = json.loads(ai_response["content"])
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to parse diff response as JSON: {e}")
+            raise ValueError(f"AI returned invalid JSON for diff: {ai_response['content'][:100]}")
         
-        # Build result
+        # Build result with safe access
+        usage_data = ai_response.get("usage", {})
         result = {
             "jobId": job_id,
             "diffs": diff_data.get("diffs", []),
             "summary": diff_data.get("summary", ""),
             "impactLevel": diff_data.get("impactLevel", "medium"),
             "ragContextUsed": bool(rag_context),
-            "tokens": ai_response["usage"]["total_tokens"],
-            "model": ai_response["model"]
+            "tokens": usage_data.get("total_tokens", 0),
+            "model": ai_response.get("model", "unknown")
         }
         
         # Update DB status: SUCCEEDED
@@ -500,16 +536,21 @@ def clo_check_task(self, payload: dict, job_id: str):
         update_job_in_db(job_id, AIJobStatus.RUNNING, progress=85)
         self.update_state(state='PROGRESS', meta={'progress': 85})
         
-        check_data = json.loads(ai_response["content"])
+        try:
+            check_data = json.loads(ai_response["content"])
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to parse CLO check response as JSON: {e}")
+            raise ValueError(f"AI returned invalid JSON for CLO check: {ai_response['content'][:100]}")
         
-        # Build result
+        # Build result with safe access
+        usage_data = ai_response.get("usage", {})
         result = {
             "jobId": job_id,
             "report": check_data.get("report", {}),
             "score": check_data.get("score", 0.0),
             "summary": check_data.get("summary", ""),
-            "tokens": ai_response["usage"]["total_tokens"],
-            "model": ai_response["model"]
+            "tokens": usage_data.get("total_tokens", 0),
+            "model": ai_response.get("model", "unknown")
         }
         
         # Update DB status: SUCCEEDED
@@ -584,9 +625,14 @@ def summary_task(self, payload: dict, job_id: str):
         update_job_in_db(job_id, AIJobStatus.RUNNING, progress=90)
         self.update_state(state='PROGRESS', meta={'progress': 90})
         
-        summary_data = json.loads(ai_response["content"])
+        try:
+            summary_data = json.loads(ai_response["content"])
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to parse summary response as JSON: {e}")
+            raise ValueError(f"AI returned invalid JSON for summary: {ai_response['content'][:100]}")
         
-        # Build result
+        # Build result with safe access
+        usage_data = ai_response.get("usage", {})
         result = {
             "jobId": job_id,
             "summary": summary_data.get("summary", ""),
@@ -594,8 +640,8 @@ def summary_task(self, payload: dict, job_id: str):
             "keywords": summary_data.get("keywords", []),
             "targetAudience": summary_data.get("targetAudience", ""),
             "prerequisites": summary_data.get("prerequisites", ""),
-            "tokens": ai_response["usage"]["total_tokens"],
-            "model": ai_response["model"]
+            "tokens": usage_data.get("total_tokens", 0),
+            "model": ai_response.get("model", "unknown")
         }
         
         # Update DB status: SUCCEEDED

@@ -10,14 +10,14 @@ class ConversationRepository:
     def create_conversation(
         db: Session,
         conversation_id: str,
-        user_id: str,
+        user_id: str = None,
         syllabus_id: str = None,
         title: str = None
     ) -> AIConversation:
         """Create a new conversation"""
         conversation = AIConversation(
             conversation_id=conversation_id,
-            user_id=user_id,
+            user_id=user_id,  # Allow NULL for anonymous chats
             syllabus_id=syllabus_id,
             title=title,
             created_at=datetime.utcnow()
@@ -35,11 +35,15 @@ class ConversationRepository:
             .first()
     
     @staticmethod
-    def get_user_conversations(db: Session, user_id: str, limit: int = 50) -> list:
-        """Get all conversations for a user"""
-        return db.query(AIConversation)\
-            .filter(AIConversation.user_id == user_id)\
-            .order_by(AIConversation.updated_at.desc())\
+    def get_user_conversations(db: Session, user_id: str = None, limit: int = 50) -> list:
+        """Get all conversations for a user (or anonymous if user_id is None)"""
+        query = db.query(AIConversation)
+        if user_id:
+            query = query.filter(AIConversation.user_id == user_id)
+        else:
+            query = query.filter(AIConversation.user_id.is_(None))
+        
+        return query.order_by(AIConversation.updated_at.desc())\
             .limit(limit)\
             .all()
     

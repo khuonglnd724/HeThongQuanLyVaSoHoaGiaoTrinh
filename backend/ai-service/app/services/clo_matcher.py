@@ -1,5 +1,6 @@
 """CLO Similarity Matching Service with RAG"""
 import logging
+import os
 from typing import List, Dict, Any, Optional
 from app.services.ai_client import AIClient
 from app.services.rag_service import VectorStore
@@ -47,7 +48,7 @@ class CLOMatcher:
                         results = self.vector_store.search(
                             collection_name=collection_name,
                             query=current_clo,
-                            limit=limit
+                            top_k=limit
                         )
                         
                         for result in results:
@@ -72,7 +73,7 @@ class CLOMatcher:
                             results = self.vector_store.search(
                                 collection_name=collection,
                                 query=current_clo,
-                                limit=2  # Fewer per collection when searching all
+                                top_k=2  # Fewer per collection when searching all
                             )
                             
                             for result in results:
@@ -142,14 +143,25 @@ Consider:
                     # Merge AI scores with RAG results
                     final_results = []
                     for ai_result in ranked_data.get('rankedCLOs', [])[:limit]:
-                        # Find matching RAG result
-                        matching_rag = next(
-                            (rag for rag in similar_clos if rag['clo'].startswith(ai_result['clo'][:50])),
-                            None
-                        )
+                        # Find matching RAG result by similarity (not string matching)
+                        # Use levenshtein-like approach: find closest match
+                        ai_clo = ai_result['clo']
+                        matching_rag = None
+                        
+                        if similar_clos:
+                            # Find RAG result with text closest to AI result
+                            min_distance = float('inf')
+                            for rag in similar_clos:
+                                # Simple similarity: common prefix length
+                                common_len = len(os.path.commonprefix([ai_clo, rag['clo']]))
+                                if common_len > len(ai_clo) * 0.3:  # At least 30% match
+                                    distance = abs(len(ai_clo) - len(rag['clo']))
+                                    if distance < min_distance:
+                                        min_distance = distance
+                                        matching_rag = rag
                         
                         final_results.append({
-                            "clo": ai_result['clo'],
+                            "clo": ai_clo,
                             "similarity": ai_result.get('similarity', 0.5),
                             "reasoning": ai_result.get('reasoning', ''),
                             "subject": matching_rag.get('subject') if matching_rag else 'Unknown',
@@ -232,43 +244,6 @@ Generate {limit} similar CLOs that:
         
         except Exception as e:
             logger.error(f"AI generation failed: {e}")
-            return []
-                user_prompt += f"\n- Are at level: {level}"
-            
-            user_prompt += "\n\nGenerate realistic, diverse CLO examples."
-            
-            messages = [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt}
-            ]
-            
-            # Call AI with reduced tokens for faster response
-            response = self.ai_client.chat_completion(
-                messages=messages,
-                temperature=0.7,
-                max_tokens=800,  # Reduced from 1500 for faster response
-                json_mode=True
-            )
-            
-            # Parse response
-            import json
-            result = json.loads(response["content"])
-            
-            similar_clos = []
-            for idx, item in enumerate(result.get("similarCLOs", [])[:limit]):
-                similar_clos.append({
-                    "clo": item.get("clo", ""),
-                    "subject": item.get("subject", "Related Course"),
-                    "syllabusId": f"SYL-{2024}-{idx+1:03d}",  # Mock ID
-                    "similarity": item.get("similarity", 0.85),
-                    "context": item.get("reasoning", "")
-                })
-            
-            return similar_clos
-            
-        except Exception as e:
-            logger.error(f"CLO matching error: {e}")
-            # Return fallback similar CLOs
             return self._get_fallback_clos(current_clo, limit)
     
     def _get_fallback_clos(self, current_clo: str, limit: int) -> List[Dict[str, Any]]:

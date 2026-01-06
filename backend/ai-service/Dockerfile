@@ -11,7 +11,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Copy and install requirements to --user directory
 COPY requirements.txt .
-RUN pip install --user --no-cache-dir -r requirements.txt
+
+# Use CPU-only PyTorch wheels to avoid huge CUDA/CUDNN downloads
+ENV PIP_EXTRA_INDEX_URL=https://download.pytorch.org/whl/cpu
+
+# Pre-install torch CPU, then remaining deps
+RUN pip install --user --no-cache-dir torch==2.1.2+cpu --extra-index-url https://download.pytorch.org/whl/cpu \
+ && pip install --user --no-cache-dir -r requirements.txt
 
 # Stage 2: Runtime (minimal)
 FROM python:3.11-slim

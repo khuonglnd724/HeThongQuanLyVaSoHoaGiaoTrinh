@@ -135,7 +135,7 @@ class VectorStore:
                 for i, doc in enumerate(results['documents'][0]):
                     formatted_results.append({
                         "id": results['ids'][0][i] if results['ids'] else None,
-                        "content": doc,
+                        "document": doc,
                         "metadata": results['metadatas'][0][i] if results['metadatas'] else {},
                         "distance": results['distances'][0][i] if results['distances'] else None
                     })
@@ -168,7 +168,16 @@ class VectorStore:
         """
         try:
             collections = self.client.list_collections()
-            return [c.name for c in collections]
+            # collections is a list of Collection objects with .name attribute
+            names = []
+            for c in collections:
+                if hasattr(c, 'name'):
+                    names.append(c.name)
+                elif isinstance(c, dict) and 'name' in c:
+                    names.append(c['name'])
+                else:
+                    names.append(str(c))
+            return names
         except Exception as e:
             logger.error(f"Error listing collections: {e}")
             return []
