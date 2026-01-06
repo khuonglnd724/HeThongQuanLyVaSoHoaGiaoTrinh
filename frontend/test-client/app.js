@@ -104,6 +104,66 @@ async function doIngest() {
   log(res);
 }
 
+async function doSearch() {
+  const syllabusId = document.getElementById('searchSyllabus').value.trim();
+  const query = document.getElementById('searchQuery').value.trim();
+  
+  if (!syllabusId || !query) return log('Enter syllabusId and query');
+  
+  log('Searching documents...');
+  const data = await api('GET', `/ai/documents/search?syllabus_id=${encodeURIComponent(syllabusId)}&query=${encodeURIComponent(query)}`);
+  log(data);
+}
+
+async function doSummary() {
+  const payload = {
+    content: document.getElementById('summaryContent').value,
+    length: document.getElementById('summaryLength').value,
+  };
+  const syllabusId = document.getElementById('summarySyllabus').value.trim();
+  if (syllabusId) payload.syllabusId = syllabusId;
+  log('Submitting summary job...');
+  const job = await api('POST', '/ai/summary', payload);
+  log(job);
+}
+
+async function doCloCheck() {
+  const cloText = document.getElementById('cloCheckClos').value.trim();
+  const ploText = document.getElementById('cloCheckPlos').value.trim();
+  const clos = cloText.split('\n').map(s => s.trim()).filter(s => s);
+  const plos = ploText.split('\n').map(s => s.trim()).filter(s => s);
+  
+  if (!clos.length || !plos.length) return log('Enter CLOs and PLOs');
+  
+  const payload = {
+    clos,
+    plos,
+  };
+  const syllabusId = document.getElementById('cloCheckSyllabus').value.trim();
+  if (syllabusId) payload.syllabusId = syllabusId;
+  log('Submitting CLO check job...');
+  const job = await api('POST', '/ai/clo-check', payload);
+  log(job);
+}
+
+async function doSimilarClo() {
+  const currentClo = document.getElementById('similarClo').value.trim();
+  if (!currentClo) return log('Enter current CLO');
+  
+  const payload = {
+    currentCLO: currentClo,
+    limit: parseInt(document.getElementById('similarLimit').value) || 5,
+  };
+  const subject = document.getElementById('similarSubject').value.trim();
+  if (subject) payload.subjectArea = subject;
+  const level = document.getElementById('similarLevel').value.trim();
+  if (level) payload.level = level;
+  
+  log('Submitting similar CLO search...');
+  const job = await api('POST', '/ai/suggest-similar-clos', payload);
+  log(job);
+}
+
 // Wire buttons
 function bind(id, fn) {
   document.getElementById(id).addEventListener('click', async () => {
@@ -119,6 +179,10 @@ bind('btnHealth', doHealth);
 bind('btnSuggest', doSuggest);
 bind('btnChat', doChat);
 bind('btnDiff', doDiff);
+bind('btnSummary', doSummary);
+bind('btnCloCheck', doCloCheck);
+bind('btnSimilarClo', doSimilarClo);
+bind('btnSearch', doSearch);
 bind('btnJob', doJob);
 bind('btnIngest', doIngest);
 

@@ -35,6 +35,15 @@
     </section>
 
     <section>
+      <h2>Search Documents (RAG)</h2>
+      <label>Syllabus ID</label>
+      <input id="searchSyllabus" type="text" placeholder="syll-101" />
+      <label>Query</label>
+      <input id="searchQuery" type="text" placeholder="What are the topics..." />
+      <button id="btnSearch">Search /ai/documents/search</button>
+    </section>
+
+    <section>
       <h2>2) Suggest CLO</h2>
       <label>Syllabus ID (optional for dedup)</label>
       <input id="suggestSyllabus" type="text" placeholder="syll-101" />
@@ -75,6 +84,51 @@
         </div>
       </div>
       <button id="btnDiff">Submit /ai/diff</button>
+    </section>
+
+    <section>
+      <h2>5) Summary</h2>
+      <label>Syllabus ID (optional)</label>
+      <input id="summarySyllabus" type="text" placeholder="syll-101" />
+      <label>Content</label>
+      <textarea id="summaryContent" rows="4" placeholder="Syllabus content to summarize..."></textarea>
+      <label>Length</label>
+      <select id="summaryLength">
+        <option value="short">Short</option>
+        <option value="medium" selected>Medium</option>
+        <option value="long">Long</option>
+      </select>
+      <button id="btnSummary">Submit /ai/summary</button>
+    </section>
+
+    <section>
+      <h2>6) CLO-PLO Check</h2>
+      <label>Syllabus ID (optional)</label>
+      <input id="cloCheckSyllabus" type="text" placeholder="syll-101" />
+      <div class="split">
+        <div>
+          <label>CLOs (one per line)</label>
+          <textarea id="cloCheckClos" rows="3" placeholder="CLO 1&#10;CLO 2&#10;CLO 3"></textarea>
+        </div>
+        <div>
+          <label>PLOs (one per line)</label>
+          <textarea id="cloCheckPlos" rows="3" placeholder="PLO 1&#10;PLO 2"></textarea>
+        </div>
+      </div>
+      <button id="btnCloCheck">Submit /ai/clo-check</button>
+    </section>
+
+    <section>
+      <h2>7) Suggest Similar CLOs</h2>
+      <label>Current CLO</label>
+      <input id="similarClo" type="text" placeholder="Students can analyze data using Python" />
+      <label>Subject Area (optional)</label>
+      <input id="similarSubject" type="text" placeholder="Data Science" />
+      <label>Bloom's Level (optional)</label>
+      <input id="similarLevel" type="text" placeholder="Level 4" />
+      <label>Limit</label>
+      <input id="similarLimit" type="number" value="5" min="1" max="20" />
+      <button id="btnSimilarClo">Submit /ai/suggest-similar-clos</button>
     </section>
 
     <section>
