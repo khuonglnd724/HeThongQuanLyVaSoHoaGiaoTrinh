@@ -54,10 +54,10 @@ async def ingest_document(
             raise HTTPException(status_code=400, detail="syllabus_id is required")
         
         # Validate file type
-        if not file.filename.endswith(('.pdf', '.docx', '.doc')):
+        if not file.filename.endswith(('.pdf', '.docx', '.doc', '.txt')):
             raise HTTPException(
                 status_code=400,
-                detail="File must be PDF or DOCX format"
+                detail="File must be PDF, DOCX or TXT format"
             )
         
         logger.info(f"Ingesting document: {syllabus_id} from {file.filename}")
@@ -71,6 +71,8 @@ async def ingest_document(
         # Extract text from document
         if file.filename.endswith('.pdf'):
             extraction = DocumentProcessor.extract_from_pdf(temp_path)
+        elif file.filename.endswith('.txt'):
+            extraction = DocumentProcessor.extract_from_txt(temp_path)
         else:
             extraction = DocumentProcessor.extract_from_docx(temp_path)
         
@@ -148,7 +150,7 @@ async def search_documents(
         results = vector_store.search(
             collection_name=collection_name,
             query=query,
-            limit=limit
+            top_k=limit
         )
         
         return {

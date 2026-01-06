@@ -57,14 +57,14 @@ function Test-Endpoint {
         
         $response = Invoke-RestMethod @params -ErrorAction Stop
         
-        Write-Host "✅ PASSED" @Green
+            Write-Host "[OK] PASSED" @Green
         Write-Host "Response: $($response | ConvertTo-Json -Depth 2)" -ForegroundColor Green
         
         $script:passed++
         return $response
     }
     catch {
-        Write-Host "❌ FAILED" @Red
+            Write-Host "[FAIL] FAILED" @Red
         Write-Host "Error: $_" -ForegroundColor Red
         $script:failed++
         return $null
@@ -102,42 +102,30 @@ COURSE LEARNING OUTCOMES:
 7. Students can select appropriate algorithms for different problem types
 
 COURSE CONTENT:
-- Introduction to Machine Learning
   - Supervised vs Unsupervised Learning
   - Training and Test Sets
   - Overfitting and Underfitting
 
-- Linear Regression
   - Simple Linear Regression
   - Multiple Linear Regression
   - Regularization Techniques
 
-- Classification Methods
   - Logistic Regression
   - Decision Trees
   - Random Forests
   - Support Vector Machines
 
-- Unsupervised Learning
   - K-Means Clustering
   - Hierarchical Clustering
   - Principal Component Analysis
 
-- Evaluation Metrics
   - Accuracy, Precision, Recall, F1-Score
   - Confusion Matrix
   - ROC Curves and AUC
 
 PREREQUISITES:
-- Python Programming (CS-101)
-- Linear Algebra Basics
-- Statistics Fundamentals
 
 GRADING:
-- Participation: 10%
-- Assignments: 30%
-- Midterm Exam: 25%
-- Final Project: 35%
 "@
 
 Set-Content -Path $testDocPath -Value $syllabusContent -Encoding UTF8
@@ -156,12 +144,12 @@ if (Test-Path $testDocPath) {
         }
         
         $response = Invoke-RestMethod -Uri $url -Method Post -Form $form -ErrorAction Stop
-        Write-Host "✅ PASSED" @Green
+            Write-Host "[OK] PASSED" @Green
         Write-Host "Response: $($response | ConvertTo-Json)" @Green
         $script:passed++
     }
     catch {
-        Write-Host "⚠️  INGEST SKIPPED (file upload not supported in this context)" @Yellow
+            Write-Host "[SKIP] INGEST SKIPPED (file upload not supported in this context)" @Yellow
         Write-Host "In production, upload PDF/DOCX files via:"
         Write-Host "  curl -F 'file=@syllabus.pdf' -F 'syllabus_id=syll-123' http://localhost:8000/ai/documents/ingest"
     }
@@ -169,7 +157,7 @@ if (Test-Path $testDocPath) {
 
 # 3. List collections
 Write-Host "`n========== 3. LIST COLLECTIONS ==========" @Blue
-$collections = Test-Endpoint "List Collections" "GET" "/ai/documents/collections"
+Test-Endpoint "List Collections" "GET" "/ai/documents/collections" | Out-Null
 
 # 4. Test RAG-aware Chat
 Write-Host "`n========== 4. RAG-AWARE CHAT ==========" @Blue
@@ -230,18 +218,11 @@ if ($suggestResponse) {
 
 # 6. Test Suggest Similar CLOs
 Write-Host "`n========== 6. SUGGEST SIMILAR CLOs (RAG-POWERED) ==========" @Blue
-$similarRequest = @{
-    currentClo   = "Students can implement machine learning algorithms using Python"
-    subjectArea  = "Machine Learning"
-    level        = "Bloom's Level 3"
-    syllabusIds  = @("test-rag-2024")
-    limit        = 3
-}
 
 Write-Host "`n[TEST] Suggest Similar CLOs (via CLO Matcher)..." -ForegroundColor Cyan
 try {
     # Note: This would be called internally, but we can test via a direct call if endpoint exists
-    Write-Host "⚠️  Suggest Similar CLOs would be tested via /ai/suggest-similar-clos endpoint" @Yellow
+        Write-Host "[SKIP] Suggest Similar CLOs would be tested via /ai/suggest-similar-clos endpoint" @Yellow
     Write-Host "This endpoint uses RAG to find actual similar CLOs from database" @Yellow
 }
 catch {
@@ -252,15 +233,15 @@ catch {
 Write-Host "`n========================================" @Blue
 Write-Host "TEST RESULTS" @Blue
 Write-Host "========================================" @Blue
-Write-Host "✅ Passed: $passed" @Green
-Write-Host "❌ Failed: $failed" @Red
+    Write-Host "[OK] Passed: $passed" @Green
+    Write-Host "[FAIL] Failed: $failed" @Red
 Write-Host "Total: $($passed + $failed)" @Cyan
 
 if ($failed -eq 0) {
-    Write-Host "`n✅ ALL TESTS PASSED!" @Green
+        Write-Host "`n[OK] ALL TESTS PASSED!" @Green
 }
 else {
-    Write-Host "`n⚠️  Some tests failed. Check errors above." @Yellow
+        Write-Host "`n[WARN] Some tests failed. Check errors above." @Yellow
 }
 
 # Cleanup

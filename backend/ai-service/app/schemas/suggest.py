@@ -1,8 +1,8 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional, List
 
 class SuggestRequest(BaseModel):
-    syllabusId: str
+    syllabusId: str = Field(..., min_length=1, description="Syllabus ID")
     section: Optional[str] = None
     textDraft: Optional[str] = None
     requestId: Optional[str] = None

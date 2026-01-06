@@ -1,10 +1,18 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional, List
 
+
 class DiffRequest(BaseModel):
-    syllabusId: str
-    baseVersionId: str
-    targetVersionId: str
+    # Optional syllabus for RAG context
+    syllabusId: Optional[str] = None
+
+    # Freeform content diff (used by current worker/tasks)
+    oldContent: str = Field(..., min_length=1, description="Old content to compare")
+    newContent: str = Field(..., min_length=1, description="New content to compare")
+
+    # Optional metadata fields (kept for compatibility/future use)
+    baseVersionId: Optional[str] = None
+    targetVersionId: Optional[str] = None
     sections: Optional[List[str]] = None
 
 class DiffItem(BaseModel):

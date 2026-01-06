@@ -104,19 +104,35 @@ class KafkaEventConsumer:
             db.close()
         
         # Send to WebSocket client
-        import asyncio
         try:
-            asyncio.run(manager.broadcast_to_user(
-                user_id=user_id,
-                message={
-                    "type": "notification",
-                    "jobId": job_id,
-                    "taskType": task_type,
-                    "status": status,
-                    "title": title,
-                    "message": message
-                }
-            ))
+            # Use threading to avoid asyncio.run() in sync context
+            import threading
+            def send_notification():
+                import asyncio
+                try:
+                    # Create event loop if needed
+                    try:
+                        loop = asyncio.get_event_loop()
+                    except RuntimeError:
+                        loop = asyncio.new_event_loop()
+                        asyncio.set_event_loop(loop)
+                    
+                    loop.run_until_complete(manager.broadcast_to_user(
+                        user_id=user_id,
+                        message={
+                            "type": "notification",
+                            "jobId": job_id,
+                            "taskType": task_type,
+                            "status": status,
+                            "title": title,
+                            "message": message
+                        }
+                    ))
+                except Exception as e:
+                    logger.error(f"Error in WebSocket broadcast thread: {e}")
+            
+            thread = threading.Thread(target=send_notification, daemon=True)
+            thread.start()
         except Exception as e:
             logger.error(f"Error sending WebSocket notification: {e}")
     
