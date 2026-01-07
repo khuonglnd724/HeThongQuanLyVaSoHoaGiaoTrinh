@@ -53,7 +53,7 @@ class CLOMatcher:
                         
                         for result in results:
                             similar_clos.append({
-                                "clo": result['document'][:200],  # CLO text
+                                "clo": result['content'][:200],  # CLO text
                                 "subject": result['metadata'].get('subject', 'Unknown'),
                                 "syllabusId": syllabus_id,
                                 "similarity": result.get('distance', 0),
@@ -78,7 +78,7 @@ class CLOMatcher:
                             
                             for result in results:
                                 similar_clos.append({
-                                    "clo": result['document'][:200],
+                                    "clo": result['content'][:200],
                                     "subject": result['metadata'].get('subject', 'Unknown'),
                                     "syllabusId": result['metadata'].get('syllabus_id', 'unknown'),
                                     "similarity": result.get('distance', 0),

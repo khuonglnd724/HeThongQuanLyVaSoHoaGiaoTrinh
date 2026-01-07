@@ -230,15 +230,16 @@ services:
       timeout: 5s
       retries: 5
 
-  # Redis - Result backend for Celery
+  # Redis Stack - Vector store + Celery backend
   redis:
-    image: redis:7-alpine
+    image: redis/redis-stack:latest
     container_name: smd-redis
     ports:
       - "6379:6379"
+      - "8001:8001" # Redis Stack browser UI (optional)
     volumes:
       - redis_data:/data
-    command: redis-server --appendonly yes
+    command: ["redis-stack-server", "--appendonly", "yes"]
     networks:
       - smd-network
     healthcheck:
