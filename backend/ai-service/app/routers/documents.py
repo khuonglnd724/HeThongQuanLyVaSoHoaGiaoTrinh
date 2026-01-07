@@ -12,8 +12,8 @@ from pydantic import BaseModel
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/ai", tags=["documents"])
 
-# Initialize vector store
-vector_store = VectorStore(persist_directory="./chroma_data")
+# Initialize vector store (Redis Stack)
+vector_store = VectorStore()
 
 
 class DocumentIngestRequest(BaseModel):

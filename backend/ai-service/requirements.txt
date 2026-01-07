@@ -32,7 +32,6 @@ pdfplumber==0.10.3
 python-docx==0.8.11
 
 # Vector Store & Embeddings
-chromadb==0.4.24
 sentence-transformers==2.2.2
 huggingface-hub<0.20.0  # Pin to avoid cached_download import error
 

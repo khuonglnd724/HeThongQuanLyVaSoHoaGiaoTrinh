@@ -236,7 +236,7 @@ def chat_task(self, payload: dict, job_id: str):
                 
                 if search_results:
                     rag_context = "\n".join([
-                        f"[{r['metadata'].get('subject', 'Content')}] {r['document']}"
+                        f"[{r['metadata'].get('subject', 'Content')}] {r['content']}"
                         for r in search_results
                     ])
                     logger.info(f"Found RAG context for {syllabus_id}")
@@ -407,7 +407,7 @@ def diff_task(self, payload: dict, job_id: str):
                 
                 if search_results:
                     rag_context = "Previous context:\n" + "\n".join([
-                        f"- {r['document'][:100]}"
+                        f"- {r['content'][:100]}"
                         for r in search_results
                     ])
                     logger.info(f"Found RAG context for diff in syllabus {syllabus_id}")

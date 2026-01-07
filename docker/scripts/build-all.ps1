@@ -62,9 +62,9 @@ foreach ($p in $projects) {
 Write-Host "`nAll Java builds done." -ForegroundColor Green
 
 # Build AI service Docker image
-Write-Host "`n" + "="*60 -ForegroundColor Cyan
+Write-Host "`n" + ("="*60) -ForegroundColor Cyan
 Write-Host "Building AI Service (Python + FastAPI + Celery)" -ForegroundColor Cyan
-Write-Host "="*60 -ForegroundColor Cyan
+Write-Host ("="*60) -ForegroundColor Cyan
 
 $aiServicePath = Join-Path $PSScriptRoot "..\ai-service"
 if (Test-Path (Join-Path $aiServicePath "Dockerfile")) {
