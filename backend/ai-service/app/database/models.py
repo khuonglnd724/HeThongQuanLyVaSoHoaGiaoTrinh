@@ -73,7 +73,7 @@ class AIMessage(Base):
     __tablename__ = "ai_messages"
 
     id = Column(Integer, primary_key=True, index=True)
-    conversation_id = Column(String(255), ForeignKey("ai_conversations.conversation_id"), nullable=False)
+    conversation_id = Column(String(255), ForeignKey("ai_conversations.conversation_id"), nullable=False, index=True)
     
     role = Column(String(20), nullable=False)  # "user" or "assistant"
     content = Column(Text, nullable=False)

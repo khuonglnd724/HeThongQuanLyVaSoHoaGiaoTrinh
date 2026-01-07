@@ -1,11 +1,11 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional, List
 
 class SuggestSimilarCLORequest(BaseModel):
-    currentCLO: str
+    currentCLO: str = Field(..., min_length=1, description="CLO to find similar matches for")
     subjectArea: Optional[str] = None
     level: Optional[str] = None  # "beginner", "intermediate", "advanced"
-    limit: Optional[int] = 5
+    limit: Optional[int] = Field(5, ge=1, le=20, description="Max results to return")
 
 class SimilarCLOItem(BaseModel):
     clo: str

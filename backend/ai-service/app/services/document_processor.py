@@ -117,6 +117,33 @@ class DocumentProcessor:
             raise
     
     @staticmethod
+    def extract_from_txt(file_path: str) -> Dict[str, str]:
+        """
+        Extract text from TXT file
+        
+        Args:
+            file_path: Path to TXT file
+            
+        Returns:
+            Dict with 'full_text' and 'metadata'
+        """
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                full_text = f.read()
+            
+            return {
+                "full_text": full_text,
+                "metadata": {
+                    "file_type": "txt",
+                    "size": len(full_text)
+                }
+            }
+        
+        except Exception as e:
+            logger.error(f"Error extracting TXT {file_path}: {e}")
+            raise
+    
+    @staticmethod
     def extract_document(file_path: str, max_pages: Optional[int] = None) -> Dict[str, str]:
         """
         Auto-detect document type and extract text
@@ -140,6 +167,8 @@ class DocumentProcessor:
                 return DocumentProcessor.extract_from_pdf(file_path, max_pages)
             elif file_type in [".docx", ".doc"]:
                 return DocumentProcessor.extract_from_docx(file_path)
+            elif file_type == ".txt":
+                return DocumentProcessor.extract_from_txt(file_path)
             else:
                 raise ValueError(f"Unsupported file type: {file_type}")
         
