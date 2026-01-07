@@ -1,64 +1,87 @@
-"""Vector store for semantic search and RAG"""
+"""Vector store for semantic search and RAG (Redis Stack)"""
 import logging
-import json
 from typing import List, Dict, Optional, Tuple
-import chromadb
+import os
+import numpy as np
+from redis import Redis
+from redis.exceptions import ResponseError
+from redis.commands.search.field import TextField, NumericField, VectorField, TagField
+from redis.commands.search.indexDefinition import IndexDefinition, IndexType
+from redis.commands.search.query import Query
 from sentence_transformers import SentenceTransformer
 
 logger = logging.getLogger(__name__)
 
 
 class VectorStore:
-    """Vector database for storing and searching embeddings"""
-    
-    def __init__(self, persist_directory: str = "./chroma_data"):
-        """
-        Initialize vector store
-        
-        Args:
-            persist_directory: Directory for persistent storage
-        """
-        self.persist_directory = persist_directory
-        
-        # Initialize ChromaDB client
-        self.client = chromadb.PersistentClient(path=persist_directory)
-        
-        # Initialize embedding model (lightweight)
+    """Vector database for storing and searching embeddings using Redis Stack"""
+
+    def __init__(self, index_name: str = "idx:syllabi", key_prefix: str = "vs:chunk:"):
+        """Initialize Redis-based vector store and ensure index exists"""
+        self.index_name = index_name
+        self.key_prefix = key_prefix
+
+        # Redis connection from environment
+        redis_host = os.getenv("REDIS_HOST", "localhost")
+        redis_port = int(os.getenv("REDIS_PORT", "6379"))
+        redis_db = int(os.getenv("REDIS_DB", "0"))
+        self.redis = Redis(host=redis_host, port=redis_port, db=redis_db)
+
+        # Embedding model (CPU)
         self.embedding_model = SentenceTransformer(
             'sentence-transformers/all-MiniLM-L6-v2',
-            device='cpu'  # Use CPU to avoid GPU memory issues
+            device='cpu'
         )
-        
-        logger.info(f"Vector store initialized at {persist_directory}")
+
+        # Ensure RediSearch index exists
+        self._ensure_index()
+        logger.info("Redis VectorStore initialized and index ready")
     
     def create_collection(self, collection_name: str, metadata: Optional[Dict] = None) -> None:
-        """
-        Create or get a collection (does not delete existing collections)
-        
-        Args:
-            collection_name: Name of collection
-            metadata: Optional metadata dict
-        """
+        """No-op for Redis; index is global. Collections are filtered by `syllabus_id`."""
+        # Ensure index is present (idempotent)
+        self._ensure_index()
+        logger.info(f"Collection (filter) ready: {collection_name}")
+
+    def _ensure_index(self) -> None:
+        """Create RediSearch index if missing"""
         try:
-            # Check if collection already exists - do not delete!
-            try:
-                collection = self.client.get_collection(name=collection_name)
-                logger.info(f"Collection {collection_name} already exists, skipping creation")
-                return
-            except:
-                # Collection doesn't exist, create it
-                pass
-            
-            # Create collection with embedding function
-            self.client.create_collection(
-                name=collection_name,
-                metadata=metadata or {"description": f"Collection {collection_name}"}
-            )
-            
-            logger.info(f"Created collection: {collection_name}")
-        
+            # If info succeeds, index exists
+            self.redis.ft(self.index_name).info()
+            return
+        except ResponseError:
+            pass
         except Exception as e:
-            logger.error(f"Error creating collection {collection_name}: {e}")
+            logger.warning(f"Index check failed: {e}")
+
+        # Define schema: content text + tags for exact filters + numeric + vector
+        dim = 384
+        schema = [
+            TextField("content"),
+            TagField("syllabus_id"),
+            TagField("subject"),
+            TagField("file_name"),
+            NumericField("chunk_index"),
+            VectorField(
+                "embedding",
+                "HNSW",
+                {
+                    "TYPE": "FLOAT32",
+                    "DIM": dim,
+                    "DISTANCE_METRIC": "COSINE",
+                    "M": 16,
+                    "EF_CONSTRUCTION": 200,
+                    "EF_RUNTIME": 64,
+                },
+            ),
+        ]
+
+        definition = IndexDefinition(prefix=[self.key_prefix], index_type=IndexType.HASH)
+        try:
+            self.redis.ft(self.index_name).create_index(schema, definition=definition)
+            logger.info(f"Created RediSearch index: {self.index_name}")
+        except Exception as e:
+            logger.error(f"Failed to create RediSearch index {self.index_name}: {e}")
             raise
     
     def add_documents(
@@ -68,31 +91,30 @@ class VectorStore:
         metadatas: List[Dict],
         ids: List[str]
     ) -> None:
-        """
-        Add documents to collection with embeddings
-        
-        Args:
-            collection_name: Name of collection
-            documents: List of text documents
-            metadatas: List of metadata dicts
-            ids: List of unique IDs
-        """
+        """Add documents as Redis hashes with vector embeddings"""
         try:
-            collection = self.client.get_collection(name=collection_name)
-            
-            # Generate embeddings
-            embeddings = self.embedding_model.encode(documents, show_progress_bar=True)
-            
-            # Add to collection
-            collection.add(
-                ids=ids,
-                documents=documents,
-                metadatas=metadatas,
-                embeddings=embeddings.tolist()
-            )
-            
-            logger.info(f"Added {len(documents)} documents to {collection_name}")
-        
+            # Generate embeddings (float32 bytes)
+            vectors = self.embedding_model.encode(documents, show_progress_bar=True)
+            vectors = np.asarray(vectors, dtype=np.float32)
+
+            pipe = self.redis.pipeline(transaction=False)
+            for i, doc in enumerate(documents):
+                meta = metadatas[i] if i < len(metadatas) else {}
+                doc_id = ids[i] if i < len(ids) else f"doc:{i}"
+                key = f"{self.key_prefix}{doc_id}"
+
+                mapping = {
+                    "content": doc,
+                    "syllabus_id": str(meta.get("syllabus_id", "")),
+                    "subject": str(meta.get("subject", "")),
+                    "file_name": str(meta.get("file_name", "")),
+                    "chunk_index": int(meta.get("chunk_index", i)),
+                    "embedding": vectors[i].tobytes(),
+                }
+                pipe.hset(key, mapping=mapping)
+
+            pipe.execute()
+            logger.info(f"Added {len(documents)} documents to Redis index via {collection_name}")
         except Exception as e:
             logger.error(f"Error adding documents to {collection_name}: {e}")
             raise
@@ -104,88 +126,115 @@ class VectorStore:
         top_k: int = 5,
         where: Optional[Dict] = None
     ) -> List[Dict]:
-        """
-        Search for similar documents
-        
-        Args:
-            collection_name: Name of collection
-            query: Search query text
-            top_k: Number of top results
-            where: Optional filter conditions
-            
-        Returns:
-            List of results with text and metadata
-        """
+        """KNN search using RediSearch HNSW index"""
         try:
-            collection = self.client.get_collection(name=collection_name)
-            
-            # Generate query embedding
-            query_embedding = self.embedding_model.encode([query])[0].tolist()
-            
-            # Search
-            results = collection.query(
-                query_embeddings=[query_embedding],
-                n_results=top_k,
-                where=where
-            )
-            
-            # Format results
+            # Encode query to vector bytes
+            qvec = self.embedding_model.encode([query])
+            qvec = np.asarray(qvec, dtype=np.float32)[0].tobytes()
+
+            # Optional filters
+            filter_clauses = []
+            if where:
+                if "syllabus_id" in where and where["syllabus_id"]:
+                    sid = str(where["syllabus_id"]).replace(',', '\,')
+                    filter_clauses.append(f"@syllabus_id:{{{sid}}}")
+                if "subject" in where and where["subject"]:
+                    subj = str(where["subject"]).replace(',', '\,')
+                    filter_clauses.append(f"@subject:{{{subj}}}")
+
+            base_query = " ".join(filter_clauses) if filter_clauses else "*"
+
+            knn = f"=>[KNN {top_k} @embedding $vec AS score]"
+            q = Query(base_query + knn)
+            q = q.return_fields("content", "syllabus_id", "subject", "file_name", "chunk_index", "score")
+            q = q.sort_by("score")
+            q = q.paging(0, top_k)
+            q = q.dialect(2)
+
+            res = self.redis.ft(self.index_name).search(q, query_params={"vec": qvec})
+
             formatted_results = []
-            if results and results['documents'] and len(results['documents']) > 0:
-                for i, doc in enumerate(results['documents'][0]):
-                    formatted_results.append({
-                        "id": results['ids'][0][i] if results['ids'] else None,
-                        "content": doc,
-                        "metadata": results['metadatas'][0][i] if results['metadatas'] else {},
-                        "distance": results['distances'][0][i] if results['distances'] else None
-                    })
-            
+            for doc in res.docs:
+                # RediSearch returns lower score for better match with cosine
+                formatted_results.append({
+                    "id": getattr(doc, "id", None),
+                    "content": getattr(doc, "content", ""),
+                    "metadata": {
+                        "syllabus_id": getattr(doc, "syllabus_id", None),
+                        "subject": getattr(doc, "subject", None),
+                        "file_name": getattr(doc, "file_name", None),
+                        "chunk_index": int(getattr(doc, "chunk_index", 0)),
+                    },
+                    "distance": float(getattr(doc, "score", 0.0)),
+                })
+
             return formatted_results
-        
         except Exception as e:
             logger.error(f"Error searching {collection_name}: {e}")
             return []
     
     def delete_collection(self, collection_name: str) -> None:
-        """
-        Delete a collection
-        
-        Args:
-            collection_name: Name of collection
-        """
+        """Delete all documents with matching `syllabus_id`"""
         try:
-            self.client.delete_collection(name=collection_name)
-            logger.info(f"Deleted collection: {collection_name}")
+            sid = collection_name.replace("syllabus_", "")
+            # Scan keys by prefix and delete those matching HGET syllabus_id == sid
+            cursor = 0
+            keys_to_delete = []
+            while True:
+                cursor, keys = self.redis.scan(cursor=cursor, match=f"{self.key_prefix}*")
+                for k in keys:
+                    try:
+                        if self.redis.hget(k, "syllabus_id") == sid.encode():
+                            keys_to_delete.append(k)
+                    except Exception:
+                        continue
+                if cursor == 0:
+                    break
+            if keys_to_delete:
+                self.redis.delete(*keys_to_delete)
+            logger.info(f"Deleted {len(keys_to_delete)} documents for syllabus {sid}")
         except Exception as e:
             logger.error(f"Error deleting collection {collection_name}: {e}")
     
     def list_collections(self) -> List[str]:
-        """
-        List all collections
-        
-        Returns:
-            List of collection names
-        """
+        """List distinct syllabus collections by scanning keys"""
         try:
-            collections = self.client.list_collections()
-            return [c.name for c in collections]
+            cursor = 0
+            syllabus_ids = set()
+            while True:
+                cursor, keys = self.redis.scan(cursor=cursor, match=f"{self.key_prefix}*")
+                for k in keys:
+                    try:
+                        sid_bytes = self.redis.hget(k, "syllabus_id")
+                        if sid_bytes:
+                            sid = sid_bytes.decode()
+                            syllabus_ids.add(f"syllabus_{sid}")
+                    except Exception:
+                        continue
+                if cursor == 0:
+                    break
+            return sorted(list(syllabus_ids))
         except Exception as e:
             logger.error(f"Error listing collections: {e}")
             return []
     
     def get_collection_size(self, collection_name: str) -> int:
-        """
-        Get number of documents in collection
-        
-        Args:
-            collection_name: Name of collection
-            
-        Returns:
-            Number of documents
-        """
+        """Count documents with matching `syllabus_id`"""
         try:
-            collection = self.client.get_collection(name=collection_name)
-            return collection.count()
+            sid = collection_name.replace("syllabus_", "")
+            count = 0
+            cursor = 0
+            while True:
+                cursor, keys = self.redis.scan(cursor=cursor, match=f"{self.key_prefix}*")
+                for k in keys:
+                    try:
+                        if self.redis.hget(k, "syllabus_id") == sid.encode():
+                            count += 1
+                    except Exception:
+                        continue
+                if cursor == 0:
+                    break
+            return count
         except Exception as e:
             logger.error(f"Error getting collection size: {e}")
             return 0

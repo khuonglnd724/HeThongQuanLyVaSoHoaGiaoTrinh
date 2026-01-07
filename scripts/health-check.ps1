@@ -1,9 +1,9 @@
 Param()
 $ErrorActionPreference = "Continue"
 
-Write-Host "=" * 70 -ForegroundColor Cyan
+Write-Host ("=" * 70) -ForegroundColor Cyan
 Write-Host "SMD Microservices Health Check" -ForegroundColor Cyan
-Write-Host "=" * 70 -ForegroundColor Cyan
+Write-Host ("=" * 70) -ForegroundColor Cyan
 
 $services = @(
   @{Name="Eureka Discovery"; Url="http://localhost:8761"; Type="Web"},
@@ -55,9 +55,10 @@ foreach ($service in $services) {
   }
 }
 
-Write-Host "`n" + "=" * 70 -ForegroundColor Cyan
+Write-Host ""
+Write-Host ("=" * 70) -ForegroundColor Cyan
 Write-Host "Summary" -ForegroundColor Cyan
-Write-Host "=" * 70 -ForegroundColor Cyan
+Write-Host ("=" * 70) -ForegroundColor Cyan
 Write-Host "  Healthy:   $passed" -ForegroundColor Green
 Write-Host "  Unhealthy: $failed" -ForegroundColor $(if ($failed -eq 0) { "Green" } else { "Red" })
 Write-Host "  Total:     $($services.Count)" -ForegroundColor White
@@ -69,18 +70,28 @@ if ($failed -gt 0) {
 }
 
 # Additional checks
-Write-Host "`n" + "=" * 70 -ForegroundColor Cyan
+Write-Host ""
+Write-Host ("=" * 70) -ForegroundColor Cyan
 Write-Host "Docker Container Status" -ForegroundColor Cyan
-Write-Host "=" * 70 -ForegroundColor Cyan
+Write-Host ("=" * 70) -ForegroundColor Cyan
 
-Push-Location $PSScriptRoot\..
-docker-compose ps --format "table {{.Name}}\t{{.Status}}\t{{.Ports}}" 2>$null
-Pop-Location
+# Run docker compose from the docker folder so it always finds the compose file
+$composeDir = Join-Path $PSScriptRoot "..\docker"
+$composeFile = Join-Path $composeDir "docker-compose.yml"
+
+if (Test-Path $composeFile) {
+  Push-Location $composeDir
+  docker compose -f $composeFile ps --format "table {{.Name}}\t{{.Status}}\t{{.Ports}}" 2>$null
+  Pop-Location
+} else {
+  Write-Host "(docker-compose.yml not found)" -ForegroundColor Yellow
+}
 
 # Database check
-Write-Host "`n" + "=" * 70 -ForegroundColor Cyan
+Write-Host ""
+Write-Host ("=" * 70) -ForegroundColor Cyan
 Write-Host "Database Check" -ForegroundColor Cyan
-Write-Host "=" * 70 -ForegroundColor Cyan
+Write-Host ("=" * 70) -ForegroundColor Cyan
 
 try {
   $output = docker exec smd-postgres psql -U postgres -l -t 2>$null
@@ -90,46 +101,48 @@ try {
       $exists = $output -match $db
       $dbName = $db.PadRight(20)
       if ($exists) {
-        Write-Host "  $dbName ✅" -ForegroundColor Green
+        Write-Host "  $dbName [OK]" -ForegroundColor Green
       } else {
-        Write-Host "  $dbName ❌ Missing" -ForegroundColor Red
+        Write-Host "  $dbName [MISSING]" -ForegroundColor Red
       }
     }
   } else {
-    Write-Host "  ⚠️  Could not connect to PostgreSQL" -ForegroundColor Yellow
+    Write-Host "  [WARNING] Could not connect to PostgreSQL" -ForegroundColor Yellow
   }
 } catch {
-  Write-Host "  ⚠️  PostgreSQL not available" -ForegroundColor Yellow
+  Write-Host "  [WARNING] PostgreSQL not available" -ForegroundColor Yellow
 }
 
 # Kafka check
-Write-Host "`n" + "=" * 70 -ForegroundColor Cyan
+Write-Host ""
+Write-Host ("=" * 70) -ForegroundColor Cyan
 Write-Host "Kafka Topics" -ForegroundColor Cyan
-Write-Host "=" * 70 -ForegroundColor Cyan
+Write-Host ("=" * 70) -ForegroundColor Cyan
 
 try {
   $topics = docker exec smd-kafka kafka-topics --list --bootstrap-server localhost:9092 2>$null
   if ($LASTEXITCODE -eq 0) {
     if ($topics -match "ai-events") {
-      Write-Host "  ai-events                ✅" -ForegroundColor Green
+      Write-Host "  ai-events                [OK]" -ForegroundColor Green
     } else {
-      Write-Host "  ai-events                ❌ Not found" -ForegroundColor Red
+      Write-Host "  ai-events                [NOT FOUND]" -ForegroundColor Red
     }
   } else {
-    Write-Host "  ⚠️  Could not list Kafka topics" -ForegroundColor Yellow
+    Write-Host "  [WARNING] Could not list Kafka topics" -ForegroundColor Yellow
   }
 } catch {
-  Write-Host "  ⚠️  Kafka not available" -ForegroundColor Yellow
+  Write-Host "  [WARNING] Kafka not available" -ForegroundColor Yellow
 }
 
-Write-Host "`n" + "=" * 70 -ForegroundColor Green
+Write-Host ""
+Write-Host ("=" * 70) -ForegroundColor Green
 Write-Host "Health Check Complete" -ForegroundColor Green
-Write-Host "=" * 70 -ForegroundColor Green
+Write-Host ("=" * 70) -ForegroundColor Green
 
 if ($failed -eq 0) {
-  Write-Host "✅ All services are healthy!" -ForegroundColor Green
+  Write-Host "[OK] All services are healthy!" -ForegroundColor Green
   exit 0
 } else {
-  Write-Host "⚠️  $failed service(s) need attention" -ForegroundColor Yellow
+  Write-Host "[WARNING] $failed service(s) need attention" -ForegroundColor Yellow
   exit 1
 }

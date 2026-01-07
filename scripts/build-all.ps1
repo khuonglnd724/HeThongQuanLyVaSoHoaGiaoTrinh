@@ -66,6 +66,25 @@ Write-Host "`n" + "="*60 -ForegroundColor Cyan
 Write-Host "Building AI Service (Python + FastAPI + Celery)" -ForegroundColor Cyan
 Write-Host "="*60 -ForegroundColor Cyan
 
+# Validate GROQ_API_KEY in .env before attempting Docker builds
+$envPath = Join-Path $PSScriptRoot "../.env"
+if (-not (Test-Path $envPath)) {
+  Write-Host "[ERROR] .env not found at $envPath. Create or provide .env with GROQ_API_KEY before building." -ForegroundColor Red
+  exit 1
+}
+
+$envLines = Get-Content $envPath | Where-Object { $_ -and -not ($_.TrimStart().StartsWith('#')) }
+$groqLine = $envLines | Where-Object { $_ -match '^[\s]*GROQ_API_KEY\s*=' } | Select-Object -First 1
+if (-not $groqLine) {
+  Write-Host "[ERROR] GROQ_API_KEY not set in .env. Add 'GROQ_API_KEY=your_key' before building." -ForegroundColor Red
+  exit 1
+}
+$groqVal = ($groqLine -replace '^[\s]*GROQ_API_KEY\s*=\s*','').Trim('"'' ')
+if ([string]::IsNullOrWhiteSpace($groqVal) -or $groqVal -match 'GROQ_API_KEY|REPLACE|YOUR_KEY') {
+  Write-Host "[ERROR] GROQ_API_KEY has an invalid placeholder value in .env. Replace it with a real API key." -ForegroundColor Red
+  exit 1
+}
+
 $aiServicePath = Join-Path $PSScriptRoot "..\backend\ai-service"
 if (Test-Path (Join-Path $aiServicePath "Dockerfile")) {
   Write-Host "Building ai-service and ai-worker Docker images..." -ForegroundColor Yellow

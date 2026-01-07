@@ -163,18 +163,39 @@ Trả về JSON:
 
 
 def build_suggest_prompt(syllabus_content: str, focus_area: str = None) -> str:
-    """Build prompt for suggest task"""
-    prompt = f"""Phân tích đề cương học phần sau và đưa ra gợi ý cải thiện:
+    """Build prompt for suggest task - now with detailed analysis instructions"""
+    prompt = f"""PHÂN TÍCH CHUYÊN SÂU ĐỀ CƯƠNG HỌC PHẦN:
+
+Đề cương dưới đây cần được phân tích kỹ lưỡng để đưa ra gợi ý cải thiện cụ thể, khả thi và dựa trên nội dung thực tế:
 
 --- ĐỀ CƯƠNG HỌC PHẦN ---
 {syllabus_content}
 --- HẾT ĐỀ CƯƠNG ---
+
+HƯỚNG DẪN PHÂN TÍCH:
+1. Xác định các điểm mạnh hiện tại của đề cương
+2. Phát hiện các lỗ hổng hoặc thiếu sót cụ thể
+3. Đưa ra gợi ý cải thiện TỪ NỘI DUNG THỰC TẾ, không phải mẫu chung
+4. Mỗi gợi ý phải cụ thể: nêu rõ VẤN ĐỀ HỌC PHẦN NÀY + GIẢI PHÁP
+
+TIÊU CHÍ GỢI ý:
+- objective: Nếu mục tiêu không rõ ràng, tính cụ thể, không đo lường được
+- content: Nếu nội dung thiếu cấu trúc, thiếu ví dụ, không cân bằng với mục tiêu
+- method: Nếu phương pháp giảng dạy không phù hợp với nội dung và đối tượng
+- assessment: Nếu đánh giá không khớp với CLOs, không công bằng
+- reference: Nếu tài liệu tham khảo lạc hậu, không đầy đủ, không phù hợp
+
+CÁCH TRÌNH BÀY:
+- Đừng đưa ra gợi ý chung chung (ví dụ: "thêm tài liệu tham khảo")
+- CHỈ RA ĐIỂM CỤ THỂ trong đề cương cần cải thiện
+- GIẢI THÍCH TẠI SAO điểm đó cần cải thiện
+- ĐỀ XUẤT CÁCH CẢI THIỆN rõ ràng
 """
     
     if focus_area:
-        prompt += f"\nTập trung phân tích: {focus_area}"
+        prompt += f"\nƯU TIÊN PHÂN TÍCH AREA: {focus_area}"
     
-    prompt += "\n\nĐưa ra 5-7 gợi ý cải thiện cụ thể nhất, xếp theo mức độ ưu tiên."
+    prompt += "\n\nĐưa ra 5-7 gợi ý CỤ THỂ, DỰA TRÊN NỘI DUNG THỰC TẾ CỦA ĐỀ CƯƠNG, xếp theo mức độ ưu tiên.\n\nTRẢ VỀ JSON:"
     return prompt
 
 
