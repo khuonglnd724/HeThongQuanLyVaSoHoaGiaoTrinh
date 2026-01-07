@@ -311,6 +311,8 @@ services:
       context: ../backend/ai-service
       dockerfile: Dockerfile
     container_name: ai-service
+    env_file:
+      - ./.env
     ports:
       - "8000:8000"
     environment:
@@ -347,7 +349,11 @@ services:
       context: ../backend/ai-service
       dockerfile: Dockerfile
     container_name: ai-worker
+    env_file:
+      - ./.env
     command: ["celery", "-A", "app.workers.celery_app", "worker", "--loglevel=info", "--pool=solo"]
+    volumes:
+      - transformers_cache:/root/.cache/torch
     environment:
       DATABASE_URL: postgresql://postgres:123456@postgres:5432/ai_service_db
       RABBITMQ_HOST: rabbitmq
@@ -464,5 +470,7 @@ volumes:
   grafana_data:
     driver: local
   loki_data:
+    driver: local
+  transformers_cache:
     driver: local
 

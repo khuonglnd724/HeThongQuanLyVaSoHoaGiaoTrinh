@@ -78,11 +78,14 @@ def update_job_in_db(job_id: str, status: AIJobStatus, progress: int = None, res
 def suggest_task(self, payload: dict, job_id: str):
     """
     AI Suggest task - Real AI implementation with OpenAI
+    Retrieves RAG context from uploaded syllabus to generate specific suggestions
     """
     user_id = payload.get("userId")
     syllabus_id = payload.get("syllabusId")
     syllabus_content = payload.get("content", "")
     focus_area = payload.get("focusArea")
+    rag_context = ""
+    rag_used = False
     
     try:
         # Update DB status: RUNNING
@@ -92,12 +95,54 @@ def suggest_task(self, payload: dict, job_id: str):
         # Get AI client
         ai_client = get_ai_client()
         
-        # Update progress - preparing AI request
-        update_job_in_db(job_id, AIJobStatus.RUNNING, progress=30)
-        self.update_state(state='PROGRESS', meta={'progress': 30})
+        # Retrieve RAG context from uploaded syllabus documents (progress 20-25)
+        if syllabus_id:
+            update_job_in_db(job_id, AIJobStatus.RUNNING, progress=20)
+            self.update_state(state='PROGRESS', meta={'progress': 20})
+            
+            try:
+                vector_store = VectorStore()
+                collection_name = f"syllabus_{syllabus_id}".lower()
+                
+                # Search for context about course structure, objectives, assessment
+                search_queries = [
+                    "mục tiêu học phần chuẩn đầu ra learning outcomes objectives",
+                    "nội dung học phần chủ đề topics content",
+                    "phương pháp giảng dạy teaching methods",
+                    "đánh giá assessment evaluation"
+                ]
+                
+                rag_contexts = []
+                for query in search_queries:
+                    try:
+                        results = vector_store.search(
+                            collection_name=collection_name,
+                            query=query,
+                            top_k=2
+                        )
+                        for r in results:
+                            rag_contexts.append(r.get('content', ''))
+                    except:
+                        pass
+                
+                if rag_contexts:
+                    rag_context = "\n\n".join(rag_contexts[:6])  # Top 6 chunks
+                    rag_used = True
+                    logger.info(f"RAG context retrieved: {len(rag_contexts)} chunks for syllabus {syllabus_id}")
+            except Exception as e:
+                logger.warning(f"RAG retrieval failed for syllabus {syllabus_id}: {e}")
+                rag_used = False
         
-        # Build prompt and call AI
-        user_prompt = prompts.build_suggest_prompt(syllabus_content, focus_area)
+        # Update progress - preparing AI request
+        update_job_in_db(job_id, AIJobStatus.RUNNING, progress=35)
+        self.update_state(state='PROGRESS', meta={'progress': 35})
+        
+        # Build prompt with RAG context + content
+        enriched_content = syllabus_content
+        if rag_context:
+            enriched_content = f"{syllabus_content}\n\n--- THÔNG TIN LIÊN QUAN TỪ TÀI LIỆU ĐÃ UPLOAD ---\n{rag_context}"
+        
+        user_prompt = prompts.build_suggest_prompt(enriched_content, focus_area)
         messages = [
             ai_client.create_system_message(prompts.SUGGEST_SYSTEM_PROMPT),
             ai_client.create_user_message(user_prompt)
@@ -162,12 +207,22 @@ def suggest_task(self, payload: dict, job_id: str):
                 logger.warning(f"RAG duplicate check failed: {e}, using all suggestions")
                 filtered_suggestions = suggestions
         
-        # Build result with safe access
+        # Build result with safe access + RAG info
         usage_data = ai_response.get("usage", {})
+        
+        # Create summary that reflects RAG usage
+        raw_summary = suggestions_data.get("summary", "")
+        if rag_used:
+            enhanced_summary = f"[Phân tích dựa trên tài liệu đã upload] {raw_summary}"
+        else:
+            enhanced_summary = raw_summary
+        
         result = {
             "jobId": job_id,
             "suggestions": filtered_suggestions,
-            "summary": suggestions_data.get("summary", ""),
+            "summary": enhanced_summary,
+            "ragUsed": rag_used,
+            "ragContext": "Có" if rag_used else "Không",
             "duplicateCheckEnabled": bool(syllabus_id),
             "tokens": usage_data.get("total_tokens", 0),
             "model": ai_response.get("model", "unknown")
@@ -586,33 +641,78 @@ def clo_check_task(self, payload: dict, job_id: str):
 
 @celery_app.task(bind=True, name='tasks.summary')
 def summary_task(self, payload: dict, job_id: str):
-    """Summary task - Real AI implementation with OpenAI"""
+    """Summary task - Real AI implementation with RAG context retrieval"""
     user_id = payload.get("userId")
     syllabus_id = payload.get("syllabusId")
     syllabus_content = payload.get("content", "")
     length = payload.get("length", "medium")  # short|medium|long
+    rag_context = ""
+    rag_used = False
     
     try:
         # Update DB status: RUNNING
-        update_job_in_db(job_id, AIJobStatus.RUNNING, progress=30)
-        self.update_state(state='PROGRESS', meta={'progress': 30})
+        update_job_in_db(job_id, AIJobStatus.RUNNING, progress=10)
+        self.update_state(state='PROGRESS', meta={'progress': 10})
         
         # Get AI client
         ai_client = get_ai_client()
         
-        # Build prompt and call AI
-        update_job_in_db(job_id, AIJobStatus.RUNNING, progress=50)
-        self.update_state(state='PROGRESS', meta={'progress': 50})
+        # Retrieve RAG context from uploaded syllabus documents (progress 20-25)
+        if syllabus_id:
+            update_job_in_db(job_id, AIJobStatus.RUNNING, progress=20)
+            self.update_state(state='PROGRESS', meta={'progress': 20})
+            
+            try:
+                vector_store = VectorStore()
+                collection_name = f"syllabus_{syllabus_id}".lower()
+                
+                # Search for context about course structure, objectives, assessment
+                search_queries = [
+                    "mục tiêu học phần chuẩn đầu ra learning outcomes objectives",
+                    "nội dung học phần chủ đề topics content",
+                    "phương pháp giảng dạy teaching methods",
+                    "đánh giá assessment evaluation"
+                ]
+                
+                rag_contexts = []
+                for query in search_queries:
+                    try:
+                        results = vector_store.search(
+                            collection_name=collection_name,
+                            query=query,
+                            top_k=2
+                        )
+                        for r in results:
+                            rag_contexts.append(r.get('content', ''))
+                    except:
+                        pass
+                
+                if rag_contexts:
+                    rag_context = "\n\n".join(rag_contexts[:6])  # Top 6 chunks
+                    rag_used = True
+                    logger.info(f"RAG context retrieved: {len(rag_contexts)} chunks for syllabus {syllabus_id}")
+            except Exception as e:
+                logger.warning(f"RAG retrieval failed for syllabus {syllabus_id}: {e}")
+                rag_used = False
         
-        user_prompt = prompts.build_summary_prompt(syllabus_content, length)
+        # Update progress - preparing AI request
+        update_job_in_db(job_id, AIJobStatus.RUNNING, progress=35)
+        self.update_state(state='PROGRESS', meta={'progress': 35})
+        
+        # Build prompt with RAG context + content
+        enriched_content = syllabus_content
+        if rag_context:
+            enriched_content = f"{syllabus_content}\n\n--- THÔNG TIN LIÊN QUAN TỪ TÀI LIỆU ĐÃ UPLOAD ---\n{rag_context}"
+        
+        user_prompt = prompts.build_summary_prompt(enriched_content, length)
         messages = [
             ai_client.create_system_message(prompts.SUMMARY_SYSTEM_PROMPT),
             ai_client.create_user_message(user_prompt)
         ]
         
-        # Call OpenAI API
-        update_job_in_db(job_id, AIJobStatus.RUNNING, progress=70)
-        self.update_state(state='PROGRESS', meta={'progress': 70})
+        # Call Groq API
+        update_job_in_db(job_id, AIJobStatus.RUNNING, progress=50)
+        self.update_state(state='PROGRESS', meta={'progress': 50})
         
         ai_response = ai_client.chat_completion(
             messages=messages,
@@ -622,8 +722,8 @@ def summary_task(self, payload: dict, job_id: str):
         )
         
         # Parse AI response
-        update_job_in_db(job_id, AIJobStatus.RUNNING, progress=90)
-        self.update_state(state='PROGRESS', meta={'progress': 90})
+        update_job_in_db(job_id, AIJobStatus.RUNNING, progress=70)
+        self.update_state(state='PROGRESS', meta={'progress': 70})
         
         try:
             summary_data = json.loads(ai_response["content"])
@@ -631,15 +731,25 @@ def summary_task(self, payload: dict, job_id: str):
             logger.error(f"Failed to parse summary response as JSON: {e}")
             raise ValueError(f"AI returned invalid JSON for summary: {ai_response['content'][:100]}")
         
-        # Build result with safe access
+        # Build result with safe access + RAG info
         usage_data = ai_response.get("usage", {})
+        
+        # Create summary that reflects RAG usage
+        raw_summary = summary_data.get("summary", "")
+        if rag_used:
+            enhanced_summary = f"[Phân tích dựa trên tài liệu đã upload] {raw_summary}"
+        else:
+            enhanced_summary = raw_summary
+        
         result = {
             "jobId": job_id,
-            "summary": summary_data.get("summary", ""),
+            "summary": enhanced_summary,
             "bullets": summary_data.get("bullets", []),
             "keywords": summary_data.get("keywords", []),
             "targetAudience": summary_data.get("targetAudience", ""),
             "prerequisites": summary_data.get("prerequisites", ""),
+            "ragUsed": rag_used,
+            "ragContext": rag_context[:500] if rag_context else "",  # Include sample of RAG context
             "tokens": usage_data.get("total_tokens", 0),
             "model": ai_response.get("model", "unknown")
         }

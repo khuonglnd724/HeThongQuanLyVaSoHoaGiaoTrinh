@@ -40,6 +40,9 @@ COPY --from=builder /root/.local /root/.local
 # Copy application code
 COPY app ./app
 
+# Pre-download sentence-transformers model to avoid slow first-run
+RUN python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')"
+
 # Environment defaults (override via docker-compose)
 ENV RABBITMQ_HOST=rabbitmq \
     RABBITMQ_PORT=5672 \
