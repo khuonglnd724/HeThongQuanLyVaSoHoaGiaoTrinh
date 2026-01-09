@@ -1,7 +1,7 @@
 package com.smd.syllabus_service.dto;
 
 public record SyllabusListItemDto(
-                Long id,
-                String name,
-                String courseCode) {
+        Long id,
+        String name,
+        String courseCode) {
 }
