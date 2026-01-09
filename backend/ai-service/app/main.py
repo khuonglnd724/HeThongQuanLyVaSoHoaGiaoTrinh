@@ -20,14 +20,17 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# CORS middleware
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # Configure appropriately for production
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# CORS middleware - Only add if not behind API Gateway
+# If behind API Gateway, let gateway handle CORS
+ENABLE_CORS = False  # Set to True for direct access to ai-service
+if ENABLE_CORS:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
 # Mount static files (HTML/CSS/JS)
 static_path = Path(__file__).parent.parent / "static"
