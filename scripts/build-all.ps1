@@ -1,24 +1,6 @@
 ﻿Param()
 $ErrorActionPreference = "Stop"
 
-# Check .env file for AI service
-Write-Host "Checking environment setup..." -ForegroundColor Cyan
-$envFile = Join-Path $PSScriptRoot "../.env"
-$envExample = Join-Path $PSScriptRoot "../.env.example"
-
-if (-not (Test-Path $envFile)) {
-  Write-Host "[WARNING] Warning: .env file not found!" -ForegroundColor Yellow
-  Write-Host "AI service requires GROQ_API_KEY to be set." -ForegroundColor Yellow
-  if (Test-Path $envExample) {
-    Write-Host "Creating .env from .env.example..." -ForegroundColor Yellow
-    Copy-Item $envExample $envFile
-    Write-Host "[OK] Created .env file. Please edit it and add your Groq API key!" -ForegroundColor Green
-    Write-Host "   Get FREE key from: https://console.groq.com/keys" -ForegroundColor Cyan
-  }
-} else {
-  Write-Host "[OK] .env file exists" -ForegroundColor Green
-}
-
 $projects = @(
   "backend/common-lib",
   "backend/discovery-server",
@@ -67,7 +49,7 @@ Write-Host "Building AI Service (Python + FastAPI + Celery)" -ForegroundColor Cy
 Write-Host "="*60 -ForegroundColor Cyan
 
 # Validate GROQ_API_KEY in .env before attempting Docker builds
-$envPath = Join-Path $PSScriptRoot "../.env"
+$envPath = Join-Path $PSScriptRoot "../docker/.env"
 if (-not (Test-Path $envPath)) {
   Write-Host "[ERROR] .env not found at $envPath. Create or provide .env with GROQ_API_KEY before building." -ForegroundColor Red
   exit 1
