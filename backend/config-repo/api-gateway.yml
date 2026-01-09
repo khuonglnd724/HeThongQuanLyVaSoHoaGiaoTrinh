@@ -5,6 +5,19 @@ spring:
     name: api-gateway
   cloud:
     gateway:
+      globalcors:
+        cors-configurations:
+          '[/**]':
+            allowedOrigins: "*"
+            allowedMethods:
+              - GET
+              - POST
+              - PUT
+              - DELETE
+              - OPTIONS
+              - PATCH
+            allowedHeaders: "*"
+            allowCredentials: false
       routes:
         - id: auth-service
           uri: lb://auth-service
@@ -37,6 +50,10 @@ spring:
             - Path=/api/ai/**
           filters:
             - RewritePath=/api/ai/(?<segment>.*), /${segment}
+            - RemoveResponseHeader=Access-Control-Allow-Origin
+            - RemoveResponseHeader=Access-Control-Allow-Methods
+            - RemoveResponseHeader=Access-Control-Allow-Headers
+            - RemoveResponseHeader=Access-Control-Allow-Credentials
       
       default-filters:
         - RemoveRequestHeader=Cookie

@@ -37,8 +37,8 @@ async function apiForm(path, formData) {
 
 // Actions
 async function doHealth() {
-  log('Calling /health via gateway...');
-  const data = await api('GET', '/health');
+  log('Calling /api/ai/health via gateway...');
+  const data = await api('GET', '/api/ai/health');
   log(data);
 }
 
@@ -50,7 +50,7 @@ async function doSuggest() {
   const syllabusId = document.getElementById('suggestSyllabus').value.trim();
   if (syllabusId) payload.syllabusId = syllabusId;
   log('Submitting suggest job...');
-  const job = await api('POST', '/ai/suggest', payload);
+  const job = await api('POST', '/api/ai/suggest', payload);
   log(job);
 }
 
@@ -61,7 +61,7 @@ async function doChat() {
     conversationId: document.getElementById('chatConv').value || undefined,
   };
   log('Submitting chat job...');
-  const job = await api('POST', '/ai/chat', payload);
+  const job = await api('POST', '/api/ai/chat', payload);
   log(job);
 }
 
@@ -73,7 +73,7 @@ async function doDiff() {
   const syllabusId = document.getElementById('diffSyllabus').value.trim();
   if (syllabusId) payload.syllabusId = syllabusId;
   log('Submitting diff job...');
-  const job = await api('POST', '/ai/diff', payload);
+  const job = await api('POST', '/api/ai/diff', payload);
   log(job);
 }
 
@@ -81,7 +81,7 @@ async function doJob() {
   const jobId = document.getElementById('jobId').value.trim();
   if (!jobId) return log('Enter jobId');
   log(`Fetching job ${jobId}...`);
-  const data = await api('GET', `/ai/jobs/${jobId}`);
+  const data = await api('GET', `/api/ai/jobs/${jobId}`);
   log(data);
 }
 
@@ -100,7 +100,7 @@ async function doIngest() {
   if (subjectName) formData.append('subject_name', subjectName);
 
   log('Uploading document...');
-  const res = await apiForm('/ai/documents/ingest', formData);
+  const res = await apiForm('/api/ai/documents/ingest', formData);
   log(res);
 }
 
@@ -111,7 +111,7 @@ async function doSearch() {
   if (!syllabusId || !query) return log('Enter syllabusId and query');
   
   log('Searching documents...');
-  const data = await api('GET', `/ai/documents/search?syllabus_id=${encodeURIComponent(syllabusId)}&query=${encodeURIComponent(query)}`);
+  const data = await api('GET', `/api/ai/documents/search?syllabus_id=${encodeURIComponent(syllabusId)}&query=${encodeURIComponent(query)}`);
   log(data);
 }
 
@@ -123,7 +123,7 @@ async function doSummary() {
   const syllabusId = document.getElementById('summarySyllabus').value.trim();
   if (syllabusId) payload.syllabusId = syllabusId;
   log('Submitting summary job...');
-  const job = await api('POST', '/ai/summary', payload);
+  const job = await api('POST', '/api/ai/summary', payload);
   log(job);
 }
 
@@ -142,7 +142,7 @@ async function doCloCheck() {
   const syllabusId = document.getElementById('cloCheckSyllabus').value.trim();
   if (syllabusId) payload.syllabusId = syllabusId;
   log('Submitting CLO check job...');
-  const job = await api('POST', '/ai/clo-check', payload);
+  const job = await api('POST', '/api/ai/clo-check', payload);
   log(job);
 }
 
@@ -160,7 +160,7 @@ async function doSimilarClo() {
   if (level) payload.level = level;
   
   log('Submitting similar CLO search...');
-  const job = await api('POST', '/ai/suggest-similar-clos', payload);
+  const job = await api('POST', '/api/ai/suggest-similar-clos', payload);
   log(job);
 }
 
