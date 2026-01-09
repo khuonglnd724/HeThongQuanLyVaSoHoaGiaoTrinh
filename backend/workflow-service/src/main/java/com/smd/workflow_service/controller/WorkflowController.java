@@ -1,64 +1,52 @@
 package com.smd.workflow_service.controller;
 
+import com.smd.workflow_service.domain.UserRole;
+import com.smd.workflow_service.domain.Workflow;
 import com.smd.workflow_service.domain.WorkflowEvent;
 import com.smd.workflow_service.domain.WorkflowState;
 import com.smd.workflow_service.service.WorkflowService;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.UUID;
+
 @RestController
 @RequestMapping("/api/workflows")
 public class WorkflowController {
 
-    private final WorkflowService workflowService;
+    private final WorkflowService service;
 
-    public WorkflowController(WorkflowService workflowService) {
-        this.workflowService = workflowService;
+    public WorkflowController(WorkflowService service) {
+        this.service = service;
     }
 
-    /**
-     * Start workflow (Draft)
-     */
-    @PostMapping("/start")
-    public WorkflowState startWorkflow() {
-        return workflowService
-                .startWorkflow()
-                .getState()
-                .getId();
+    @PostMapping
+    public Workflow create(@RequestParam String entityId,
+                           @RequestParam String entityType) {
+        return service.createWorkflow(entityId, entityType);
     }
 
-    /**
-     * Submit syllabus: DRAFT -> REVIEW
-     */
-    @PostMapping("/submit")
-    public WorkflowState submit() {
-        var sm = workflowService.startWorkflow();
-        return workflowService.sendEvent(sm, WorkflowEvent.SUBMIT);
+    @GetMapping("/{id}")
+    public Workflow get(@PathVariable UUID id) {
+        return service.getWorkflow(id);
     }
 
-    /**
-     * Approve syllabus: REVIEW -> APPROVED
-     */
-    @PostMapping("/approve")
-    public WorkflowState approve() {
-        var sm = workflowService.startWorkflow();
-        return workflowService.sendEvent(sm, WorkflowEvent.APPROVE);
+    @PostMapping("/{id}/submit")
+    public WorkflowState submit(@PathVariable UUID id) {
+        return service.sendEvent(id, WorkflowEvent.SUBMIT, UserRole.AA);
     }
 
-    /**
-     * Reject syllabus: REVIEW -> REJECTED
-     */
-    @PostMapping("/reject")
-    public WorkflowState reject() {
-        var sm = workflowService.startWorkflow();
-        return workflowService.sendEvent(sm, WorkflowEvent.REJECT);
+    @PostMapping("/{id}/approve")
+    public WorkflowState approve(@PathVariable UUID id) {
+        return service.sendEvent(id, WorkflowEvent.APPROVE, UserRole.HOD);
     }
 
-    /**
-     * Require edit: REJECTED -> DRAFT
-     */
-    @PostMapping("/require-edit")
-    public WorkflowState requireEdit() {
-        var sm = workflowService.startWorkflow();
-        return workflowService.sendEvent(sm, WorkflowEvent.REQUIRE_EDIT);
+    @PostMapping("/{id}/reject")
+    public WorkflowState reject(@PathVariable UUID id) {
+        return service.sendEvent(id, WorkflowEvent.REJECT, UserRole.HOD);
+    }
+
+    @PostMapping("/{id}/require-edit")
+    public WorkflowState requireEdit(@PathVariable UUID id) {
+        return service.sendEvent(id, WorkflowEvent.REQUIRE_EDIT, UserRole.AA);
     }
 }
