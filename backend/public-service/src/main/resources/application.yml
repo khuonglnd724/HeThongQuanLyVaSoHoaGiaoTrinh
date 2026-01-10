@@ -19,6 +19,21 @@ spring:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
 
+  # Redis Cache Configuration
+  redis:
+    host: redis
+    port: 6379
+    timeout: 60000ms
+    jedis:
+      pool:
+        max-active: 8
+        max-idle: 8
+        min-idle: 0
+    cache:
+      type: redis
+      redis:
+        time-to-live: 3600000
+
   # Config Server Configuration (commented out - incompatible with Boot 3.4.0)
   # config:
   #   import: optional:configserver:http://config-server:8888
@@ -29,3 +44,10 @@ eureka:
       defaultZone: http://discovery-server:8761/eureka/
   instance:
     prefer-ip-address: true
+
+# Logging
+logging:
+  level:
+    root: INFO
+    com.smd: DEBUG
+
