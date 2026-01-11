@@ -120,4 +120,11 @@ public class FollowService {
         
         return response;
     }
+    
+    /**
+     * Get count of followers for a syllabus
+     */
+    public Long getFollowCount(Long syllabusId) {
+        return followRepository.countBySyllabusId(syllabusId);
+    }
 }

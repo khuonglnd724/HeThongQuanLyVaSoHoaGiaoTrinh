@@ -24,4 +24,6 @@ public interface SyllabusFollowRepository extends JpaRepository<SyllabusFollow, 
     List<SyllabusFollow> findFollowersToNotify(@Param("syllabusId") Long syllabusId);
     
     boolean existsBySyllabusIdAndUserId(Long syllabusId, Long userId);
+    
+    Long countBySyllabusId(Long syllabusId);
 }

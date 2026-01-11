@@ -158,8 +158,14 @@ public class FeedbackService {
         response.feedbackType = feedback.getFeedbackType();
         response.title = feedback.getTitle();
         response.status = feedback.getStatus();
-        response.createdAt = feedback.getCreatedAt() != null ? 
-                feedback.getCreatedAt().atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli() : 0L;
+        if (feedback.getCreatedAt() != null) {
+            response.createdAt = feedback.getCreatedAt()
+                    .atZone(java.time.ZoneId.systemDefault())
+                    .toInstant()
+                    .toEpochMilli();
+        } else {
+            response.createdAt = System.currentTimeMillis();
+        }
         response.response = feedback.getResponse();
         
         return response;
