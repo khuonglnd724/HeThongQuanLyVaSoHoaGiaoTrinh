@@ -6,7 +6,7 @@ from app.database.connection import SessionLocal
 from app.repositories.job_repository import JobRepository
 import uuid
 
-router = APIRouter(prefix="/ai", tags=["ai-suggest"])
+router = APIRouter(tags=["ai-suggest"])
 
 @router.post("/suggest", response_model=JobCreateResponse, status_code=202)
 async def create_suggest_task(request: SuggestRequest):

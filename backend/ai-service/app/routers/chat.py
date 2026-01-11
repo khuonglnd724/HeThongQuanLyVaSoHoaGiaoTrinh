@@ -7,7 +7,7 @@ from app.repositories.job_repository import JobRepository
 from app.repositories.conversation_repository import ConversationRepository
 import uuid
 
-router = APIRouter(prefix="/ai", tags=["ai-chat"])
+router = APIRouter(tags=["ai-chat"])
 
 @router.post("/chat", response_model=JobCreateResponse, status_code=202)
 async def create_chat_task(request: ChatRequest):
