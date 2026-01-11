@@ -6,7 +6,7 @@ from app.database.connection import SessionLocal
 from app.repositories.job_repository import JobRepository
 import uuid
 
-router = APIRouter(prefix="/ai", tags=["ai-clo-check"])
+router = APIRouter(tags=["ai-clo-check"])
 
 @router.post("/clo-check", response_model=JobCreateResponse, status_code=202)
 async def create_clo_check_task(request: CLOCheckRequest):
