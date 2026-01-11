@@ -6,7 +6,7 @@ from app.database.connection import SessionLocal
 from app.repositories.job_repository import JobRepository
 import uuid
 
-router = APIRouter(prefix="/ai", tags=["ai-diff"])
+router = APIRouter(tags=["ai-diff"])
 
 @router.post("/diff", response_model=JobCreateResponse, status_code=202)
 async def create_diff_task(request: DiffRequest):

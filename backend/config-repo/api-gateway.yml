@@ -81,7 +81,7 @@ security:
     secret: smdMicroservicesSecretKeyForJWTTokenGenerationAndValidation2024
     whitelist:
       - /api/auth/**
-      - /api/ai/health
+      - /api/ai/**
       - /actuator/prometheus
       - /actuator/health
       - /

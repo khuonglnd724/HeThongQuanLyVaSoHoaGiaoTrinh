@@ -7,7 +7,7 @@ from app.database.connection import SessionLocal
 from app.repositories.job_repository import JobRepository
 from app.database.models import AIJobStatus
 
-router = APIRouter(prefix="/ai/jobs", tags=["jobs"])
+router = APIRouter(prefix="/jobs", tags=["jobs"])
 
 @router.get("/{job_id}", response_model=JobResponse)
 async def get_job_status(job_id: str):
