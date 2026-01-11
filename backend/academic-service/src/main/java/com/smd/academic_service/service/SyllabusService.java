@@ -21,13 +21,15 @@ public class SyllabusService {
     
     private final SyllabusRepository syllabusRepository;
     private final SubjectRepository subjectRepository;
+    private final SyllabusVersionService syllabusVersionService;
     
     // Create
     public SyllabusDto createSyllabus(SyllabusDto syllabusDto, String createdBy) {
         log.info("Creating syllabus with code: {}", syllabusDto.getSyllabusCode());
         
         Subject subject = subjectRepository.findById(syllabusDto.getSubjectId())
-            .orElseThrow(() -> new RuntimeException("Subject not found with id: " + syllabusDto.getSubjectId()));
+            .orElseThrow(() -> new com.smd.academic_service.exception.ResourceNotFoundException(
+                "Subject not found with id: " + syllabusDto.getSubjectId()));
         
         Syllabus syllabus = Syllabus.builder()
             .syllabusCode(syllabusDto.getSyllabusCode())
@@ -46,6 +48,10 @@ public class SyllabusService {
             .build();
         
         Syllabus savedSyllabus = syllabusRepository.save(syllabus);
+        
+        // Record in version history
+        syllabusVersionService.recordChange(savedSyllabus.getId(), "CREATE", "Syllabus created", createdBy);
+        
         log.info("Syllabus created successfully with id: {}", savedSyllabus.getId());
         return mapToDto(savedSyllabus);
     }
@@ -54,7 +60,8 @@ public class SyllabusService {
     public SyllabusDto getSyllabusById(Long id) {
         log.debug("Fetching syllabus with id: {}", id);
         Syllabus syllabus = syllabusRepository.findByIdAndIsActiveTrue(id)
-            .orElseThrow(() -> new RuntimeException("Syllabus not found with id: " + id));
+            .orElseThrow(() -> new com.smd.academic_service.exception.ResourceNotFoundException(
+                "Syllabus not found with id: " + id));
         return mapToDto(syllabus);
     }
     
@@ -104,7 +111,8 @@ public class SyllabusService {
         log.info("Updating syllabus with id: {}", id);
         
         Syllabus syllabus = syllabusRepository.findByIdAndIsActiveTrue(id)
-            .orElseThrow(() -> new RuntimeException("Syllabus not found with id: " + id));
+            .orElseThrow(() -> new com.smd.academic_service.exception.ResourceNotFoundException(
+                "Syllabus not found with id: " + id));
         
         if (syllabusDto.getContent() != null) {
             syllabus.setContent(syllabusDto.getContent());
@@ -125,6 +133,9 @@ public class SyllabusService {
         syllabus.setUpdatedBy(updatedBy);
         Syllabus updatedSyllabus = syllabusRepository.save(syllabus);
         
+        // Record in version history
+        syllabusVersionService.recordChange(id, "UPDATE", "Syllabus updated", updatedBy);
+        
         log.info("Syllabus updated successfully with id: {}", id);
         return mapToDto(updatedSyllabus);
     }
@@ -134,11 +145,15 @@ public class SyllabusService {
         log.info("Deleting syllabus with id: {}", id);
         
         Syllabus syllabus = syllabusRepository.findByIdAndIsActiveTrue(id)
-            .orElseThrow(() -> new RuntimeException("Syllabus not found with id: " + id));
+            .orElseThrow(() -> new com.smd.academic_service.exception.ResourceNotFoundException(
+                "Syllabus not found with id: " + id));
         
         syllabus.setIsActive(false);
         syllabus.setUpdatedBy(deletedBy);
         syllabusRepository.save(syllabus);
+        
+        // Record in version history
+        syllabusVersionService.recordChange(id, "DELETE", "Syllabus deleted", deletedBy);
         
         log.info("Syllabus deleted successfully with id: {}", id);
     }
@@ -148,7 +163,8 @@ public class SyllabusService {
         log.info("Updating approval status of syllabus with id: {} to {}", id, approvalStatus);
         
         Syllabus syllabus = syllabusRepository.findByIdAndIsActiveTrue(id)
-            .orElseThrow(() -> new RuntimeException("Syllabus not found with id: " + id));
+            .orElseThrow(() -> new com.smd.academic_service.exception.ResourceNotFoundException(
+                "Syllabus not found with id: " + id));
         
         syllabus.setApprovalStatus(approvalStatus);
         syllabus.setApprovedBy(approvedBy);
@@ -161,6 +177,10 @@ public class SyllabusService {
         
         syllabus.setUpdatedBy(updatedBy);
         Syllabus updatedSyllabus = syllabusRepository.save(syllabus);
+        
+        // Record in version history
+        String changeType = "Approved".equals(approvalStatus) ? "APPROVE" : "Rejected".equals(approvalStatus) ? "REJECT" : "REVIEW";
+        syllabusVersionService.recordChange(id, changeType, "Approval status: " + approvalStatus, updatedBy);
         
         log.info("Syllabus approval status updated successfully with id: {}", id);
         return mapToDto(updatedSyllabus);
