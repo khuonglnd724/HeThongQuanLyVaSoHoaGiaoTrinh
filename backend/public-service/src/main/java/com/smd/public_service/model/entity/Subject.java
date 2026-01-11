@@ -53,6 +53,7 @@ public class Subject extends BaseEntity {
     private String subjectType;
     
     @Column(name = "is_foundational", nullable = false)
+    @Builder.Default
     private Boolean isFoundational = false;
     
     @OneToMany(mappedBy = "subject", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)

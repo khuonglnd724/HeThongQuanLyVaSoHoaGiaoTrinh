@@ -188,4 +188,33 @@ public class SyllabusDiffService {
         }
         return text.substring(0, length) + "...";
     }
+    
+    /**
+     * Compare two versions by subject ID and version numbers
+     */
+    public DiffResult compareSyllabi(Long subjectId, Integer oldVersion, Integer newVersion) {
+        List<Syllabus> syllabi = syllabusRepository.findBySubjectId(subjectId);
+        
+        Syllabus oldSyllabus = syllabi.stream()
+                .filter(s -> s.getVersion().equals(oldVersion))
+                .findFirst()
+                .orElseThrow(() -> new RuntimeException("Version not found: " + oldVersion));
+        
+        Syllabus newSyllabus = syllabi.stream()
+                .filter(s -> s.getVersion().equals(newVersion))
+                .findFirst()
+                .orElseThrow(() -> new RuntimeException("Version not found: " + newVersion));
+        
+        DiffResult result = new DiffResult();
+        result.oldVersion = convertToSummary(oldSyllabus);
+        result.newVersion = convertToSummary(newSyllabus);
+        
+        // Compare content
+        compareSyllabusContent(oldSyllabus, newSyllabus, result);
+        
+        // Generate summary
+        result.summary = generateSummary(result.differences);
+        
+        return result;
+    }
 }

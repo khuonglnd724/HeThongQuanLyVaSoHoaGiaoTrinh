@@ -147,4 +147,11 @@ public class TreeViewService {
         
         return node;
     }
+    
+    /**
+     * Build tree for a subject
+     */
+    public SubjectTreeNode buildTree(Long subjectId) {
+        return getSubjectTree(subjectId);
+    }
 }

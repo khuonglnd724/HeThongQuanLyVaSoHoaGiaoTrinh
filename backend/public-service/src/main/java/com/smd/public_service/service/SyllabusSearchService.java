@@ -139,4 +139,30 @@ public class SyllabusSearchService {
         }
         return content.substring(0, length) + "...";
     }
+    
+    /**
+     * Get syllabus by ID
+     */
+    public Syllabus getSyllabusById(Long id) {
+        return syllabusRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Syllabus not found: " + id));
+    }
+    
+    /**
+     * Get all versions of a subject
+     */
+    public List<Syllabus> getAllVersionsBySubject(Long subjectId) {
+        return syllabusRepository.findBySubjectId(subjectId);
+    }
+    
+    /**
+     * Get specific version of a subject
+     */
+    public Syllabus getVersionBySubject(Long subjectId, Integer version) {
+        List<Syllabus> syllabi = syllabusRepository.findBySubjectIdAndVersion(subjectId, version);
+        if (syllabi.isEmpty()) {
+            throw new RuntimeException("Syllabus version not found for subject: " + subjectId + ", version: " + version);
+        }
+        return syllabi.get(0);
+    }
 }
