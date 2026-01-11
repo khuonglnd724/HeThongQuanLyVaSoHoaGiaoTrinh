@@ -2,7 +2,15 @@ package com.smd.academic_service.controller;
 
 import com.smd.academic_service.model.dto.ApiResponse;
 import com.smd.academic_service.model.dto.SyllabusDto;
+import com.smd.academic_service.model.dto.ApprovalValidationResult;
+import com.smd.academic_service.model.dto.SyllabusVersionDto;
+import com.smd.academic_service.model.dto.SyllabusVersionComparisonDto;
+import com.smd.academic_service.model.entity.Syllabus;
 import com.smd.academic_service.service.SyllabusService;
+import com.smd.academic_service.service.ApprovalValidationService;
+import com.smd.academic_service.service.SyllabusVersionService;
+import com.smd.academic_service.service.PrerequisiteValidatorService;
+import com.smd.academic_service.repository.SyllabusRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -10,6 +18,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/v1/syllabus")
@@ -18,6 +27,10 @@ import java.util.List;
 public class SyllabusController {
     
     private final SyllabusService syllabusService;
+    private final ApprovalValidationService approvalValidationService;
+    private final SyllabusVersionService syllabusVersionService;
+    private final PrerequisiteValidatorService prerequisiteValidatorService;
+    private final SyllabusRepository syllabusRepository;
     
     /**
      * Create new Syllabus
@@ -137,4 +150,91 @@ public class SyllabusController {
         syllabusService.deleteSyllabus(id, deletedBy);
         return ResponseEntity.ok(ApiResponse.success(null, "Syllabus deleted successfully"));
     }
+    
+    // ==================== VALIDATION ENDPOINTS ====================
+    
+    /**
+     * Validate syllabus for approval
+     * GET /api/v1/syllabus/{id}/validate-approval
+     */
+    @GetMapping("/{id}/validate-approval")
+    public ResponseEntity<ApiResponse<ApprovalValidationResult>> validateForApproval(@PathVariable Long id) {
+        log.info("Validating syllabus for approval: {}", id);
+        ApprovalValidationResult result = approvalValidationService.validateForApproval(id);
+        return ResponseEntity.ok(ApiResponse.success(result, "Approval validation completed"));
+    }
+    
+    /**
+     * Validate prerequisites of subject related to syllabus
+     * GET /api/v1/syllabus/{id}/validate-prerequisites
+     */
+    @GetMapping("/{id}/validate-prerequisites")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> validatePrerequisites(@PathVariable Long id) {
+        log.info("Validating prerequisites for syllabus: {}", id);
+        
+        Syllabus syllabus = syllabusRepository.findByIdAndIsActiveTrue(id)
+            .orElseThrow(() -> new RuntimeException("Syllabus not found with id: " + id));
+        
+        var prereqResult = prerequisiteValidatorService.validatePrerequisites(syllabus.getSubject().getId());
+        
+        Map<String, Object> result = Map.of(
+            "syllabusCode", syllabus.getSyllabusCode(),
+            "subjectCode", syllabus.getSubject().getSubjectCode(),
+            "validation", prereqResult
+        );
+        
+        return ResponseEntity.ok(ApiResponse.success(result, "Prerequisite validation completed"));
+    }
+    
+    // ==================== VERSION MANAGEMENT ENDPOINTS ====================
+    
+    /**
+     * Get version history for a syllabus
+     * GET /api/v1/syllabus/{id}/versions
+     */
+    @GetMapping("/{id}/versions")
+    public ResponseEntity<ApiResponse<List<SyllabusVersionDto>>> getVersionHistory(@PathVariable Long id) {
+        log.info("Fetching version history for syllabus id: {}", id);
+        List<SyllabusVersionDto> versions = syllabusVersionService.getVersionHistory(id);
+        return ResponseEntity.ok(ApiResponse.success(versions, "Version history retrieved successfully"));
+    }
+    
+    /**
+     * Get specific version of syllabus
+     * GET /api/v1/syllabus/{id}/versions/{versionNumber}
+     */
+    @GetMapping("/{id}/versions/{versionNumber}")
+    public ResponseEntity<ApiResponse<SyllabusVersionDto>> getVersion(
+        @PathVariable Long id,
+        @PathVariable Integer versionNumber) {
+        log.info("Fetching version {} for syllabus id: {}", versionNumber, id);
+        SyllabusVersionDto version = syllabusVersionService.getVersion(id, versionNumber);
+        return ResponseEntity.ok(ApiResponse.success(version, "Specific version retrieved successfully"));
+    }
+    
+    /**
+     * Get latest version of syllabus
+     * GET /api/v1/syllabus/{id}/versions/latest
+     */
+    @GetMapping("/{id}/versions/latest")
+    public ResponseEntity<ApiResponse<SyllabusVersionDto>> getLatestVersion(@PathVariable Long id) {
+        log.info("Fetching latest version for syllabus id: {}", id);
+        SyllabusVersionDto version = syllabusVersionService.getLatestVersion(id);
+        return ResponseEntity.ok(ApiResponse.success(version, "Latest version retrieved successfully"));
+    }
+    
+    /**
+     * Compare two versions of syllabus
+     * GET /api/v1/syllabus/{id}/compare?version1=1&version2=2
+     */
+    @GetMapping("/{id}/compare")
+    public ResponseEntity<ApiResponse<SyllabusVersionComparisonDto>> compareVersions(
+        @PathVariable Long id,
+        @RequestParam Integer version1,
+        @RequestParam Integer version2) {
+        log.info("Comparing versions {} and {} for syllabus id: {}", version1, version2, id);
+        SyllabusVersionComparisonDto comparison = syllabusVersionService.compareVersions(id, version1, version2);
+        return ResponseEntity.ok(ApiResponse.success(comparison, "Version comparison completed"));
+    }
 }
+
