@@ -6,7 +6,7 @@ from app.database.connection import SessionLocal
 from app.repositories.job_repository import JobRepository
 import uuid
 
-router = APIRouter(prefix="/ai", tags=["ai-summary"])
+router = APIRouter(tags=["ai-summary"])
 
 @router.post("/summary", response_model=JobCreateResponse, status_code=202)
 async def create_summary_task(request: SummaryRequest):

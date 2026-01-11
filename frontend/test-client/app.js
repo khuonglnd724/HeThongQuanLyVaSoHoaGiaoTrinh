@@ -4,6 +4,9 @@
 const outputEl = document.getElementById('output');
 const baseUrlInput = document.getElementById('baseUrl');
 
+// Valid JWT token signed with API Gateway secret
+const DUMMY_TOKEN = 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0LWNsaWVudCIsImlhdCI6MTc2Nzk0NjQ5NSwiZXhwIjoxNzk5NDgyNDk1fQ.rBA46lpi24eh5XdBAKwjsIoXvxv5oaqaLEYaFHj1FI4';
+
 function log(data) {
   outputEl.textContent = typeof data === 'string' ? data : JSON.stringify(data, null, 2);
 }
@@ -17,7 +20,10 @@ async function api(method, path, body) {
   const url = `${getBase()}${path}`;
   const opts = {
     method,
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 
+      'Content-Type': 'application/json',
+      'Authorization': DUMMY_TOKEN
+    },
   };
   if (body) opts.body = JSON.stringify(body);
   const res = await fetch(url, opts);
@@ -29,6 +35,9 @@ async function apiForm(path, formData) {
   const url = `${getBase()}${path}`;
   const res = await fetch(url, {
     method: 'POST',
+    headers: {
+      'Authorization': DUMMY_TOKEN
+    },
     body: formData,
   });
   if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);

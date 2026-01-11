@@ -6,7 +6,7 @@ from app.database.connection import SessionLocal
 from app.repositories.job_repository import JobRepository
 import uuid
 
-router = APIRouter(prefix="/ai", tags=["ai-clo"])
+router = APIRouter(tags=["ai-clo"])
 
 @router.post("/suggest-similar-clos", response_model=JobCreateResponse, status_code=202)
 async def suggest_similar_clos(request: SuggestSimilarCLORequest):

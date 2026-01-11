@@ -10,7 +10,7 @@ from app.repositories.job_repository import JobRepository
 from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/ai", tags=["documents"])
+router = APIRouter(tags=["documents"])
 
 # Initialize vector store (Redis Stack)
 vector_store = VectorStore()
