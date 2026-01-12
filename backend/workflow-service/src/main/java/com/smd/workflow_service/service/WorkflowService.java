@@ -1,5 +1,6 @@
 package com.smd.workflow_service.service;
 
+import com.smd.workflow_service.domain.UserRole;
 import com.smd.workflow_service.domain.Workflow;
 import com.smd.workflow_service.domain.WorkflowEvent;
 import com.smd.workflow_service.domain.WorkflowState;
@@ -13,21 +14,22 @@ import org.springframework.statemachine.support.DefaultStateMachineContext;
 import org.springframework.stereotype.Service;
 
 import java.util.UUID;
+import java.util.List;
 
 @Service
 public class WorkflowService {
 
-    private final StateMachineFactory<WorkflowState, WorkflowEvent> stateMachineFactory;
-    private final WorkflowRepository workflowRepository;
+    private final StateMachineFactory<WorkflowState, WorkflowEvent> factory;
+    private final WorkflowRepository repository;
     private final WorkflowHistoryRepository historyRepository;
     private final WorkflowAuditProducer auditProducer;
 
-    public WorkflowService(StateMachineFactory<WorkflowState, WorkflowEvent> stateMachineFactory,
-                           WorkflowRepository workflowRepository,
+    public WorkflowService(StateMachineFactory<WorkflowState, WorkflowEvent> factory,
+                           WorkflowRepository repository,
                            WorkflowHistoryRepository historyRepository,
                            WorkflowAuditProducer auditProducer) {
-        this.stateMachineFactory = stateMachineFactory;
-        this.workflowRepository = workflowRepository;
+        this.factory = factory;
+        this.repository = repository;
         this.historyRepository = historyRepository;
         this.auditProducer = auditProducer;
     }
@@ -37,43 +39,42 @@ public class WorkflowService {
         wf.setEntityId(entityId);
         wf.setEntityType(entityType);
         wf.setCurrentState(WorkflowState.DRAFT);
-        return workflowRepository.save(wf);
+        return repository.save(wf);
     }
 
     public Workflow getWorkflow(UUID id) {
-        return workflowRepository.findById(id)
+        return repository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Workflow not found"));
     }
 
     public WorkflowState sendEvent(UUID workflowId,
                                    WorkflowEvent event,
+                                   UserRole role,
                                    String actionBy) {
 
         Workflow workflow = getWorkflow(workflowId);
         WorkflowState fromState = workflow.getCurrentState();
 
+        validateRole(fromState, event, role);
+
         StateMachine<WorkflowState, WorkflowEvent> sm =
-                stateMachineFactory.getStateMachine(workflowId.toString());
+                factory.getStateMachine(workflowId.toString());
 
         sm.stop();
-        sm.getStateMachineAccessor()
-                .doWithAllRegions(access ->
-                        access.resetStateMachine(
-                                new DefaultStateMachineContext<>(
-                                        fromState,
-                                        null,
-                                        null,
-                                        null
-                                )
+        sm.getStateMachineAccessor().doWithAllRegions(access ->
+                access.resetStateMachine(
+                        new DefaultStateMachineContext<>(
+                                fromState, null, null, null
                         )
-                );
+                )
+        );
         sm.start();
 
         sm.sendEvent(MessageBuilder.withPayload(event).build());
 
         WorkflowState toState = sm.getState().getId();
         workflow.setCurrentState(toState);
-        workflowRepository.save(workflow);
+        repository.save(workflow);
 
         WorkflowHistory history = new WorkflowHistory();
         history.setWorkflowId(workflowId);
@@ -86,12 +87,36 @@ public class WorkflowService {
         if (event == WorkflowEvent.APPROVE || event == WorkflowEvent.REJECT) {
             auditProducer.sendAudit(
                     "Workflow " + workflowId +
-                            " changed from " + fromState +
-                            " to " + toState +
-                            " by " + actionBy
+                    " from " + fromState +
+                    " to " + toState +
+                    " by " + actionBy
             );
         }
 
         return toState;
+    }
+
+    public List<WorkflowHistory> getHistory(UUID workflowId) {
+        return historyRepository.findByWorkflowId(workflowId);
+    }
+
+    private void validateRole(WorkflowState state,
+                              WorkflowEvent event,
+                              UserRole role) {
+
+        switch (event) {
+            case SUBMIT -> {
+                if (role != UserRole.AA || state != WorkflowState.DRAFT)
+                    throw new RuntimeException("Only AA can submit from DRAFT");
+            }
+            case APPROVE, REJECT -> {
+                if (role != UserRole.HOD || state != WorkflowState.REVIEW)
+                    throw new RuntimeException("Only HoD can approve/reject from REVIEW");
+            }
+            case REQUIRE_EDIT -> {
+                if (role != UserRole.AA || state != WorkflowState.REJECTED)
+                    throw new RuntimeException("Only AA can require edit from REJECTED");
+            }
+        }
     }
 }

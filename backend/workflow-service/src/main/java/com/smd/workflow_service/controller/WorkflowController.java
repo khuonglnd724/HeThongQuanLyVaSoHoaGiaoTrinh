@@ -1,11 +1,14 @@
 package com.smd.workflow_service.controller;
 
+import com.smd.workflow_service.domain.UserRole;
 import com.smd.workflow_service.domain.Workflow;
 import com.smd.workflow_service.domain.WorkflowEvent;
+import com.smd.workflow_service.domain.WorkflowHistory;
 import com.smd.workflow_service.domain.WorkflowState;
 import com.smd.workflow_service.service.WorkflowService;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -32,24 +35,49 @@ public class WorkflowController {
     @PostMapping("/{id}/submit")
     public WorkflowState submit(@PathVariable UUID id,
                                 @RequestParam String actionBy) {
-        return service.sendEvent(id, WorkflowEvent.SUBMIT, actionBy);
+        return service.sendEvent(
+                id,
+                WorkflowEvent.SUBMIT,
+                UserRole.AA,
+                actionBy
+        );
     }
 
     @PostMapping("/{id}/approve")
     public WorkflowState approve(@PathVariable UUID id,
                                  @RequestParam String actionBy) {
-        return service.sendEvent(id, WorkflowEvent.APPROVE, actionBy);
+        return service.sendEvent(
+                id,
+                WorkflowEvent.APPROVE,
+                UserRole.HOD,
+                actionBy
+        );
     }
 
     @PostMapping("/{id}/reject")
     public WorkflowState reject(@PathVariable UUID id,
                                 @RequestParam String actionBy) {
-        return service.sendEvent(id, WorkflowEvent.REJECT, actionBy);
+        return service.sendEvent(
+                id,
+                WorkflowEvent.REJECT,
+                UserRole.HOD,
+                actionBy
+        );
     }
 
     @PostMapping("/{id}/require-edit")
     public WorkflowState requireEdit(@PathVariable UUID id,
                                      @RequestParam String actionBy) {
-        return service.sendEvent(id, WorkflowEvent.REQUIRE_EDIT, actionBy);
+        return service.sendEvent(
+                id,
+                WorkflowEvent.REQUIRE_EDIT,
+                UserRole.AA,
+                actionBy
+        );
+    }
+
+    @GetMapping("/{id}/history")
+    public List<WorkflowHistory> history(@PathVariable UUID id) {
+        return service.getHistory(id);
     }
 }
