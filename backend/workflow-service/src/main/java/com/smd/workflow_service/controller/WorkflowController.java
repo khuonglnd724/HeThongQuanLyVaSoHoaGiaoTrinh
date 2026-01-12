@@ -1,6 +1,5 @@
 package com.smd.workflow_service.controller;
 
-import com.smd.workflow_service.domain.UserRole;
 import com.smd.workflow_service.domain.Workflow;
 import com.smd.workflow_service.domain.WorkflowEvent;
 import com.smd.workflow_service.domain.WorkflowState;
@@ -31,22 +30,26 @@ public class WorkflowController {
     }
 
     @PostMapping("/{id}/submit")
-    public WorkflowState submit(@PathVariable UUID id) {
-        return service.sendEvent(id, WorkflowEvent.SUBMIT, UserRole.AA);
+    public WorkflowState submit(@PathVariable UUID id,
+                                @RequestParam String actionBy) {
+        return service.sendEvent(id, WorkflowEvent.SUBMIT, actionBy);
     }
 
     @PostMapping("/{id}/approve")
-    public WorkflowState approve(@PathVariable UUID id) {
-        return service.sendEvent(id, WorkflowEvent.APPROVE, UserRole.HOD);
+    public WorkflowState approve(@PathVariable UUID id,
+                                 @RequestParam String actionBy) {
+        return service.sendEvent(id, WorkflowEvent.APPROVE, actionBy);
     }
 
     @PostMapping("/{id}/reject")
-    public WorkflowState reject(@PathVariable UUID id) {
-        return service.sendEvent(id, WorkflowEvent.REJECT, UserRole.HOD);
+    public WorkflowState reject(@PathVariable UUID id,
+                                @RequestParam String actionBy) {
+        return service.sendEvent(id, WorkflowEvent.REJECT, actionBy);
     }
 
     @PostMapping("/{id}/require-edit")
-    public WorkflowState requireEdit(@PathVariable UUID id) {
-        return service.sendEvent(id, WorkflowEvent.REQUIRE_EDIT, UserRole.AA);
+    public WorkflowState requireEdit(@PathVariable UUID id,
+                                     @RequestParam String actionBy) {
+        return service.sendEvent(id, WorkflowEvent.REQUIRE_EDIT, actionBy);
     }
 }
