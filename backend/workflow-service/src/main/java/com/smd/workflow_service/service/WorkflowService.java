@@ -1,27 +1,35 @@
 package com.smd.workflow_service.service;
 
-import com.smd.workflow_service.domain.UserRole;
 import com.smd.workflow_service.domain.Workflow;
 import com.smd.workflow_service.domain.WorkflowEvent;
 import com.smd.workflow_service.domain.WorkflowState;
+import com.smd.workflow_service.domain.WorkflowHistory;
 import com.smd.workflow_service.repository.WorkflowRepository;
+import com.smd.workflow_service.repository.WorkflowHistoryRepository;
 import org.springframework.messaging.support.MessageBuilder;
 import org.springframework.statemachine.StateMachine;
 import org.springframework.statemachine.config.StateMachineFactory;
 import org.springframework.statemachine.support.DefaultStateMachineContext;
 import org.springframework.stereotype.Service;
+
 import java.util.UUID;
 
 @Service
 public class WorkflowService {
 
-    private final StateMachineFactory<WorkflowState, WorkflowEvent> factory;
-    private final WorkflowRepository repository;
+    private final StateMachineFactory<WorkflowState, WorkflowEvent> stateMachineFactory;
+    private final WorkflowRepository workflowRepository;
+    private final WorkflowHistoryRepository historyRepository;
+    private final WorkflowAuditProducer auditProducer;
 
-    public WorkflowService(StateMachineFactory<WorkflowState, WorkflowEvent> factory,
-                           WorkflowRepository repository) {
-        this.factory = factory;
-        this.repository = repository;
+    public WorkflowService(StateMachineFactory<WorkflowState, WorkflowEvent> stateMachineFactory,
+                           WorkflowRepository workflowRepository,
+                           WorkflowHistoryRepository historyRepository,
+                           WorkflowAuditProducer auditProducer) {
+        this.stateMachineFactory = stateMachineFactory;
+        this.workflowRepository = workflowRepository;
+        this.historyRepository = historyRepository;
+        this.auditProducer = auditProducer;
     }
 
     public Workflow createWorkflow(String entityId, String entityType) {
@@ -29,63 +37,61 @@ public class WorkflowService {
         wf.setEntityId(entityId);
         wf.setEntityType(entityType);
         wf.setCurrentState(WorkflowState.DRAFT);
-        return repository.save(wf);
+        return workflowRepository.save(wf);
     }
 
     public Workflow getWorkflow(UUID id) {
-        return repository.findById(id)
+        return workflowRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Workflow not found"));
     }
 
     public WorkflowState sendEvent(UUID workflowId,
                                    WorkflowEvent event,
-                                   UserRole role) {
+                                   String actionBy) {
 
         Workflow workflow = getWorkflow(workflowId);
-
-        validateRole(workflow.getCurrentState(), event, role);
+        WorkflowState fromState = workflow.getCurrentState();
 
         StateMachine<WorkflowState, WorkflowEvent> sm =
-                factory.getStateMachine(workflowId.toString());
+                stateMachineFactory.getStateMachine(workflowId.toString());
 
         sm.stop();
-        sm.getStateMachineAccessor().doWithAllRegions(access ->
-                access.resetStateMachine(
-                        new DefaultStateMachineContext<>(
-                                workflow.getCurrentState(),
-                                null,
-                                null,
-                                null
+        sm.getStateMachineAccessor()
+                .doWithAllRegions(access ->
+                        access.resetStateMachine(
+                                new DefaultStateMachineContext<>(
+                                        fromState,
+                                        null,
+                                        null,
+                                        null
+                                )
                         )
-                )
-        );
+                );
         sm.start();
 
         sm.sendEvent(MessageBuilder.withPayload(event).build());
 
-        workflow.setCurrentState(sm.getState().getId());
-        repository.save(workflow);
+        WorkflowState toState = sm.getState().getId();
+        workflow.setCurrentState(toState);
+        workflowRepository.save(workflow);
 
-        return workflow.getCurrentState();
-    }
+        WorkflowHistory history = new WorkflowHistory();
+        history.setWorkflowId(workflowId);
+        history.setFromState(fromState);
+        history.setToState(toState);
+        history.setEvent(event);
+        history.setActionBy(actionBy);
+        historyRepository.save(history);
 
-    private void validateRole(WorkflowState state,
-                              WorkflowEvent event,
-                              UserRole role) {
-
-        switch (event) {
-            case SUBMIT -> {
-                if (role != UserRole.AA || state != WorkflowState.DRAFT)
-                    throw new RuntimeException("Only AA can submit from DRAFT");
-            }
-            case APPROVE, REJECT -> {
-                if (role != UserRole.HOD || state != WorkflowState.REVIEW)
-                    throw new RuntimeException("Only HoD can approve/reject from REVIEW");
-            }
-            case REQUIRE_EDIT -> {
-                if (role != UserRole.AA || state != WorkflowState.REJECTED)
-                    throw new RuntimeException("Only AA can require edit from REJECTED");
-            }
+        if (event == WorkflowEvent.APPROVE || event == WorkflowEvent.REJECT) {
+            auditProducer.sendAudit(
+                    "Workflow " + workflowId +
+                            " changed from " + fromState +
+                            " to " + toState +
+                            " by " + actionBy
+            );
         }
+
+        return toState;
     }
 }
