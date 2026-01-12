@@ -30,6 +30,10 @@ public class WorkflowHistory {
     @Column(nullable = false)
     private LocalDateTime actionAt;
 
+    @Column(columnDefinition = "TEXT")
+    private String comment;
+
+
     @PrePersist
     public void prePersist() {
         actionAt = LocalDateTime.now();
@@ -51,6 +55,10 @@ public class WorkflowHistory {
 
     public String getActionBy() { return actionBy; }
     public void setActionBy(String actionBy) { this.actionBy = actionBy; }
+
+    public String getComment() { return comment; }
+    public void setComment(String comment) { this.comment = comment; }
+
 
     public LocalDateTime getActionAt() { return actionAt; }
 }

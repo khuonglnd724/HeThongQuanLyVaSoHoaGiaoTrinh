@@ -50,10 +50,18 @@ public class WorkflowService {
     public WorkflowState sendEvent(UUID workflowId,
                                    WorkflowEvent event,
                                    UserRole role,
-                                   String actionBy) {
+                                   String actionBy,
+                                   String comment) {
 
         Workflow workflow = getWorkflow(workflowId);
         WorkflowState fromState = workflow.getCurrentState();
+
+    if ((event == WorkflowEvent.REJECT || event == WorkflowEvent.REQUIRE_EDIT)
+            && (comment == null || comment.isBlank())) {
+        throw new RuntimeException(
+                "Comment is required for reject or require edit"
+        );
+    }
 
         validateRole(fromState, event, role);
 
@@ -82,6 +90,7 @@ public class WorkflowService {
         history.setToState(toState);
         history.setEvent(event);
         history.setActionBy(actionBy);
+        history.setComment(comment);
         historyRepository.save(history);
 
         if (event == WorkflowEvent.APPROVE || event == WorkflowEvent.REJECT) {
