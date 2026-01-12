@@ -110,22 +110,35 @@ public class WorkflowService {
     }
 
     private void validateRole(WorkflowState state,
-                              WorkflowEvent event,
-                              UserRole role) {
+                          WorkflowEvent event,
+                          UserRole role) {
 
-        switch (event) {
-            case SUBMIT -> {
-                if (role != UserRole.AA || state != WorkflowState.DRAFT)
-                    throw new RuntimeException("Only AA can submit from DRAFT");
+    switch (event) {
+
+        case SUBMIT -> {
+            if (role != UserRole.LECTURER || state != WorkflowState.DRAFT) {
+                throw new RuntimeException(
+                        "Only Lecturer can submit from DRAFT"
+                );
             }
-            case APPROVE, REJECT -> {
-                if (role != UserRole.HOD || state != WorkflowState.REVIEW)
-                    throw new RuntimeException("Only HoD can approve/reject from REVIEW");
+        }
+
+        case APPROVE, REJECT -> {
+            if ((role != UserRole.HOD && role != UserRole.PRINCIPAL)
+                    || state != WorkflowState.REVIEW) {
+                throw new RuntimeException(
+                        "Only HoD or Principal can approve/reject from REVIEW"
+                );
             }
-            case REQUIRE_EDIT -> {
-                if (role != UserRole.AA || state != WorkflowState.REJECTED)
-                    throw new RuntimeException("Only AA can require edit from REJECTED");
+        }
+
+        case REQUIRE_EDIT -> {
+            if (role != UserRole.LECTURER || state != WorkflowState.REJECTED) {
+                throw new RuntimeException(
+                        "Only Lecturer can require edit from REJECTED"
+                );
             }
         }
     }
+}
 }

@@ -38,7 +38,7 @@ public class WorkflowController {
         return service.sendEvent(
                 id,
                 WorkflowEvent.SUBMIT,
-                UserRole.AA,
+                UserRole.LECTURER,
                 actionBy,
                 null
         );
@@ -46,11 +46,12 @@ public class WorkflowController {
 
     @PostMapping("/{id}/approve")
     public WorkflowState approve(@PathVariable UUID id,
-                                 @RequestParam String actionBy) {
+                                 @RequestParam String actionBy,
+                                 @RequestParam UserRole role) {
         return service.sendEvent(
                 id,
                 WorkflowEvent.APPROVE,
-                UserRole.HOD,
+                role,
                 actionBy,
                 null
         );
@@ -58,12 +59,13 @@ public class WorkflowController {
 
     @PostMapping("/{id}/reject")
     public WorkflowState reject(@PathVariable UUID id,
-                                @RequestParam String actionBy, 
+                                @RequestParam String actionBy,
+                                @RequestParam UserRole role, 
                                 @RequestParam String comment) {
         return service.sendEvent(
                 id,
                 WorkflowEvent.REJECT,
-                UserRole.HOD,
+                role,
                 actionBy,
                 comment
         );
@@ -76,7 +78,7 @@ public class WorkflowController {
         return service.sendEvent(
                 id,
                 WorkflowEvent.REQUIRE_EDIT,
-                UserRole.AA,
+                UserRole.LECTURER,
                 actionBy,
                 comment
         );
