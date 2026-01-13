@@ -22,13 +22,15 @@ public class Workflow {
     @Column(nullable = false)
     private WorkflowState currentState;
 
+    @Column
+    private LocalDateTime reviewDeadline;
+
     @Column(nullable = false)
     private LocalDateTime createdAt;
 
     @Column(nullable = false)
     private LocalDateTime updatedAt;
 
-    // JPA lifecycle
     @PrePersist
     public void prePersist() {
         createdAt = LocalDateTime.now();
@@ -39,8 +41,6 @@ public class Workflow {
     public void preUpdate() {
         updatedAt = LocalDateTime.now();
     }
-
-    // GETTER / SETTER
     
     public UUID getId() {
         return id;
@@ -81,4 +81,13 @@ public class Workflow {
     public LocalDateTime getUpdatedAt() {
         return updatedAt;
     }
+
+    public LocalDateTime getReviewDeadline() {
+        return reviewDeadline;
+    }
+
+    public void setReviewDeadline(LocalDateTime reviewDeadline) {
+        this.reviewDeadline = reviewDeadline;
+    }
+
 }
