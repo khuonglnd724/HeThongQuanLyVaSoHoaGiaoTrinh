@@ -4,6 +4,8 @@ import com.smd.workflow_service.domain.UserRole;
 import com.smd.workflow_service.domain.Workflow;
 import com.smd.workflow_service.domain.WorkflowEvent;
 import com.smd.workflow_service.domain.WorkflowState;
+import com.smd.workflow_service.event.WorkflowApprovalEvent;
+import com.smd.workflow_service.messaging.WorkflowApprovalProducer;
 import com.smd.workflow_service.domain.WorkflowHistory;
 import com.smd.workflow_service.repository.WorkflowRepository;
 import com.smd.workflow_service.repository.WorkflowHistoryRepository;
@@ -24,15 +26,19 @@ public class WorkflowService {
     private final WorkflowRepository repository;
     private final WorkflowHistoryRepository historyRepository;
     private final WorkflowAuditProducer auditProducer;
+    private final WorkflowApprovalProducer approvalProducer;
+
 
     public WorkflowService(StateMachineFactory<WorkflowState, WorkflowEvent> factory,
                            WorkflowRepository repository,
                            WorkflowHistoryRepository historyRepository,
-                           WorkflowAuditProducer auditProducer) {
+                           WorkflowAuditProducer auditProducer,
+                           WorkflowApprovalProducer approvalProducer) {
         this.factory = factory;
         this.repository = repository;
         this.historyRepository = historyRepository;
         this.auditProducer = auditProducer;
+        this.approvalProducer = approvalProducer;
     }
 
     public Workflow createWorkflow(String entityId, String entityType) {
@@ -116,6 +122,16 @@ public class WorkflowService {
                     " to " + toState +
                     " by " + actionBy
             );
+        }
+
+        if (event == WorkflowEvent.APPROVE || event == WorkflowEvent.REJECT) {
+            WorkflowApprovalEvent approvalEvent = new WorkflowApprovalEvent();
+            approvalEvent.setWorkflowId(workflowId);
+            approvalEvent.setFromState(fromState);
+            approvalEvent.setToState(toState);
+            approvalEvent.setActionBy(actionBy);
+
+            approvalProducer.send(approvalEvent);
         }
 
         return toState;
