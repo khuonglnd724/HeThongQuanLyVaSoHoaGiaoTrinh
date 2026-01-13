@@ -14,6 +14,7 @@ import org.springframework.statemachine.support.DefaultStateMachineContext;
 import org.springframework.stereotype.Service;
 
 import java.util.UUID;
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
@@ -56,12 +57,18 @@ public class WorkflowService {
         Workflow workflow = getWorkflow(workflowId);
         WorkflowState fromState = workflow.getCurrentState();
 
-    if ((event == WorkflowEvent.REJECT || event == WorkflowEvent.REQUIRE_EDIT)
-            && (comment == null || comment.isBlank())) {
-        throw new RuntimeException(
-                "Comment is required for reject or require edit"
-        );
-    }
+        if ((event == WorkflowEvent.APPROVE || event == WorkflowEvent.REJECT)
+                && workflow.getReviewDeadline() != null
+                && LocalDateTime.now().isAfter(workflow.getReviewDeadline())) {
+            throw new RuntimeException("Review deadline exceeded");
+        }
+
+        if ((event == WorkflowEvent.REJECT || event == WorkflowEvent.REQUIRE_EDIT)
+                && (comment == null || comment.isBlank())) {
+            throw new RuntimeException(
+                    "Comment is required for reject or require edit"
+            );
+        }
 
         validateRole(fromState, event, role);
 
@@ -81,6 +88,15 @@ public class WorkflowService {
         sm.sendEvent(MessageBuilder.withPayload(event).build());
 
         WorkflowState toState = sm.getState().getId();
+
+        if (event == WorkflowEvent.SUBMIT) {
+            workflow.setReviewDeadline(LocalDateTime.now().plusDays(7));
+        }
+
+        if (event == WorkflowEvent.APPROVE || event == WorkflowEvent.REJECT) {
+            workflow.setReviewDeadline(null);
+        }
+
         workflow.setCurrentState(toState);
         repository.save(workflow);
 
