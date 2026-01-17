@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import academicService, { Syllabus, ValidationResult } from '../types';
+import academicService from '../services/academicService';
+import { Syllabus, ValidationResult } from '../types';
 import './SyllabusList.css';
 
 interface SyllabusListProps {

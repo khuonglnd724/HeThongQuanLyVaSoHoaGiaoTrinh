@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import academicService, { Notification } from '../types';
+import academicService from '../services/academicService';
+import { Notification } from '../types';
 import './Notifications.css';
 
 interface NotificationsProps {
