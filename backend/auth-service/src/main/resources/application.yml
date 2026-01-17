@@ -28,7 +28,7 @@ spring:
 
 # JWT Configuration
 app:
-  jwtSecret: smdMicroservicesSecretKeyForJWTTokenGenerationAndValidation2024
+  jwtSecret: smdMicroservicesSecretKeyForJWTTokenGenerationAndValidation2024SuperSecureKeyWithEnoughBytesForHS512HS512HS512
   jwtExpirationMs: 86400000
   jwtRefreshExpirationMs: 604800000
 
