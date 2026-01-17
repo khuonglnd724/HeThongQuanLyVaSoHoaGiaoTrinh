@@ -2,6 +2,7 @@ package com.smd.auth_service.security;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -22,13 +23,20 @@ public class AuthTokenFilter extends OncePerRequestFilter {
     
     @Autowired
     private UserDetailsServiceImpl userDetailsService;
+
+    /**
+     * Optional: nếu có Redis thì dùng để blacklist token khi logout.
+     * Key format: bl:token:<token>
+     */
+    @Autowired(required = false)
+    private StringRedisTemplate stringRedisTemplate;
     
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, 
                                     FilterChain filterChain) throws ServletException, IOException {
         try {
             String jwt = parseJwt(request);
-            if (jwt != null && tokenProvider.validateJwtToken(jwt)) {
+            if (jwt != null && !isBlacklisted(jwt) && tokenProvider.validateJwtToken(jwt)) {
                 String username = tokenProvider.getUserNameFromJwtToken(jwt);
                 
                 UserDetails userDetails = userDetailsService.loadUserByUsername(username);
@@ -43,6 +51,17 @@ public class AuthTokenFilter extends OncePerRequestFilter {
         }
         
         filterChain.doFilter(request, response);
+    }
+
+    private boolean isBlacklisted(String token) {
+        if (stringRedisTemplate == null) return false;
+        try {
+            return Boolean.TRUE.equals(stringRedisTemplate.hasKey("bl:token:" + token));
+        } catch (Exception e) {
+            // Nếu Redis lỗi thì không chặn request để tránh làm sập toàn bộ auth.
+            log.warn("Redis blacklist check failed: {}", e.getMessage());
+            return false;
+        }
     }
     
     private String parseJwt(HttpServletRequest request) {
