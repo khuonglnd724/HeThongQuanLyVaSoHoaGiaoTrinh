@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Management - SMD Admin</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <h2>SMD Admin</h2>
+            </div>
+            <nav class="sidebar-nav">
+                <a href="dashboard.html" class="nav-item">
+                    <span class="icon">📊</span>
+                    <span>Dashboard</span>
+                </a>
+                <a href="services.html" class="nav-item">
+                    <span class="icon">⚙️</span>
+                    <span>Services</span>
+                </a>
+                <a href="eureka.html" class="nav-item">
+                    <span class="icon">🔍</span>
+                    <span>Eureka Registry</span>
+                </a>
+                <a href="config-server.html" class="nav-item">
+                    <span class="icon">📝</span>
+                    <span>Config Server</span>
+                </a>
+                <div class="nav-divider"></div>
+                <a href="users.html" class="nav-item active">
+                    <span class="icon">👥</span>
+                    <span>User Management</span>
+                </a>
+                <a href="roles.html" class="nav-item">
+                    <span class="icon">🔐</span>
+                    <span>Roles & Permissions</span>
+                </a>
+            </nav>
+            <div class="sidebar-footer">
+                <button id="logoutBtn" class="btn btn-logout">
+                    <span class="icon">🚪</span>
+                    <span>Logout</span>
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <header class="header">
+                <h1>User Management</h1>
+                <div class="header-actions">
+                    <button id="addUserBtn" class="btn btn-primary">
+                        ➕ Add User
+                    </button>
+                    <button id="refreshBtn" class="btn btn-icon">🔄</button>
+                </div>
+            </header>
+
+            <div class="content">
+                <!-- Filters -->
+                <div class="filters">
+                    <input type="text" id="searchInput" placeholder="Search users..." 
+                           class="search-input">
+                    <select id="roleFilter" class="filter-select">
+                        <option value="all">All Roles</option>
+                        <option value="ADMIN">Admin</option>
+                        <option value="TEACHER">Teacher</option>
+                        <option value="STUDENT">Student</option>
+                    </select>
+                    <select id="statusFilter" class="filter-select">
+                        <option value="all">All Status</option>
+                        <option value="active">Active</option>
+                        <option value="inactive">Inactive</option>
+                    </select>
+                </div>
+
+                <!-- Users Table -->
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Username</th>
+                                <th>Email</th>
+                                <th>Full Name</th>
+                                <th>Roles</th>
+                                <th>Status</th>
+                                <th>Created At</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="usersTableBody">
+                            <tr>
+                                <td colspan="8" class="loading">Loading users...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Add/Edit User Modal -->
+    <div id="userModal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalTitle">Add User</h2>
+                <button class="modal-close" onclick="closeUserModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="userForm">
+                    <input type="hidden" id="userId">
+                    
+                    <div class="form-group">
+                        <label for="username">Username *</label>
+                        <input type="text" id="username" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="email">Email *</label>
+                        <input type="email" id="email" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="fullName">Full Name</label>
+                        <input type="text" id="fullName">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="password">Password *</label>
+                        <input type="password" id="password" required>
+                        <small class="text-muted">Leave empty to keep current password (when editing)</small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Roles *</label>
+                        <div class="checkbox-group">
+                            <label class="checkbox-label">
+                                <input type="checkbox" name="roles" value="ADMIN">
+                                <span>Admin</span>
+                            </label>
+                            <label class="checkbox-label">
+                                <input type="checkbox" name="roles" value="TEACHER">
+                                <span>Teacher</span>
+                            </label>
+                            <label class="checkbox-label">
+                                <input type="checkbox" name="roles" value="STUDENT">
+                                <span>Student</span>
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="isActive" checked>
+                            <span>Active</span>
+                        </label>
+                    </div>
+                    
+                    <div class="modal-actions">
+                        <button type="button" class="btn btn-secondary" onclick="closeUserModal()">
+                            Cancel
+                        </button>
+                        <button type="submit" class="btn btn-primary">
+                            Save User
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/common.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/users.js"></script>
+</body>
+</html>
