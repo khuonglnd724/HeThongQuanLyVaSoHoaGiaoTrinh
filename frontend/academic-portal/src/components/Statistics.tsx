@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import academicService, { StatisticsData, ProgramStatistic, SubjectStatistic } from '../types';
+import academicService from '../services/academicService';
+import { StatisticsData, ProgramStatistic, SubjectStatistic } from '../types';
 import './Statistics.css';
 
 interface StatisticsProps {

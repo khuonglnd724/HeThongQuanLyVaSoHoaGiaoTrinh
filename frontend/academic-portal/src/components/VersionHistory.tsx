@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import academicService, { Syllabus, SyllabusVersion } from '../types';
+import academicService from '../services/academicService';
+import { Syllabus, SyllabusVersion } from '../types';
 import './VersionHistory.css';
 
 interface VersionHistoryProps {
