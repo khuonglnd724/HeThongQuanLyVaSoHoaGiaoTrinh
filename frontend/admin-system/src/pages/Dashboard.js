@@ -48,31 +48,39 @@ function Dashboard() {
             {/* Sidebar */}
             <aside className="sidebar">
                 <div className="sidebar-header">
-                    <h2>SMD Admin</h2>
+                    <h2>Quản trị SMD</h2>
                 </div>
                 <nav className="sidebar-nav">
                     <Link to="/dashboard" className="nav-item active">
                         <span className="icon">📊</span>
-                        <span>Dashboard</span>
+                        <span>Bảng điều khiển</span>
                     </Link>
                     <Link to="/services" className="nav-item">
                         <span className="icon">⚙️</span>
-                        <span>Services</span>
+                        <span>Dịch vụ</span>
                     </Link>
                     <div className="nav-divider"></div>
                     <Link to="/users" className="nav-item">
                         <span className="icon">👥</span>
-                        <span>User Management</span>
+                        <span>Quản lý người dùng</span>
                     </Link>
                     <Link to="/roles" className="nav-item">
                         <span className="icon">🔐</span>
-                        <span>Roles & Permissions</span>
+                        <span>Vai trò & Quyền</span>
+                    </Link>
+                    <Link to="/publishing" className="nav-item">
+                        <span className="icon">📤</span>
+                        <span>Xuất bản</span>
+                    </Link>
+                    <Link to="/syllabus-management" className="nav-item">
+                        <span className="icon">📚</span>
+                        <span>Lưu trữ Giáo trình</span>
                     </Link>
                 </nav>
                 <div className="sidebar-footer">
                     <button className="btn btn-logout" onClick={handleLogout}>
                         <span className="icon">🚪</span>
-                        <span>Logout</span>
+                        <span>Đăng xuất</span>
                     </button>
                 </div>
             </aside>
@@ -81,7 +89,7 @@ function Dashboard() {
             <main className="main-content">
                 {/* Header */}
                 <header className="header">
-                    <h1>Dashboard</h1>
+                    <h1>Bảng điều khiển</h1>
                     <div className="header-actions">
                         <span className="user-info">{username}</span>
                         <button className="btn btn-icon" onClick={loadServices} title="Refresh">
@@ -98,7 +106,7 @@ function Dashboard() {
                             <div className="stat-icon">🖥️</div>
                             <div className="stat-info">
                                 <h3>{totalServices}</h3>
-                                <p>Total Services</p>
+                                <p>Tổng số dịch vụ</p>
                             </div>
                         </div>
                         
@@ -106,7 +114,7 @@ function Dashboard() {
                             <div className="stat-icon">✅</div>
                             <div className="stat-info">
                                 <h3>{upServices}</h3>
-                                <p>Services Up</p>
+                                <p>Dịch vụ hoạt động</p>
                             </div>
                         </div>
                         
@@ -114,7 +122,7 @@ function Dashboard() {
                             <div className="stat-icon">❌</div>
                             <div className="stat-info">
                                 <h3>{downServices}</h3>
-                                <p>Services Down</p>
+                                <p>Dịch vụ lỗi</p>
                             </div>
                         </div>
                         
@@ -122,7 +130,7 @@ function Dashboard() {
                             <div className="stat-icon">👥</div>
                             <div className="stat-info">
                                 <h3>1</h3>
-                                <p>Active Users</p>
+                                <p>Người dùng hoạt động</p>
                             </div>
                         </div>
                     </div>
@@ -130,21 +138,21 @@ function Dashboard() {
                     {/* Services Table */}
                     <div className="card">
                         <div className="card-header">
-                            <h2>Registered Services</h2>
+                            <h2>Dịch vụ đã đăng ký</h2>
                         </div>
                         <div className="card-body">
                             {loading ? (
-                                <p>Loading services...</p>
+                                <p>Đang tải danh sách dịch vụ...</p>
                             ) : error ? (
                                 <p className="error">{error}</p>
                             ) : (
                                 <table className="table">
                                     <thead>
                                         <tr>
-                                            <th>Service Name</th>
-                                            <th>Status</th>
-                                            <th>Instances</th>
-                                            <th>Health</th>
+                                            <th>Tên dịch vụ</th>
+                                            <th>Trạng thái</th>
+                                            <th>Phiên bản chạy</th>
+                                            <th>Sức khoẻ</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -159,17 +167,17 @@ function Dashboard() {
                                                         <td><strong>{service.name}</strong></td>
                                                         <td>
                                                             <span className={`badge badge-${status === 'UP' ? 'success' : 'danger'}`}>
-                                                                {status}
+                                                                {status === 'UP' ? 'Hoạt động' : 'Lỗi'}
                                                             </span>
                                                         </td>
                                                         <td>{instances.length}</td>
-                                                        <td>{upCount}/{instances.length} UP</td>
+                                                        <td>{upCount}/{instances.length} Hoạt động</td>
                                                     </tr>
                                                 );
                                             })
                                         ) : (
                                             <tr>
-                                                <td colSpan="4" style={{textAlign: 'center'}}>No services found</td>
+                                                <td colSpan="4" style={{textAlign: 'center'}}>Không có dịch vụ nào</td>
                                             </tr>
                                         )}
                                     </tbody>

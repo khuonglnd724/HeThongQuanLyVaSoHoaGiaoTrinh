@@ -6,6 +6,8 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.List;
+
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -28,4 +30,6 @@ public class RegisterRequest {
     private String fullName;
     
     private String phoneNumber;
+    
+    private List<Long> roleIds;
 }

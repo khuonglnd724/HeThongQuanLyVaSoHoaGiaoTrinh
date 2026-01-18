@@ -1,3 +1,53 @@
+export interface Lecturer {
+  id: number;
+  name: string;
+  email: string;
+  phone?: string;
+  department: string;
+  qualification: string;
+  specialization?: string;
+}
+
+export interface CLO {
+  id?: number;
+  code: string;
+  description: string;
+  bloomLevel: 'REMEMBER' | 'UNDERSTAND' | 'APPLY' | 'ANALYZE' | 'EVALUATE' | 'CREATE';
+}
+
+export interface PLO {
+  id?: number;
+  code: string;
+  description: string;
+  type: 'KNOWLEDGE' | 'SKILL' | 'ATTITUDE';
+}
+
+export interface CLOPLOMapping {
+  id?: number;
+  cloId: number;
+  cloCode: string;
+  plos: PLO[];
+  mappedAt: string;
+}
+
+export interface ApprovalFeedback {
+  id?: string;
+  syllabusId: number;
+  approverName: string;
+  approverRole: 'APPROVER_L1' | 'APPROVER_L2';
+  comments: string;
+  issues: ApprovalIssue[];
+  createdAt: string;
+}
+
+export interface ApprovalIssue {
+  id?: string;
+  type: 'ERROR' | 'WARNING' | 'SUGGESTION';
+  field: string;
+  message: string;
+  status: 'OPEN' | 'RESOLVED';
+}
+
 export interface Syllabus {
   id: number;
   code: string;
@@ -12,11 +62,21 @@ export interface Syllabus {
   teachingMethods: string;
   assessmentMethods: string;
   prerequisites: string;
+  learningOutcomes?: string;
   status: 'DRAFT' | 'SUBMITTED' | 'APPROVED' | 'REJECTED' | 'PUBLISHED';
   approvalStatus: 'PENDING' | 'APPROVED_L1' | 'APPROVED_L2' | 'REJECTED';
   createdBy: string;
   createdAt: string;
   updatedAt: string;
+  lecturerId?: number;
+  lecturerName?: string;
+  lecturerEmail?: string;
+  lecturerDepartment?: string;
+  clos?: CLO[];
+  cloMappings?: CLOPLOMapping[];
+  approvalFeedback?: ApprovalFeedback[];
+  programId?: number;
+  programName?: string;
 }
 
 export interface ValidationResult {

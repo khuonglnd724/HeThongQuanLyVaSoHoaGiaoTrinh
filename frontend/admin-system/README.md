@@ -1,166 +1,171 @@
-# SMD Admin System (React)
+# Admin System
 
-React-based admin portal for SMD Microservices Management System.
+## 👨‍💼 Purpose
 
-## Features
+**Admin System** - Super Admin portal for system management AND syllabus lifecycle management.
 
-- User Authentication & Authorization
-- User Management
-- Role & Permission Management
-- Service Discovery (Eureka Integration)
-- Responsive Dashboard
+### ✅ Vai Trò: ADMIN/SUPER_ADMIN ONLY
 
-## Setup
+**Chức năng System Management**:
+- 👥 User account management
+- 🔐 Role & permissions management
+- ⚙️ System settings
+- 🖥️ Service monitoring
+- 📊 Audit logs
+- 🔍 Health checks
 
-### Prerequisites
-- Node.js 16+
-- npm 7+
+**Chức năng Syllabus Lifecycle**:
+- 📢 **Publish** approved syllabuses (make public)
+- 🔒 **Unpublish** syllabuses (remove from public)
+- 📦 **Archive** old syllabuses (with reason)
+- 📋 View all syllabuses (Approved/Published/Archived)
+- 📈 Syllabus statistics
 
-### Installation
+### ❌ Không Có
+
+- ❌ Lecturer features → Xem `lecturer-portal/syllabus-builder` (Port 5173)
+- ❌ AA review → Xem `academic-portal` (Port 5174)
+- ❌ Syllabus creation/editing → Lecturer portal
+
+---
+
+## 🚀 Quick Start
 
 ```bash
 cd frontend/admin-system
 npm install
-```
-
-### Development
-
-```bash
 npm start
+# → http://localhost:3001
 ```
 
-The application will open at `http://localhost:3000`
-
-### Build
-
-```bash
-npm run build
+### Default Login:
+```
+Username: admin
+Password: admin123
 ```
 
-Production-ready files will be in the `build/` directory.
+---
 
-## Project Structure
+## 📂 Structure
 
 ```
-src/
-├── pages/
-│   ├── Login.js          # Login page
-│   ├── Dashboard.js      # Main dashboard
-│   ├── Users.js          # User management
-│   ├── Roles.js          # Role & permission management
-│   └── Services.js       # Service discovery
-├── components/           # Reusable components
-├── utils/
-│   └── api.js           # API client utilities
-├── App.js               # Main app with routing
-└── index.css            # Styles
+admin-system/
+├── src/
+│   ├── components/
+│   │   └── AdminSyllabusManagement.tsx ✅ NEW
+│   ├── pages/
+│   │   ├── Dashboard.js
+│   │   ├── Users.js
+│   │   ├── Roles.js
+│   │   ├── Services.js
+│   │   ├── SystemSettings.js
+│   │   └── ...
+│   ├── utils/
+│   │   └── api.js
+│   └── App.js
 ```
 
-## Environment Configuration
+---
 
-Update API endpoints in `src/utils/api.js`:
+## 🎯 Workflow Integration
 
-```javascript
-const API_BASE_URL = 'http://localhost:8081';  // Auth service
-const EUREKA_URL = 'http://localhost:8761';    // Eureka
-const CONFIG_SERVER_URL = 'http://localhost:8888';
+```
+Lecturer → HoD → AA → Principal → ADMIN (HERE!) → Published
+                                     ↓
+                              Publish/Archive Control
+                              - Make public
+                              - Remove from public
+                              - Archive old versions
 ```
 
-## Login Credentials
+### Admin Workflow:
 
-- **Username**: `admin`
-- **Password**: `admin123`
+1. **View Approved Syllabuses** (tab: Approved)
+   - Syllabuses approved by Principal
+   - Ready to publish
 
-## API Integration
+2. **Publish** → Make public
+   - Students/Public can view
+   - Status: PUBLISHED
 
-The application connects to:
-- Auth Service (port 8081)
-- Eureka (port 8761)
-- Config Server (port 8888)
+3. **Manage Published** (tab: Published)
+   - View all published syllabuses
+   - Unpublish if needed
+   - Archive when outdated
 
-## Available Pages
+4. **Archive** (tab: Archived)
+   - Old/obsolete syllabuses
+   - With archive reason
+   - Preserved for records
 
-1. **Dashboard** - Overview of services and instances
-2. **Users** - User CRUD operations
-3. **Roles** - Role and permission management
-4. **Services** - Service discovery and status
+---
 
-## Deployment
+## 📋 Features
 
-For production deployment:
+### System Management:
+- ✅ User accounts (all users)
+- ✅ Role assignments (Lecturer, AA, Admin, etc.)
+- ✅ Service health monitoring (Eureka integration)
+- ✅ System settings
+- ✅ Audit logs
 
-1. Build the application:
-   ```bash
-   npm run build
-   ```
+### Syllabus Management (NEW):
+- ✅ Publish approved syllabuses
+- ✅ Unpublish published syllabuses
+- ✅ Archive with reason
+- ✅ Search syllabuses
+- ✅ View statistics
+- ✅ 3 tabs: Approved / Published / Archived
 
-2. Copy the `build/` directory to your web server or use Docker.
+---
 
-## Technologies
+## 🔗 Related Portals
 
-- React 18
-- React Router v6
-- ES6+ JavaScript
-- CSS3
+| Portal | Port | Role | Purpose |
+|--------|------|------|---------|
+| **Lecturer Portal** | 5173 | Lecturer | Create, edit syllabuses |
+| **Academic Portal** | 5174 | AA | Review Level 2, validate |
+| **Admin System** | 3001 | Admin | Publish, Archive, System |
 
+---
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+## 🎨 UI Features
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+- **3 Tabs Navigation**:
+  - Approved (ready to publish)
+  - Published (currently public)
+  - Archived (old versions)
 
-### `npm test`
+- **Actions**:
+  - 📢 Publish button (with confirmation)
+  - 🔒 Unpublish button (with confirmation)
+  - 📦 Archive button (with reason modal)
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+- **Search**: By code, name, or lecturer
+- **Stats**: Total count, last updated
 
-### `npm run build`
+---
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+## 🔧 Backend APIs Required
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+```java
+// Syllabus Lifecycle
+POST   /api/syllabus/{id}/publish
+POST   /api/syllabus/{id}/unpublish
+POST   /api/syllabus/{id}/archive
+GET    /api/syllabus/published
+GET    /api/syllabus/archived
+GET    /api/syllabus/all
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+// System Management (existing)
+GET    /api/users
+POST   /api/users
+GET    /api/roles
+...
+```
 
-### `npm run eject`
+---
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
-
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
-
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
-
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
-
-## Learn More
-
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
-
-To learn React, check out the [React documentation](https://reactjs.org/).
-
-### Code Splitting
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
-
-### Analyzing the Bundle Size
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
-
-### Making a Progressive Web App
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
-
-### Advanced Configuration
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
-
-### Deployment
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+**Port**: 3001  
+**Role**: Admin/Super Admin only  
+**Updated**: Jan 18, 2026

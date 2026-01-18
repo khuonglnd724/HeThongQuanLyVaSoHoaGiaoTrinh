@@ -28,8 +28,9 @@ public class CorrelationIdFilter implements GlobalFilter, Ordered {
             .build();
 
         log.debug("CorrelationId assigned: {} for path {}", correlationId, exchange.getRequest().getPath());
-        return chain.filter(mutated)
-            .doFinally(signal -> mutated.getResponse().getHeaders().add(CorrelationIdUtils.HEADER, correlationId));
+        // Add the correlation id to the response headers before the response is committed
+        mutated.getResponse().getHeaders().add(CorrelationIdUtils.HEADER, correlationId);
+        return chain.filter(mutated);
     }
 
     @Override

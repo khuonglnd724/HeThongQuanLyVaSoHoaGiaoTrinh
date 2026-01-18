@@ -1,121 +1,90 @@
-# Academic Portal Frontend
+# Academic Affairs Portal
 
-Frontend riêng cho Academic Service - Quản Lý Giáo Trình Học Thuật
+## 📋 Purpose
 
-## Các tính năng chính
+**Academic Affairs (AA) Portal** - Dành riêng cho nhân viên Academic Affairs để duyệt giáo trình cấp 2.
 
-- **Danh sách giáo trình**: Xem, tìm kiếm, lọc giáo trình
-- **Kiểm tra hợp lệ**: Kiểm tra điểm số giáo trình (7 tiêu chí)
-- **Lịch sử phiên bản**: Xem lịch sử thay đổi và so sánh phiên bản
-- **Quy trình phê duyệt**: Gửi, phê duyệt, từ chối ở 2 cấp độ
-- **Thống kê**: Dashboard với thống kê CLO-PLO coverage
-- **Thông báo**: Hệ thống thông báo real-time
+### ✅ Vai Trò: ACADEMIC AFFAIRS ONLY
 
-## Công nghệ
+**Chức năng**:
+- Review syllabuses (Level 2 approval)
+- Validate CLO-PLO mapping
+- Check credit structure
+- Check assessment rules
+- Approve/Reject syllabuses
+- Statistics và báo cáo
 
-- React 18.3.1
-- TypeScript 5.5.4
-- Vite 5.4.1
-- Axios 1.6.8
-- React Router DOM 6.26.2
-- Recharts 2.12.0
+### ❌ Không Có
 
-## Cấu trúc thư mục
+- ❌ Lecturer features → Xem `lecturer-portal/syllabus-builder` (Port 5173)
+- ❌ Admin publish/archive → Xem `admin-system` (Port 3001)
+- ❌ HoD approval → Sẽ implement sau
+- ❌ Principal approval → Sẽ implement sau
+
+---
+
+## 🚀 Quick Start
+
+```bash
+cd frontend/academic-portal
+npm install
+npm run dev
+# → http://localhost:5174
+```
+
+### Test AA Role:
+
+```javascript
+// Browser Console
+localStorage.setItem('user_role', 'AA');
+localStorage.setItem('token', 'test-token');
+// Reload → Thấy "📋 AA Reviews" button
+```
+
+---
+
+## 📂 Structure
 
 ```
 academic-portal/
 ├── src/
-│   ├── components/          # React components
-│   │   ├── SyllabusList.tsx
-│   │   ├── VersionHistory.tsx
+│   ├── components/
+│   │   ├── AA/  ✅ AA Review Components
+│   │   │   ├── AAPendingReviews.tsx
+│   │   │   ├── AAPendingReviews.css
+│   │   │   ├── AASyllabusReview.tsx
+│   │   │   └── AASyllabusReview.css
 │   │   ├── Statistics.tsx
-│   │   ├── Notifications.tsx
-│   │   └── *.css
-│   ├── pages/               # Page components (future)
-│   ├── services/            # API services
-│   │   └── academicService.ts
-│   ├── types/               # TypeScript types
-│   │   └── index.ts
+│   │   ├── Login.tsx
+│   │   └── Notifications.tsx
+│   ├── services/
+│   │   └── authService.ts
 │   ├── App.tsx
-│   ├── App.css
-│   ├── main.tsx
-│   └── index.css
-├── package.json
-├── tsconfig.json
-├── vite.config.ts
-├── index.html
-└── README.md
+│   └── App.css
 ```
 
-## Cài đặt & Chạy
+---
 
-```bash
-# Cài đặt dependencies
-npm install
-
-# Chạy dev server (port 5174)
-npm run dev
-
-# Build production
-npm run build
-
-# Preview build
-npm run preview
-```
-
-## API Endpoints (được gọi từ academicService)
-
-### Syllabus CRUD
-- `GET /api/academic/syllabuses` - Danh sách giáo trình
-- `POST /api/academic/syllabuses` - Tạo giáo trình mới
-- `PUT /api/academic/syllabuses/{id}` - Cập nhật giáo trình
-- `DELETE /api/academic/syllabuses/{id}` - Xóa giáo trình
-
-### Validation
-- `POST /api/academic/syllabuses/{id}/validate-approval` - Kiểm tra phê duyệt
-- `POST /api/academic/syllabuses/{id}/validate-prerequisites` - Kiểm tra điều kiện tiên quyết
-
-### Approval Workflow
-- `POST /api/academic/syllabuses/{id}/submit-level1` - Gửi cấp 1
-- `POST /api/academic/syllabuses/{id}/approve-level1` - Phê duyệt cấp 1
-- `POST /api/academic/syllabuses/{id}/reject-level1` - Từ chối cấp 1
-- `POST /api/academic/syllabuses/{id}/approve-level2` - Phê duyệt cấp 2
-- `POST /api/academic/syllabuses/{id}/reject-level2` - Từ chối cấp 2
-
-### Version History
-- `GET /api/academic/syllabuses/{id}/versions` - Lịch sử phiên bản
-- `GET /api/academic/syllabuses/{id}/compare` - So sánh phiên bản
-- `GET /api/academic/syllabuses/{id}/versions/latest` - Phiên bản mới nhất
-
-### Search & Filter
-- `GET /api/academic/syllabuses/search` - Tìm kiếm
-- `GET /api/academic/syllabuses/pending-approval` - Chờ phê duyệt
-- `GET /api/academic/syllabuses/rejected` - Bị từ chối
-- `GET /api/academic/syllabuses/approved` - Đã phê duyệt
-
-### Statistics
-- `GET /api/academic/statistics/department` - Thống kê toàn bộ
-- `GET /api/academic/statistics/programs` - Thống kê theo chương trình
-- `GET /api/academic/statistics/subjects` - Thống kê theo môn học
-- `GET /api/academic/statistics/low-coverage` - Môn học coverage thấp
-
-### Notifications
-- `GET /api/academic/notifications` - Danh sách thông báo
-- `GET /api/academic/notifications/unread` - Thông báo chưa đọc
-- `PUT /api/academic/notifications/{id}/read` - Đánh dấu đã đọc
-- `DELETE /api/academic/notifications/{id}` - Xóa thông báo
-
-## Biến môi trường
-
-Tạo file `.env.local` tại thư mục gốc:
+## 🎯 Workflow
 
 ```
-VITE_API_URL=http://localhost:8080/api/academic
+Lecturer → [HoD] → AA (HERE!) → Principal → Admin Publish
+                     ↑
+              Academic Affairs
+              - Review Level 2
+              - Validate Rules
+              - Approve/Reject
 ```
 
-## Lưu ý
+---
 
-- Frontend này là riêng cho Academic Service
-- Sử dụng REST API qua axios
-- Hỗ trợ authentication token (localStorage)
-- Responsive design cho mobile, tablet, desktop
+## 🔗 Related Portals
+
+- **Lecturer Portal** (Port 5173) - Tạo, sửa syllabus
+- **Admin System** (Port 3001) - Publish, Archive, System Management
+
+---
+
+**Port**: 5174  
+**Role**: Academic Affairs (AA) only  
+**Updated**: Jan 18, 2026

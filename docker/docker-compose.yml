@@ -129,6 +129,7 @@ services:
       JAVA_OPTS: "-Xmx256m -Xms256m"
       EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE: http://discovery-server:8761/eureka
       SPRING_CONFIG_IMPORT: "optional:configserver:http://config-server:8888"
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
     command: java -jar academic-service-0.0.1-SNAPSHOT.jar
     depends_on:
       discovery-server:
