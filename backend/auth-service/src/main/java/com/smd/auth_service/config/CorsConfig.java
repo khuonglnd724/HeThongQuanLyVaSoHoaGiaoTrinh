@@ -17,11 +17,17 @@ public class CorsConfig {
         
         // Allow requests from frontend
         configuration.setAllowedOrigins(Arrays.asList(
-            "http://localhost:3000",      // Frontend dev server
+            "http://localhost:3000",      // Frontend dev server (port 3000)
+            "http://localhost:3001",      // Frontend dev server (port 3001)
+            "http://localhost:3002",      // Admin system
+            "http://localhost:5174",      // Academic portal (Vite)
             "http://localhost:9000",      // Frontend Python server
             "http://localhost:80",         // Frontend via nginx
             "http://localhost",            // Direct localhost
             "http://127.0.0.1:3000",
+            "http://127.0.0.1:3001",
+            "http://127.0.0.1:3002",
+            "http://127.0.0.1:5174",
             "http://127.0.0.1:9000",
             "http://127.0.0.1",
             "http://localhost:8080"        // Via API Gateway

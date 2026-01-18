@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import academicService from '../services/academicService';
+import syllabusService from '../services/syllabusService';
 import { Syllabus, ValidationResult } from '../types';
 import './SyllabusList.css';
 
 interface SyllabusListProps {
   onSelectSyllabus: (syllabus: Syllabus) => void;
+  userRole?: string;
 }
 
-const SyllabusList: React.FC<SyllabusListProps> = ({ onSelectSyllabus }) => {
+const SyllabusList: React.FC<SyllabusListProps> = ({ onSelectSyllabus, userRole = 'LECTURER' }) => {
   const [syllabuses, setSyllabuses] = useState<Syllabus[]>([]);
   const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(0);
@@ -25,14 +26,21 @@ const SyllabusList: React.FC<SyllabusListProps> = ({ onSelectSyllabus }) => {
       setLoading(true);
       let response;
 
-      if (filterStatus === 'PENDING') {
-        response = await academicService.getPendingApprovalSyllabuses(page, 10);
+      // For lecturers, show their own syllabuses by default
+      if (userRole === 'LECTURER' && !filterStatus) {
+        response = await syllabusService.getMySyllabuses(page, 10);
+      } else if (filterStatus === 'PENDING') {
+        response = await syllabusService.getPendingApprovalSyllabuses(page, 10);
       } else if (filterStatus === 'REJECTED') {
-        response = await academicService.getRejectedSyllabuses(page, 10);
+        response = await syllabusService.getRejectedSyllabuses(page, 10);
       } else if (filterStatus === 'APPROVED') {
-        response = await academicService.getApprovedSyllabuses(page, 10);
+        response = await syllabusService.getApprovedSyllabuses(page, 10);
+      } else if (filterStatus === 'DRAFT') {
+        response = await syllabusService.getDraftSyllabuses(page, 10);
+      } else if (filterStatus === 'PUBLISHED') {
+        response = await syllabusService.getPublishedSyllabuses(page, 10);
       } else {
-        response = await academicService.getSyllabuses(page, 10);
+        response = await syllabusService.getSyllabuses(page, 10);
       }
 
       setSyllabuses(response.content || response);
@@ -53,7 +61,7 @@ const SyllabusList: React.FC<SyllabusListProps> = ({ onSelectSyllabus }) => {
 
     try {
       setLoading(true);
-      const response = await academicService.searchByCodeOrName(searchKeyword, 0, 10);
+      const response = await syllabusService.searchByCodeOrName(searchKeyword, 0, 10);
       setSyllabuses(response.content || response);
       setPage(0);
     } catch (error) {
@@ -66,7 +74,7 @@ const SyllabusList: React.FC<SyllabusListProps> = ({ onSelectSyllabus }) => {
 
   const handleValidate = async (syllabusId: number) => {
     try {
-      const result = await academicService.validateApproval(syllabusId);
+      const result = await syllabusService.validateApproval(syllabusId);
       setValidationResults(new Map(validationResults).set(syllabusId, result));
     } catch (error) {
       console.error('Error validating syllabus:', error);
@@ -125,9 +133,15 @@ const SyllabusList: React.FC<SyllabusListProps> = ({ onSelectSyllabus }) => {
             className="filter-select"
           >
             <option value="">Tất cả trạng thái</option>
-            <option value="PENDING">Chờ phê duyệt</option>
+            {userRole === 'LECTURER' && (
+              <>
+                <option value="DRAFT">Nháp</option>
+                <option value="PENDING">Chờ phê duyệt</option>
+              </>
+            )}
             <option value="APPROVED">Đã phê duyệt</option>
             <option value="REJECTED">Bị từ chối</option>
+            <option value="PUBLISHED">Xuất bản</option>
           </select>
         </div>
       </div>

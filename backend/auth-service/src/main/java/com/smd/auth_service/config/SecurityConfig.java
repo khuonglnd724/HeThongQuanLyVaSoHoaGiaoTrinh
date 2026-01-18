@@ -12,6 +12,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfigurationSource;
+import static org.springframework.security.config.Customizer.withDefaults;
 
 import com.smd.auth_service.security.AuthTokenFilter;
 import com.smd.auth_service.security.UserDetailsServiceImpl;
@@ -40,9 +41,10 @@ public class SecurityConfig {
     }
 
     @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http, AuthTokenFilter authTokenFilter) throws Exception {
+        public SecurityFilterChain filterChain(HttpSecurity http, AuthTokenFilter authTokenFilter, CorsConfigurationSource corsConfigurationSource) throws Exception {
         http
                 .csrf(csrf -> csrf.disable())
+            .cors(withDefaults()) // enable CORS using CorsConfigurationSource bean
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(

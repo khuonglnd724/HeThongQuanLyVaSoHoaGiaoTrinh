@@ -44,31 +44,39 @@ function Roles() {
             {/* Sidebar */}
             <aside className="sidebar">
                 <div className="sidebar-header">
-                    <h2>SMD Admin</h2>
+                    <h2>Quản trị SMD</h2>
                 </div>
                 <nav className="sidebar-nav">
                     <Link to="/dashboard" className="nav-item">
                         <span className="icon">📊</span>
-                        <span>Dashboard</span>
+                        <span>Bảng điều khiển</span>
                     </Link>
                     <Link to="/services" className="nav-item">
                         <span className="icon">⚙️</span>
-                        <span>Services</span>
+                        <span>Dịch vụ</span>
                     </Link>
                     <div className="nav-divider"></div>
                     <Link to="/users" className="nav-item">
                         <span className="icon">👥</span>
-                        <span>User Management</span>
+                        <span>Quản lý người dùng</span>
                     </Link>
                     <Link to="/roles" className="nav-item active">
                         <span className="icon">🔐</span>
-                        <span>Roles & Permissions</span>
+                        <span>Vai trò & Quyền</span>
+                    </Link>
+                    <Link to="/publishing" className="nav-item">
+                        <span className="icon">📤</span>
+                        <span>Xuất bản</span>
+                    </Link>
+                    <Link to="/syllabus-management" className="nav-item">
+                        <span className="icon">📚</span>
+                        <span>Lưu trữ Giáo trình</span>
                     </Link>
                 </nav>
                 <div className="sidebar-footer">
                     <button className="btn btn-logout" onClick={handleLogout}>
                         <span className="icon">🚪</span>
-                        <span>Logout</span>
+                        <span>Đăng xuất</span>
                     </button>
                 </div>
             </aside>
@@ -77,7 +85,7 @@ function Roles() {
             <main className="main-content">
                 {/* Header */}
                 <header className="header">
-                    <h1>Roles & Permissions</h1>
+                    <h1>Vai trò & Quyền</h1>
                 </header>
 
                 {/* Content */}

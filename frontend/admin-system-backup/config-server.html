@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Config Server - SMD Admin</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="app-container">
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <h2>SMD Admin</h2>
+            </div>
+            <nav class="sidebar-nav">
+    <a href="dashboard.html" class="nav-item">
+        <span class="icon">📊</span>
+        <span>Dashboard</span>
+    </a>
+    <a href="services.html" class="nav-item">
+        <span class="icon">⚙️</span>
+        <span>Services</span>
+    </a>
+    <a href="eureka.html" class="nav-item">
+        <span class="icon">🔍</span>
+        <span>Eureka Registry</span>
+    </a>
+    <a href="config-server.html" class="nav-item active">
+        <span class="icon">📝</span>
+        <span>Config Server</span>
+    </a>
+    
+    <!-- Divider -->
+    <div class="nav-divider"></div>
+    
+    <!-- User Management Section -->
+    <a href="users.html" class="nav-item">
+        <span class="icon">👥</span>
+        <span>User Management</span>
+    </a>
+    <a href="roles.html" class="nav-item">
+        <span class="icon">🔐</span>
+        <span>Roles & Permissions</span>
+    </a>
+</nav>
+            <div class="sidebar-footer">
+                <button id="logoutBtn" class="btn btn-logout">
+                    <span class="icon">🚪</span>
+                    <span>Logout</span>
+                </button>
+            </div>
+        </aside>
+
+        <main class="main-content">
+            <header class="header">
+                <h1>Configuration Server</h1>
+                <div class="header-actions">
+                    <button id="refreshBtn" class="btn btn-icon">🔄</button>
+                </div>
+            </header>
+
+            <div class="content">
+                <div class="section">
+                    <h2>Service Configuration</h2>
+                    <div class="config-selector">
+                        <select id="serviceSelect" class="filter-select">
+                            <option value="">Select a service...</option>
+                            <option value="api-gateway">API Gateway</option>
+                            <option value="auth-service">Auth Service</option>
+                            <option value="academic-service">Academic Service</option>
+                            <option value="public-service">Public Service</option>
+                            <option value="workflow-service">Workflow Service</option>
+                            <option value="syllabus-service">Syllabus Service</option>
+                        </select>
+                        <select id="profileSelect" class="filter-select">
+                            <option value="default">default</option>
+                            <option value="dev">dev</option>
+                            <option value="prod">prod</option>
+                        </select>
+                        <button id="loadConfigBtn" class="btn btn-primary">Load Config</button>
+                    </div>
+                </div>
+
+                <div class="section">
+                    <h2>Configuration Details</h2>
+                    <div id="configContent" class="config-content">
+                        <p class="text-muted">Select a service to view its configuration</p>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="js/common.js"></script>
+    <script src="js/api.js"></script>
+    <script>
+        document.getElementById('loadConfigBtn').addEventListener('click', async () => {
+            const service = document.getElementById('serviceSelect').value;
+            const profile = document.getElementById('profileSelect').value;
+            
+            if (!service) {
+                alert('Please select a service');
+                return;
+            }
+            
+            const configContent = document.getElementById('configContent');
+            configContent.innerHTML = '<div class="loading">Loading configuration...</div>';
+            
+            try {
+                const config = await fetchConfigServer(service, profile);
+                configContent.innerHTML = `<pre>${JSON.stringify(config, null, 2)}</pre>`;
+            } catch (error) {
+                configContent.innerHTML = `<div class="error">Failed to load configuration: ${error.message}</div>`;
+            }
+        });
+
+        checkAuth();
+    </script>
+</body>
+</html>
