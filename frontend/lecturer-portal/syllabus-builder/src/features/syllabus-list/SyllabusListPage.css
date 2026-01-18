@@ -2,13 +2,18 @@
   display: flex;
   flex-direction: column;
   gap: 16px;
+
+  /* ✅ làm trang list kéo full theo container cha */
+  width: 100%;
 }
 
+/* ===== Header ===== */
 .pageHeader {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
   gap: 16px;
+  width: 100%;
 }
 
 .pageTitle {
@@ -30,17 +35,71 @@
   align-items: center;
 }
 
-/* Filters */
+/* ===== Buttons (đẹp) ===== */
+.btn-primary-action {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: #fff;
+  border: none;
+  padding: 10px 18px;
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 800;
+  transition: all 0.25s ease;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.14);
+}
+
+.btn-primary-action:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.18);
+}
+
+.btn-primary-action:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.btn-secondary-action {
+  background: #f7f7f7;
+  color: #222;
+  border: 1px solid #ddd;
+  padding: 10px 16px;
+  border-radius: 12px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 800;
+  transition: all 0.2s ease;
+}
+
+.btn-secondary-action:hover {
+  background: #ececec;
+  border-color: #bbb;
+  transform: translateY(-1px);
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.10);
+}
+
+.btn-secondary-action:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+/* ===== Filters ===== */
 .filtersBar {
   background: #fff;
   border: 1px solid #e9e9e9;
-  border-radius: 8px;
+  border-radius: 12px;
   padding: 14px;
+
+  /* ✅ quan trọng: full width */
+  width: 100%;
+
   display: grid;
   grid-template-columns: 1.4fr 0.9fr 0.7fr auto;
   gap: 14px;
   align-items: end;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.05);
 }
 
 .filterGroup {
@@ -59,7 +118,7 @@
   width: 100%;
   padding: 10px 12px;
   border: 1px solid #ddd;
-  border-radius: 6px;
+  border-radius: 10px;
   background: #fff;
   font-size: 14px;
   color: #222;
@@ -78,22 +137,26 @@
   align-items: end;
 }
 
-/* Error alert */
+/* ===== Error alert ===== */
 .alertError {
+  width: 100%;
   background: #fff5f5;
   border: 1px solid #f5c2c7;
   color: #8a1f2b;
   padding: 12px 14px;
-  border-radius: 8px;
+  border-radius: 12px;
 }
 
-/* Table card */
+/* ===== Table card ===== */
 .tableCard {
   background: #fff;
   border: 1px solid #e9e9e9;
-  border-radius: 10px;
+  border-radius: 12px;
   overflow: hidden;
-  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 1px 8px rgba(0, 0, 0, 0.06);
+
+  /* ✅ quan trọng: full width */
+  width: 100%;
 }
 
 .tableMeta {
@@ -126,7 +189,7 @@
 
 .table th {
   color: #666;
-  font-weight: 700;
+  font-weight: 800;
   background: #fafafa;
 }
 
@@ -147,7 +210,7 @@
   color: #666;
 }
 
-/* Subject */
+/* ===== Subject ===== */
 .subjectMain {
   display: flex;
   flex-direction: column;
@@ -155,7 +218,7 @@
 }
 
 .subjectCode {
-  font-weight: 800;
+  font-weight: 900;
   color: #111;
 }
 
@@ -164,10 +227,10 @@
   color: #666;
 }
 
-/* Badges */
+/* ===== Badges ===== */
 .versionBadge {
   display: inline-block;
-  padding: 3px 10px;
+  padding: 4px 10px;
   border-radius: 999px;
   border: 1px solid #ddd;
   font-size: 12px;
@@ -180,13 +243,13 @@
   padding: 4px 10px;
   border-radius: 999px;
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 800;
   border: 1px solid #ddd;
   background: #fff;
   color: #333;
 }
 
-/* Basic status colors */
+/* Status colors */
 .status-draft {
   border-color: rgba(102, 126, 234, 0.35);
   background: rgba(102, 126, 234, 0.08);
@@ -201,26 +264,26 @@
 .status-pending_approval,
 .status-pending-approval {
   border-color: rgba(23, 162, 184, 0.35);
-  background: rgba(23, 162, 184, 0.10);
+  background: rgba(23, 162, 184, 0.1);
   color: #0a6676;
 }
 .status-approved {
   border-color: rgba(40, 167, 69, 0.35);
-  background: rgba(40, 167, 69, 0.10);
+  background: rgba(40, 167, 69, 0.1);
   color: #19692c;
 }
 .status-published {
   border-color: rgba(40, 167, 69, 0.35);
-  background: rgba(40, 167, 69, 0.10);
+  background: rgba(40, 167, 69, 0.1);
   color: #19692c;
 }
 .status-rejected {
   border-color: rgba(220, 53, 69, 0.35);
-  background: rgba(220, 53, 69, 0.10);
+  background: rgba(220, 53, 69, 0.1);
   color: #8f1d2a;
 }
 
-/* Pagination */
+/* ===== Pagination ===== */
 .paginationBar {
   display: flex;
   justify-content: flex-end;
