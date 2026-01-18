@@ -95,13 +95,13 @@ export default function SyllabusListPage() {
     <div className="syllabusListPage">
       <div className="pageHeader">
         <div>
-          <h2 className="pageTitle">Syllabus List</h2>
-          <div className="pageSubtitle">Search, filter, and manage syllabus versions</div>
+          <h2 className="pageTitle">Danh sách giáo trình</h2>
+          <div className="pageSubtitle">Tìm kiếm, lọc và quản lý các phiên bản giáo trình</div>
         </div>
 
         <div className="headerActions">
-          <button className="btnPrimary" onClick={() => nav("/syllabus/new")}>
-            + New Draft
+          <button className="btn-primary" onClick={() => nav("/syllabus/new")}>
+            + Tạo bản nháp
           </button>
         </div>
       </div>
@@ -157,7 +157,7 @@ export default function SyllabusListPage() {
         </div>
 
         <div className="filterRight">
-          <button className="btn" onClick={load} disabled={loading}>
+          <button className="btn-secondary" onClick={load} disabled={loading}>
             Refresh
           </button>
         </div>
@@ -220,7 +220,7 @@ export default function SyllabusListPage() {
                     </td>
                     <td>{formatDate(it.updatedAt || it.createdAt)}</td>
                     <td className="tdRight">
-                      <button className="btn" onClick={() => onOpen(it)}>
+                      <button className="btn-info" onClick={() => onOpen(it)}>
                         Open
                       </button>
                     </td>
@@ -232,10 +232,14 @@ export default function SyllabusListPage() {
         </div>
 
         <div className="paginationBar">
-          <button className="btn" onClick={onPrev} disabled={loading || page <= 0}>
+          <button className="btn-secondary" onClick={onPrev} disabled={loading || page <= 0}>
             Prev
           </button>
-          <button className="btn" onClick={onNext} disabled={loading || (totalPages > 0 && page >= totalPages - 1)}>
+          <button
+            className="btn-secondary"
+            onClick={onNext}
+            disabled={loading || (totalPages > 0 && page >= totalPages - 1)}
+          >
             Next
           </button>
         </div>
