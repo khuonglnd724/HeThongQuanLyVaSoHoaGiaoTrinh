@@ -3,6 +3,7 @@ package com.smd.syllabus.service;
 import com.smd.syllabus.domain.Notification;
 import com.smd.syllabus.domain.NotificationType;
 import com.smd.syllabus.domain.SyllabusFollow;
+import com.smd.syllabus.notification.NotificationBroadcaster;
 import com.smd.syllabus.repository.NotificationRepository;
 import com.smd.syllabus.repository.SyllabusFollowRepository;
 import org.springframework.stereotype.Service;
@@ -17,11 +18,14 @@ public class NotificationService {
 
     private final NotificationRepository notificationRepository;
     private final SyllabusFollowRepository followRepository;
+    private final NotificationBroadcaster broadcaster;
 
     public NotificationService(NotificationRepository notificationRepository,
-            SyllabusFollowRepository followRepository) {
+            SyllabusFollowRepository followRepository,
+            NotificationBroadcaster broadcaster) {
         this.notificationRepository = notificationRepository;
         this.followRepository = followRepository;
+        this.broadcaster = broadcaster;
     }
 
     @Transactional
@@ -30,6 +34,7 @@ public class NotificationService {
             String message,
             UUID syllabusRootId,
             UUID syllabusId) {
+
         if (userId == null || userId.isBlank())
             throw new IllegalArgumentException("userId is required");
         if (type == null)
@@ -46,7 +51,12 @@ public class NotificationService {
         n.setRead(false);
         n.setReadAt(null);
 
-        return notificationRepository.save(n);
+        Notification saved = notificationRepository.save(n);
+
+        // Push SSE realtime
+        broadcaster.notifyUser(saved.getUserId(), saved);
+
+        return saved;
     }
 
     @Transactional
@@ -55,7 +65,6 @@ public class NotificationService {
             NotificationType type,
             String message,
             String excludeUserId) {
-
         if (syllabusRootId == null)
             return;
 
@@ -73,6 +82,13 @@ public class NotificationService {
         for (String uid : userIds) {
             create(uid, type, message, syllabusRootId, syllabusId);
         }
+    }
+
+    /** Dedupe helper cho deadline reminder */
+    @Transactional(readOnly = true)
+    public boolean hasRecentReminder(String userId, UUID syllabusId, Instant after) {
+        return notificationRepository.existsByUserIdAndTypeAndSyllabusIdAndCreatedAtAfter(
+                userId, NotificationType.DEADLINE_REMINDER, syllabusId, after);
     }
 
     @Transactional(readOnly = true)
