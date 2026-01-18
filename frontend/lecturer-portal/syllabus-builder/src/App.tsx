@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate, useNavigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from "react-router-dom";
 
 import SyllabusListPage from "./features/syllabus-list/SyllabusListPage";
 import SyllabusEditorPage from "./features/syllabus-editor/SyllabusEditorPage";
@@ -9,23 +9,26 @@ import "./App.css";
 
 function Layout() {
   const navigate = useNavigate();
+  const location = useLocation();
+
+  const isActive = (path: string) => location.pathname === path;
 
   return (
     <div className="app">
       <header className="app-header">
         <div className="header-content">
-          <h1>Quản Lý Giáo Trình Học Thuật</h1>
+          <h1>Lecturer Portal</h1>
 
           <div className="header-actions">
             <button
-              className="btn-stats"
+              className={`btn-nav ${isActive("/") ? "active" : ""}`}
               onClick={() => navigate("/")}
             >
               📋 Danh sách
             </button>
 
             <button
-              className="btn-notifications"
+              className={`btn-nav ${isActive("/notifications") ? "active" : ""}`}
               onClick={() => navigate("/notifications")}
             >
               🔔 Thông báo
