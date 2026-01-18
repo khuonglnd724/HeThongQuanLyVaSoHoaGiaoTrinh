@@ -1,0 +1,79 @@
+.syllabus-page {
+  padding: 16px;
+  font-family: system-ui, Arial;
+}
+
+.syllabus-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.subtitle {
+  font-size: 12px;
+  opacity: 0.7;
+}
+
+.toolbar {
+  display: flex;
+  gap: 12px;
+  margin: 16px 0;
+  align-items: flex-end;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+}
+
+.field input,
+.field select {
+  padding: 6px 8px;
+  min-width: 200px;
+}
+
+.syllabus-table {
+  width: 100%;
+  border-collapse: collapse;
+  border: 1px solid #eee;
+}
+
+.syllabus-table th,
+.syllabus-table td {
+  padding: 10px;
+  border-bottom: 1px solid #eee;
+  font-size: 13px;
+}
+
+.badge {
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid #ddd;
+  font-size: 12px;
+}
+
+.empty {
+  text-align: center;
+  color: #888;
+}
+
+.pagination {
+  margin-top: 12px;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.error {
+  color: crimson;
+  margin-bottom: 8px;
+}
+
+.info {
+  margin-bottom: 8px;
+
+.colActions { width: 140px; }
+.tdRight { text-align: right; }
+}

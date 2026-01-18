@@ -4,15 +4,17 @@ server:
 spring:
   application:
     name: auth-service
-  
-  # Database Configuration
+
+  redis:
+    host: ${SPRING_REDIS_HOST:localhost}
+    port: ${SPRING_REDIS_PORT:6379}
+
   datasource:
     url: jdbc:postgresql://postgres:5432/auth_db
     username: postgres
     password: 123456
     driver-class-name: org.postgresql.Driver
-  
-  # JPA Configuration
+
   jpa:
     hibernate:
       ddl-auto: update
@@ -21,25 +23,27 @@ spring:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
         format_sql: true
-  
-  # Config Server Configuration
+
   config:
     import: optional:configserver:http://config-server:8888
 
-# JWT Configuration
+security:
+  jwt:
+    accessTokenMinutes: 15
+    refreshTokenDays: 7
+
 app:
   jwtSecret: smdMicroservicesSecretKeyForJWTTokenGenerationAndValidation2024SuperSecureKeyWithEnoughBytesForHS512HS512HS512
   jwtExpirationMs: 86400000
   jwtRefreshExpirationMs: 604800000
 
-# Eureka Client Configuration
 eureka:
   client:
     service-url:
       defaultZone: http://discovery-server:8761/eureka
   instance:
     prefer-ip-address: true
-# Management endpoints
+
 management:
   endpoints:
     web:

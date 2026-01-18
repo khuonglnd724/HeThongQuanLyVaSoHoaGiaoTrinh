@@ -4,11 +4,19 @@ server:
 spring:
   application:
     name: syllabus-service
+  rabbitmq:
+    host: ${SPRING_RABBITMQ_HOST:localhost}
+    port: 5672
+    username: guest
+    password: guest
+  autoconfigure:
+    exclude: org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration
+
 
   datasource:
-    url: jdbc:postgresql://postgres:5432/syllabus_db
-    username: postgres
-    password: 123456
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://postgres:5432/syllabus_db}
+    username: ${SPRING_DATASOURCE_USERNAME:postgres}
+    password: ${SPRING_DATASOURCE_PASSWORD:123456}
     driver-class-name: org.postgresql.Driver
 
   jpa:
@@ -18,6 +26,11 @@ spring:
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
+
+smd:
+  mq:
+    exchange: smd.syllabus.exchange
+    routingKey: syllabus.event
 
   # Config Server Configuration (commented out - incompatible with Boot 3.4.0)
   # config:
@@ -29,3 +42,5 @@ eureka:
       defaultZone: http://discovery-server:8761/eureka/
   instance:
     prefer-ip-address: true
+
+
