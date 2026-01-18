@@ -100,8 +100,8 @@ export default function SyllabusListPage() {
         </div>
 
         <div className="headerActions">
-          <button className="btn-primary" onClick={() => nav("/syllabus/new")}>
-            + Tạo bản nháp
+          <button className="btn-primary-action" onClick={() => nav("/syllabus/new")}>
+            ＋ Tạo bản nháp
           </button>
         </div>
       </div>
@@ -157,8 +157,8 @@ export default function SyllabusListPage() {
         </div>
 
         <div className="filterRight">
-          <button className="btn-secondary" onClick={load} disabled={loading}>
-            Refresh
+          <button className="btn-secondary-action" onClick={load} disabled={loading}>
+            ⟳ Refresh
           </button>
         </div>
       </div>
@@ -232,15 +232,15 @@ export default function SyllabusListPage() {
         </div>
 
         <div className="paginationBar">
-          <button className="btn-secondary" onClick={onPrev} disabled={loading || page <= 0}>
-            Prev
+          <button className="btn-secondary-action" onClick={onPrev} disabled={loading || page <= 0}>
+            ← Prev
           </button>
           <button
-            className="btn-secondary"
+            className="btn-secondary-action"
             onClick={onNext}
             disabled={loading || (totalPages > 0 && page >= totalPages - 1)}
           >
-            Next
+            Next →
           </button>
         </div>
       </div>
