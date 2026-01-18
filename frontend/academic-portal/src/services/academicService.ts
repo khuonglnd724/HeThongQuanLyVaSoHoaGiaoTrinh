@@ -35,9 +35,16 @@ class AcademicService {
       return config;
     });
 
-    // Add response interceptor for error handling
+    // Add response interceptor for unwrapping ApiResponse and error handling
     this.client.interceptors.response.use(
-      (response) => response,
+      (response) => {
+        const data = response.data;
+        if (data && typeof data === 'object' && 'success' in data && 'data' in data) {
+          // Unwrap our standard ApiResponse to the inner data payload
+          response.data = (data as any).data;
+        }
+        return response;
+      },
       (error) => {
         if (error.response?.status === 401) {
           localStorage.removeItem('auth_token');
@@ -50,73 +57,73 @@ class AcademicService {
 
   // ============ SYLLABUS CRUD ============
   async getSyllabuses(page: number = 0, size: number = 10): Promise<PaginatedResponse<Syllabus>> {
-    const response = await this.client.get('/syllabuses', {
+    const response = await this.client.get('/syllabus', {
       params: { page, size },
     });
     return response.data;
   }
 
   async getSyllabusById(id: number): Promise<Syllabus> {
-    const response = await this.client.get(`/syllabuses/${id}`);
+    const response = await this.client.get(`/syllabus/${id}`);
     return response.data;
   }
 
   async createSyllabus(data: Partial<Syllabus>): Promise<Syllabus> {
-    const response = await this.client.post('/syllabuses', data);
+    const response = await this.client.post('/syllabus', data);
     return response.data;
   }
 
   async updateSyllabus(id: number, data: Partial<Syllabus>): Promise<Syllabus> {
-    const response = await this.client.put(`/syllabuses/${id}`, data);
+    const response = await this.client.put(`/syllabus/${id}`, data);
     return response.data;
   }
 
   async deleteSyllabus(id: number): Promise<void> {
-    await this.client.delete(`/syllabuses/${id}`);
+    await this.client.delete(`/syllabus/${id}`);
   }
 
   // ============ VALIDATION ============
   async validateApproval(id: number): Promise<ValidationResult> {
-    const response = await this.client.post(`/syllabuses/${id}/validate-approval`);
+    const response = await this.client.post(`/syllabus/${id}/validate-approval`);
     return response.data;
   }
 
   async validatePrerequisites(id: number): Promise<any> {
-    const response = await this.client.post(`/syllabuses/${id}/validate-prerequisites`);
+    const response = await this.client.post(`/syllabus/${id}/validate-prerequisites`);
     return response.data;
   }
 
   // ============ APPROVAL WORKFLOW ============
   async submitForLevel1Approval(id: number, comment?: string): Promise<ApprovalResponse> {
-    const response = await this.client.post(`/syllabuses/${id}/submit-level1`, {
+    const response = await this.client.post(`/syllabus/${id}/submit-level1`, {
       approverComment: comment,
     });
     return response.data;
   }
 
   async approveLevel1(id: number, comment?: string): Promise<ApprovalResponse> {
-    const response = await this.client.post(`/syllabuses/${id}/approve-level1`, {
+    const response = await this.client.post(`/syllabus/${id}/approve-level1`, {
       approverComment: comment,
     });
     return response.data;
   }
 
   async rejectLevel1(id: number, reason: string): Promise<ApprovalResponse> {
-    const response = await this.client.post(`/syllabuses/${id}/reject-level1`, {
+    const response = await this.client.post(`/syllabus/${id}/reject-level1`, {
       approverComment: reason,
     });
     return response.data;
   }
 
   async approveLevel2(id: number, comment?: string): Promise<ApprovalResponse> {
-    const response = await this.client.post(`/syllabuses/${id}/approve-level2`, {
+    const response = await this.client.post(`/syllabus/${id}/approve-level2`, {
       approverComment: comment,
     });
     return response.data;
   }
 
   async rejectLevel2(id: number, reason: string): Promise<ApprovalResponse> {
-    const response = await this.client.post(`/syllabuses/${id}/reject-level2`, {
+    const response = await this.client.post(`/syllabus/${id}/reject-level2`, {
       approverComment: reason,
     });
     return response.data;
@@ -124,17 +131,17 @@ class AcademicService {
 
   // ============ VERSION HISTORY ============
   async getVersionHistory(id: number): Promise<SyllabusVersion[]> {
-    const response = await this.client.get(`/syllabuses/${id}/versions`);
+    const response = await this.client.get(`/syllabus/${id}/versions`);
     return response.data;
   }
 
   async getVersion(id: number, versionNumber: number): Promise<SyllabusVersion> {
-    const response = await this.client.get(`/syllabuses/${id}/versions/${versionNumber}`);
+    const response = await this.client.get(`/syllabus/${id}/versions/${versionNumber}`);
     return response.data;
   }
 
   async getLatestVersion(id: number): Promise<SyllabusVersion> {
-    const response = await this.client.get(`/syllabuses/${id}/versions/latest`);
+    const response = await this.client.get(`/syllabus/${id}/versions/latest`);
     return response.data;
   }
 
@@ -144,14 +151,14 @@ class AcademicService {
     versionNumber2: number
   ): Promise<SyllabusComparison> {
     const response = await this.client.get(
-      `/syllabuses/${id}/compare?v1=${versionNumber1}&v2=${versionNumber2}`
+      `/syllabus/${id}/compare?v1=${versionNumber1}&v2=${versionNumber2}`
     );
     return response.data;
   }
 
   // ============ SEARCH & FILTER ============
   async searchSyllabuses(criteria: SearchCriteria): Promise<PaginatedResponse<Syllabus>> {
-    const response = await this.client.post('/syllabuses/search', criteria);
+    const response = await this.client.post('/syllabus/search', criteria);
     return response.data;
   }
 
@@ -160,28 +167,28 @@ class AcademicService {
     page: number = 0,
     size: number = 10
   ): Promise<PaginatedResponse<Syllabus>> {
-    const response = await this.client.get('/syllabuses/search', {
+    const response = await this.client.get('/syllabus/search', {
       params: { keyword, page, size },
     });
     return response.data;
   }
 
   async getPendingApprovalSyllabuses(page: number = 0, size: number = 10): Promise<PaginatedResponse<Syllabus>> {
-    const response = await this.client.get('/syllabuses/pending-approval', {
+    const response = await this.client.get('/syllabus/pending-approval', {
       params: { page, size },
     });
     return response.data;
   }
 
   async getRejectedSyllabuses(page: number = 0, size: number = 10): Promise<PaginatedResponse<Syllabus>> {
-    const response = await this.client.get('/syllabuses/rejected', {
+    const response = await this.client.get('/syllabus/rejected', {
       params: { page, size },
     });
     return response.data;
   }
 
   async getApprovedSyllabuses(page: number = 0, size: number = 10): Promise<PaginatedResponse<Syllabus>> {
-    const response = await this.client.get('/syllabuses/approved', {
+    const response = await this.client.get('/syllabus/approved', {
       params: { page, size },
     });
     return response.data;
@@ -239,6 +246,41 @@ class AcademicService {
 
   async deleteNotification(notificationId: string): Promise<void> {
     await this.client.delete(`/notifications/${notificationId}`);
+  }
+
+  // ============ LECTURER OPERATIONS ============
+  async getLecturerSyllabuses(lecturerId: number, page: number = 0, size: number = 10): Promise<PaginatedResponse<Syllabus>> {
+    const response = await this.client.get(`/syllabus/lecturer/${lecturerId}`, {
+      params: { page, size },
+    });
+    return response.data;
+  }
+
+  async saveCLOs(syllabusId: number, clos: any[]): Promise<any> {
+    const response = await this.client.post(`/syllabus/${syllabusId}/clos`, { clos });
+    return response.data;
+  }
+
+  async saveCLOMappings(syllabusId: number, mappings: any[]): Promise<any> {
+    const response = await this.client.post(`/syllabus/${syllabusId}/clo-mappings`, { mappings });
+    return response.data;
+  }
+
+  async respondToFeedback(syllabusId: number, feedback: any): Promise<any> {
+    const response = await this.client.post(`/syllabus/${syllabusId}/feedback-response`, feedback);
+    return response.data;
+  }
+
+  async getLecturerById(lecturerId: number): Promise<any> {
+    const response = await this.client.get(`/lecturers/${lecturerId}`);
+    return response.data;
+  }
+
+  async getLecturers(page: number = 0, size: number = 100): Promise<PaginatedResponse<any>> {
+    const response = await this.client.get('/lecturers', {
+      params: { page, size },
+    });
+    return response.data;
   }
 }
 

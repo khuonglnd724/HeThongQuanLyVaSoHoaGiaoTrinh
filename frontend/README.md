@@ -17,3 +17,20 @@ frontend/
 \\\
 
 ## Sẽ được phát triển trong tương lai
+Admin System (port 3002):
+
+Username: admin
+Password: admin123
+🎓 Academic Portal (port 5174):
+
+Username: academic
+Password: academic123
+Họ tên: Academic Staff
+👨‍🏫 Lecturer (cho quản lý syllabus):
+
+Username: lecturer1
+Password: lecturer123
+👨‍🎓 Student:
+
+Username: student1
+Password: student123

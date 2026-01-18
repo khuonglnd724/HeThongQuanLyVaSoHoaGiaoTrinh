@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { fetchUsers, deleteUser, createUser } from '../utils/api';
+import { fetchUsers, deleteUser, createUser, fetchRoles } from '../utils/api';
 
 function Users() {
     const [users, setUsers] = useState([]);
+    const [roles, setRoles] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [showForm, setShowForm] = useState(false);
@@ -11,7 +12,8 @@ function Users() {
         username: '',
         email: '',
         password: '',
-        fullName: ''
+        fullName: '',
+        roleIds: []
     });
     const navigate = useNavigate();
 
@@ -22,6 +24,7 @@ function Users() {
         }
 
         loadUsers();
+        loadRoles();
     }, [navigate]);
 
     const loadUsers = async () => {
@@ -33,6 +36,18 @@ function Users() {
             console.error(err);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const loadRoles = async () => {
+        try {
+            const data = await fetchRoles();
+            // Filter out any roles with undefined roleId
+            const validRoles = (data || []).filter(role => role && role.roleId !== undefined && role.roleId !== null);
+            setRoles(validRoles);
+        } catch (err) {
+            console.error('Failed to load roles:', err);
+            setRoles([]);
         }
     };
 
@@ -53,12 +68,21 @@ function Users() {
         try {
             const newUser = await createUser(formData);
             setUsers([...users, newUser]);
-            setFormData({ username: '', email: '', password: '', fullName: '' });
+            setFormData({ username: '', email: '', password: '', fullName: '', roleIds: [] });
             setShowForm(false);
         } catch (err) {
             setError('Failed to create user');
             console.error(err);
         }
+    };
+
+    const handleRoleToggle = (roleId) => {
+        setFormData(prev => {
+            const roleIds = prev.roleIds.includes(roleId)
+                ? prev.roleIds.filter(id => id !== roleId)
+                : [...prev.roleIds, roleId];
+            return { ...prev, roleIds };
+        });
     };
 
     const handleLogout = () => {
@@ -71,31 +95,39 @@ function Users() {
             {/* Sidebar */}
             <aside className="sidebar">
                 <div className="sidebar-header">
-                    <h2>SMD Admin</h2>
+                    <h2>Quản trị SMD</h2>
                 </div>
                 <nav className="sidebar-nav">
                     <Link to="/dashboard" className="nav-item">
                         <span className="icon">📊</span>
-                        <span>Dashboard</span>
+                        <span>Bảng điều khiển</span>
                     </Link>
                     <Link to="/services" className="nav-item">
                         <span className="icon">⚙️</span>
-                        <span>Services</span>
+                        <span>Dịch vụ</span>
                     </Link>
                     <div className="nav-divider"></div>
                     <Link to="/users" className="nav-item active">
                         <span className="icon">👥</span>
-                        <span>User Management</span>
+                        <span>Quản lý người dùng</span>
                     </Link>
                     <Link to="/roles" className="nav-item">
                         <span className="icon">🔐</span>
-                        <span>Roles & Permissions</span>
+                        <span>Vai trò & Quyền</span>
+                    </Link>
+                    <Link to="/publishing" className="nav-item">
+                        <span className="icon">📤</span>
+                        <span>Xuất bản</span>
+                    </Link>
+                    <Link to="/syllabus-management" className="nav-item">
+                        <span className="icon">📚</span>
+                        <span>Lưu trữ Giáo trình</span>
                     </Link>
                 </nav>
                 <div className="sidebar-footer">
                     <button className="btn btn-logout" onClick={handleLogout}>
                         <span className="icon">🚪</span>
-                        <span>Logout</span>
+                        <span>Đăng xuất</span>
                     </button>
                 </div>
             </aside>
@@ -104,10 +136,10 @@ function Users() {
             <main className="main-content">
                 {/* Header */}
                 <header className="header">
-                    <h1>User Management</h1>
+                    <h1>Quản lý Người dùng</h1>
                     <div className="header-actions">
                         <button className="btn btn-primary" onClick={() => setShowForm(!showForm)}>
-                            {showForm ? 'Cancel' : '+ Add User'}
+                            {showForm ? 'Hủy' : '+ Thêm Người dùng'}
                         </button>
                     </div>
                 </header>
@@ -119,13 +151,13 @@ function Users() {
                     {showForm && (
                         <div className="card">
                             <div className="card-header">
-                                <h2>Add New User</h2>
+                                <h2>Thêm Người dùng Mới</h2>
                             </div>
                             <div className="card-body">
                                 <form onSubmit={handleSubmit} className="form">
                                     <div className="form-row">
                                         <div className="form-group">
-                                            <label>Username</label>
+                                            <label>Tên đăng nhập</label>
                                             <input
                                                 type="text"
                                                 value={formData.username}
@@ -145,7 +177,7 @@ function Users() {
                                     </div>
                                     <div className="form-row">
                                         <div className="form-group">
-                                            <label>Password</label>
+                                            <label>Mật khẩu</label>
                                             <input
                                                 type="password"
                                                 value={formData.password}
@@ -154,7 +186,7 @@ function Users() {
                                             />
                                         </div>
                                         <div className="form-group">
-                                            <label>Full Name</label>
+                                            <label>Họ và tên</label>
                                             <input
                                                 type="text"
                                                 value={formData.fullName}
@@ -163,7 +195,26 @@ function Users() {
                                             />
                                         </div>
                                     </div>
-                                    <button type="submit" className="btn btn-primary">Create User</button>
+                                    <div className="form-group">
+                                        <label>Gán vai trò</label>
+                                        <div className="checkbox-group">
+                                            {roles.map(role => (
+                                                <label key={`role-checkbox-${role.roleId}`} className="checkbox-label">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={formData.roleIds.includes(role.roleId)}
+                                                        onChange={(e) => {
+                                                            e.stopPropagation();
+                                                            handleRoleToggle(role.roleId);
+                                                        }}
+                                                    />
+                                                    <span>{role.name.replace('ROLE_', '')}</span>
+                                                    {role.description && <small className="text-muted"> - {role.description}</small>}
+                                                </label>
+                                            ))}
+                                        </div>
+                                    </div>
+                                    <button type="submit" className="btn btn-primary">Tạo Người dùng</button>
                                 </form>
                             </div>
                         </div>
@@ -171,21 +222,21 @@ function Users() {
 
                     <div className="card">
                         <div className="card-header">
-                            <h2>Users List</h2>
+                            <h2>Danh sách Người dùng</h2>
                         </div>
                         <div className="card-body">
                             {loading ? (
-                                <p>Loading users...</p>
+                                <p>Đang tải người dùng...</p>
                             ) : (
                                 <table className="table">
                                     <thead>
                                         <tr>
                                             <th>ID</th>
-                                            <th>Username</th>
+                                            <th>Tên đăng nhập</th>
                                             <th>Email</th>
-                                            <th>Full Name</th>
-                                            <th>Roles</th>
-                                            <th>Actions</th>
+                                            <th>Họ và tên</th>
+                                            <th>Vai trò</th>
+                                            <th>Thao tác</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -208,14 +259,14 @@ function Users() {
                                                             className="btn btn-sm btn-danger"
                                                             onClick={() => handleDelete(user.userId)}
                                                         >
-                                                            Delete
+                                                            Xóa
                                                         </button>
                                                     </td>
                                                 </tr>
                                             ))
                                         ) : (
                                             <tr>
-                                                <td colSpan="6" style={{textAlign: 'center'}}>No users found</td>
+                                                <td colSpan="6" style={{textAlign: 'center'}}>Không có người dùng nào</td>
                                             </tr>
                                         )}
                                     </tbody>

@@ -27,10 +27,21 @@ spring:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
 
+    servlet:
+      multipart:
+        enabled: true
+        max-file-size: 50MB
+        max-request-size: 50MB
+
 smd:
   mq:
     exchange: smd.syllabus.exchange
     routingKey: syllabus.event
+  file:
+    upload:
+      directory: ./uploads/syllabus-documents
+    max:
+      size: 52428800  # 50MB in bytes
 
   # Config Server Configuration (commented out - incompatible with Boot 3.4.0)
   # config:

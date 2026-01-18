@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Roles & Permissions - SMD Admin</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <h2>SMD Admin</h2>
+            </div>
+            <nav class="sidebar-nav">
+                <a href="dashboard.html" class="nav-item">
+                    <span class="icon">📊</span>
+                    <span>Dashboard</span>
+                </a>
+                <a href="services.html" class="nav-item">
+                    <span class="icon">⚙️</span>
+                    <span>Services</span>
+                </a>
+                <a href="eureka.html" class="nav-item">
+                    <span class="icon">🔍</span>
+                    <span>Eureka Registry</span>
+                </a>
+                <a href="config-server.html" class="nav-item">
+                    <span class="icon">📝</span>
+                    <span>Config Server</span>
+                </a>
+                <div class="nav-divider"></div>
+                <a href="users.html" class="nav-item">
+                    <span class="icon">👥</span>
+                    <span>User Management</span>
+                </a>
+                <a href="roles.html" class="nav-item active">
+                    <span class="icon">🔐</span>
+                    <span>Roles & Permissions</span>
+                </a>
+            </nav>
+            <div class="sidebar-footer">
+                <button id="logoutBtn" class="btn btn-logout">
+                    <span class="icon">🚪</span>
+                    <span>Logout</span>
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <header class="header">
+                <h1>Roles & Permissions</h1>
+                <div class="header-actions">
+                    <button id="addRoleBtn" class="btn btn-primary">
+                        ➕ Add Role
+                    </button>
+                </div>
+            </header>
+
+            <div class="content">
+                <!-- Role Cards -->
+                <div class="section">
+                    <h2>System Roles</h2>
+                    <div id="rolesGrid" class="roles-grid">
+                        <div class="loading">Loading roles...</div>
+                    </div>
+                </div>
+
+                <!-- Permissions Matrix -->
+                <div class="section">
+                    <h2>Permissions Matrix</h2>
+                    <div class="table-container">
+                        <table class="permissions-table">
+                            <thead>
+                                <tr>
+                                    <th>Permission</th>  
+                                    <th>ADMIN</th>
+                                    <th>TEACHER</th>
+                                    <th>STUDENT</th>
+                                </tr>
+                            </thead>
+                            <tbody id="permissionsTableBody">
+                                <!-- Will be populated by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Add/Edit Role Modal -->
+    <div id="roleModal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="roleModalTitle">Add Role</h2>
+                <button class="modal-close" onclick="closeRoleModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="roleForm">
+                    <input type="hidden" id="roleId">
+                    
+                    <div class="form-group">
+                        <label for="roleName">Role Name *</label>
+                        <input type="text" id="roleName" required placeholder="e.g., MANAGER">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="roleDescription">Description</label>
+                        <textarea id="roleDescription" rows="3" 
+                                  placeholder="Role description..."></textarea>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Permissions</label>
+                        <div class="permissions-grid" id="permissionsGrid">
+                            <!-- Will be populated by JS -->
+                        </div>
+                    </div>
+                    
+                    <div class="modal-actions">
+                        <button type="button" class="btn btn-secondary" onclick="closeRoleModal()">
+                            Cancel
+                        </button>
+                        <button type="submit" class="btn btn-primary">
+                            Save Role
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/common.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/roles.js"></script>
+</body>
+</html>

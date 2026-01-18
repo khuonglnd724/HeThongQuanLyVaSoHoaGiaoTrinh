@@ -41,10 +41,27 @@ INSERT IGNORE INTO role_permissions (role_id, permission_id) VALUES
 -- COUNCIL_MEMBER
 (7, 1), (7, 5), (7, 9);
 
--- Create default admin user
--- Password: Admin@123 (BCrypt encoded)
 INSERT IGNORE INTO users (user_id, username, email, password, full_name, phone_number, is_active, is_locked, created_at, updated_at, failed_attempts)
 VALUES (1, 'admin', 'admin@smd.edu.vn', '$2a$10$XptfskLsT6KrGfFfX8yVpOaK2FLCwaMGrFRww5/HaZZCCpGwh3Wf2', 'System Administrator', '0123456789', true, false, NOW(), NOW(), 0);
 
--- Assign ADMIN role to admin user
 INSERT IGNORE INTO user_roles (user_id, role_id) VALUES (1, 1);
+
+-- Create sample lecturer users
+-- Password: Lecturer@123 (BCrypt encoded)
+INSERT IGNORE INTO users (user_id, username, email, password, full_name, phone_number, is_active, is_locked, created_at, updated_at, failed_attempts)
+VALUES 
+(2, 'lecturer1', 'lecturer1@smd.edu.vn', '$2a$10$XptfskLsT6KrGfFfX8yVpOaK2FLCwaMGrFRww5/HaZZCCpGwh3Wf2', 'Nguyễn Văn A', '0912345678', true, false, NOW(), NOW(), 0),
+(3, 'lecturer2', 'lecturer2@smd.edu.vn', '$2a$10$XptfskLsT6KrGfFfX8yVpOaK2FLCwaMGrFRww5/HaZZCCpGwh3Wf2', 'Trần Thị B', '0923456789', true, false, NOW(), NOW(), 0);
+
+-- Assign LECTURER role to lecturer users
+INSERT IGNORE INTO user_roles (user_id, role_id) VALUES 
+(2, 5),
+(3, 5);
+
+-- Create sample Academic Affairs user
+-- Password: AA@123 (BCrypt encoded)
+INSERT IGNORE INTO users (user_id, username, email, password, full_name, phone_number, is_active, is_locked, created_at, updated_at, failed_attempts)
+VALUES (4, 'academic', 'academic@smd.edu.vn', '$2a$10$XptfskLsT6KrGfFfX8yVpOaK2FLCwaMGrFRww5/HaZZCCpGwh3Wf2', 'Phòng Đào Tạo', '0934567890', true, false, NOW(), NOW(), 0);
+
+-- Assign ACADEMIC_AFFAIRS role
+INSERT IGNORE INTO user_roles (user_id, role_id) VALUES (4, 3);
