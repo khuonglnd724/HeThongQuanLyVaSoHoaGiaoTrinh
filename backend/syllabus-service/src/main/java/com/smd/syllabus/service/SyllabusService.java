@@ -2,6 +2,7 @@ package com.smd.syllabus.service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.smd.syllabus.domain.NotificationType;
 import com.smd.syllabus.domain.Syllabus;
 import com.smd.syllabus.domain.SyllabusStatus;
 import com.smd.syllabus.dto.CreateSyllabusRequest;
@@ -22,21 +23,21 @@ import java.util.*;
 public class SyllabusService {
 
     private final SyllabusRepository syllabusRepository;
+    private final NotificationService notificationService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    public SyllabusService(SyllabusRepository syllabusRepository) {
+    public SyllabusService(SyllabusRepository syllabusRepository,
+            NotificationService notificationService) {
         this.syllabusRepository = syllabusRepository;
+        this.notificationService = notificationService;
     }
 
-    // ===== helper: content (String hoặc JsonNode/Object) -> JSON string để lưu
-    // jsonb =====
+    // helper
     private String normalizeContent(Object content) {
         if (content == null)
             return null;
-
-        if (content instanceof String s) {
+        if (content instanceof String s)
             return s;
-        }
         try {
             return objectMapper.writeValueAsString(content);
         } catch (JsonProcessingException e) {
@@ -55,6 +56,11 @@ public class SyllabusService {
                 .orElseThrow(() -> new EntityNotFoundException("Syllabus not found: " + id));
     }
 
+    private String safeCode(Syllabus s) {
+        String code = s.getSubjectCode();
+        return (code == null || code.isBlank()) ? "UNKNOWN" : code.trim();
+    }
+
     // =========================
     // CREATE / VERSIONING
     // =========================
@@ -71,7 +77,6 @@ public class SyllabusService {
         s.setCreatedBy(actor);
         s.setUpdatedBy(actor);
 
-        // FIX jsonb
         s.setContent(normalizeContent(req.getContent()));
 
         Syllabus saved = syllabusRepository.save(s);
@@ -85,10 +90,6 @@ public class SyllabusService {
         return SyllabusMapper.toResponse(saved);
     }
 
-    /**
-     * Controller của bạn đang gọi updateAsNewVersion(UUID rootId,
-     * UpdateSyllabusRequest req, String userId)
-     */
     @Transactional
     public SyllabusResponse updateAsNewVersion(UUID rootId, UpdateSyllabusRequest req, String userId) {
         String actor = requireUser(userId);
@@ -114,11 +115,10 @@ public class SyllabusService {
         nv.setUpdatedBy(actor);
 
         Object incoming = req.getContent();
-        if (incoming != null) {
+        if (incoming != null)
             nv.setContent(normalizeContent(incoming));
-        } else {
+        else
             nv.setContent(latest.getContent());
-        }
 
         Syllabus saved = syllabusRepository.save(nv);
         return SyllabusMapper.toResponse(saved);
@@ -164,7 +164,7 @@ public class SyllabusService {
     }
 
     // =========================
-    // WORKFLOW
+    // WORKFLOW + NOTIFY (SSE)
     // =========================
 
     @Transactional
@@ -184,7 +184,16 @@ public class SyllabusService {
         s.setRejectionReason(null);
         s.setRejectedAt(null);
 
-        return SyllabusMapper.toResponse(syllabusRepository.save(s));
+        Syllabus saved = syllabusRepository.save(s);
+
+        notificationService.notifyFollowers(
+                saved.getRootId(),
+                saved.getId(),
+                NotificationType.SYLLABUS_SUBMITTED,
+                "Syllabus " + safeCode(saved) + " submitted for review",
+                actor);
+
+        return SyllabusMapper.toResponse(saved);
     }
 
     @Transactional
@@ -201,7 +210,17 @@ public class SyllabusService {
         s.setUpdatedBy(actor);
         s.setLastActionBy(actor);
 
-        return SyllabusMapper.toResponse(syllabusRepository.save(s));
+        Syllabus saved = syllabusRepository.save(s);
+
+        // (tuỳ bạn) có thể bỏ notify bước trung gian này nếu không cần
+        notificationService.notifyFollowers(
+                saved.getRootId(),
+                saved.getId(),
+                NotificationType.SYLLABUS_SUBMITTED,
+                "Syllabus " + safeCode(saved) + " moved to approval",
+                actor);
+
+        return SyllabusMapper.toResponse(saved);
     }
 
     @Transactional
@@ -218,7 +237,16 @@ public class SyllabusService {
         s.setUpdatedBy(actor);
         s.setLastActionBy(actor);
 
-        return SyllabusMapper.toResponse(syllabusRepository.save(s));
+        Syllabus saved = syllabusRepository.save(s);
+
+        notificationService.notifyFollowers(
+                saved.getRootId(),
+                saved.getId(),
+                NotificationType.SYLLABUS_APPROVED,
+                "Syllabus " + safeCode(saved) + " approved",
+                actor);
+
+        return SyllabusMapper.toResponse(saved);
     }
 
     @Transactional
@@ -235,7 +263,16 @@ public class SyllabusService {
         s.setUpdatedBy(actor);
         s.setLastActionBy(actor);
 
-        return SyllabusMapper.toResponse(syllabusRepository.save(s));
+        Syllabus saved = syllabusRepository.save(s);
+
+        notificationService.notifyFollowers(
+                saved.getRootId(),
+                saved.getId(),
+                NotificationType.SYLLABUS_PUBLISHED,
+                "Syllabus " + safeCode(saved) + " published",
+                actor);
+
+        return SyllabusMapper.toResponse(saved);
     }
 
     @Transactional
@@ -253,6 +290,19 @@ public class SyllabusService {
         s.setUpdatedBy(actor);
         s.setLastActionBy(actor);
 
-        return SyllabusMapper.toResponse(syllabusRepository.save(s));
+        Syllabus saved = syllabusRepository.save(s);
+
+        String msg = "Syllabus " + safeCode(saved) + " rejected";
+        if (reason != null && !reason.isBlank())
+            msg += ": " + reason.trim();
+
+        notificationService.notifyFollowers(
+                saved.getRootId(),
+                saved.getId(),
+                NotificationType.SYLLABUS_REJECTED,
+                msg,
+                actor);
+
+        return SyllabusMapper.toResponse(saved);
     }
 }
