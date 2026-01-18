@@ -195,8 +195,19 @@ public class UserServiceImpl implements UserService {
             throw new BadRequestException("Email is already in use!");
         }
         
-        var role = roleRepository.findByName(ERole.ROLE_STUDENT)
-                .orElseThrow(() -> new RuntimeException("Error: Role is not found."));
+        // Get roles from request, default to ROLE_STUDENT if not provided
+        Set<Role> roles = new HashSet<>();
+        if (request.getRoleIds() != null && !request.getRoleIds().isEmpty()) {
+            for (Long roleId : request.getRoleIds()) {
+                Role role = roleRepository.findById(roleId)
+                        .orElseThrow(() -> new ResourceNotFoundException("Role not found with id: " + roleId));
+                roles.add(role);
+            }
+        } else {
+            Role defaultRole = roleRepository.findByName(ERole.ROLE_STUDENT)
+                    .orElseThrow(() -> new RuntimeException("Error: Default role is not found."));
+            roles.add(defaultRole);
+        }
         
         User user = User.builder()
                 .username(request.getUsername())
@@ -207,7 +218,7 @@ public class UserServiceImpl implements UserService {
                 .isActive(true)
                 .isLocked(false)
                 .failedAttempts(0)
-                .roles(Set.of(role))
+                .roles(roles)
                 .build();
         
         userRepository.save(user);

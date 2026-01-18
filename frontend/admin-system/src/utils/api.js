@@ -1,4 +1,5 @@
 const API_BASE_URL = 'http://localhost:8081';
+const EUREKA_URL = 'http://localhost:8761';
 
 // Get auth token
 export function getAuthToken() {
@@ -12,27 +13,27 @@ export async function apiRequest(url, options = {}) {
         'Content-Type': 'application/json',
         ...options.headers
     };
-    
+
     if (token) {
         headers['Authorization'] = `Bearer ${token}`;
     }
-    
+
     try {
         const response = await fetch(url, {
             ...options,
             headers
         });
-        
+
         if (response.status === 401) {
             localStorage.clear();
             window.location.href = '/';
             throw new Error('Unauthorized');
         }
-        
+
         if (!response.ok) {
             throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
-        
+
         return await response.json();
     } catch (error) {
         console.error('API Request failed:', error);
@@ -47,18 +48,29 @@ export async function login(username, password) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password })
     });
-    
+
     if (!response.ok) {
         const error = await response.text();
         throw new Error(error || 'Login failed');
     }
-    
+
     return await response.json();
 }
 
-// Eureka API (via auth-service proxy to avoid CORS)
+// Eureka API (direct call to Eureka discovery server)
 export async function fetchEurekaApps() {
-    return apiRequest(`${API_BASE_URL}/api/services/eureka/apps`);
+    try {
+        const response = await fetch(`${EUREKA_URL}/eureka/apps`, {
+            headers: { 'Accept': 'application/json' }
+        });
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+        return await response.json();
+    } catch (error) {
+        console.error('Eureka fetch failed:', error);
+        return { applications: { application: [] } };
+    }
 }
 
 // Service health check
@@ -134,4 +146,36 @@ export async function refreshToken() {
     }
     
     return data.token;
+}
+// System Settings API
+export async function getSystemSettings() {
+    return apiRequest(`${API_BASE_URL}/api/system/settings`);
+}
+
+export async function updateSemester(semesterData) {
+    return apiRequest(`${API_BASE_URL}/api/system/settings/semester`, {
+        method: 'PUT',
+        body: JSON.stringify(semesterData)
+    });
+}
+
+// System Health & Monitoring API
+export async function getSystemHealth() {
+    return apiRequest(`${API_BASE_URL}/api/system/health`);
+}
+
+export async function getAuditLogs(page = 0, size = 50) {
+    return apiRequest(`${API_BASE_URL}/api/system/audit-logs?page=${page}&size=${size}`);
+}
+
+// Publishing Management API
+export async function getPublishingStates() {
+    return apiRequest(`${API_BASE_URL}/api/system/publishing`);
+}
+
+export async function updatePublishingState(syllabusId, newState) {
+    return apiRequest(`${API_BASE_URL}/api/system/publishing/${syllabusId}/state`, {
+        method: 'PUT',
+        body: JSON.stringify({ state: newState })
+    });
 }

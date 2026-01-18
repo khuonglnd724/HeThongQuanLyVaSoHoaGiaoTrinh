@@ -5,6 +5,11 @@ import Dashboard from './pages/Dashboard';
 import Users from './pages/Users';
 import Roles from './pages/Roles';
 import Services from './pages/Services';
+import SystemSettings from './pages/SystemSettings';
+import Publishing from './pages/Publishing';
+import Monitoring from './pages/Monitoring';
+import AuditLogs from './pages/AuditLogs';
+import AdminSyllabusManagement from './components/AdminSyllabusManagement.tsx';
 import './index.css';
 
 function ProtectedRoute({ children }) {
@@ -49,7 +54,46 @@ function App() {
                         </ProtectedRoute>
                     }
                 />
-                <Route path="*" element={<Navigate to="/" />} />
+                <Route
+                    path="/system-settings"
+                    element={
+                        <ProtectedRoute>
+                            <SystemSettings />
+                        </ProtectedRoute>
+                    }
+                />
+                <Route
+                    path="/publishing"
+                    element={
+                        <ProtectedRoute>
+                            <Publishing />
+                        </ProtectedRoute>
+                    }
+                />
+                <Route
+                    path="/monitoring"
+                    element={
+                        <ProtectedRoute>
+                            <Monitoring />
+                        </ProtectedRoute>
+                    }
+                />
+                <Route
+                    path="/audit-logs"
+                    element={
+                        <ProtectedRoute>
+                            <AuditLogs />
+                        </ProtectedRoute>
+                    }
+                />
+                <Route
+                    path="/syllabus-management"
+                    element={
+                        <ProtectedRoute>
+                            <AdminSyllabusManagement />
+                        </ProtectedRoute>
+                    }
+                />
             </Routes>
         </Router>
     );
