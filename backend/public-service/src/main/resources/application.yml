@@ -24,14 +24,9 @@ spring:
           batch_size: 20
         order_inserts: true
         order_updates: true
-        # Enable second-level cache
-        cache:
-          use_second_level_cache: true
-          region:
-            factory_class: org.hibernate.cache.jcache.JCacheRegionFactory
     open-in-view: false  # Prevent lazy loading issues
 
-  # Redis Cache Configuration
+  # Redis Configuration
   redis:
     host: redis
     port: 6379
@@ -41,16 +36,13 @@ spring:
         max-active: 8
         max-idle: 8
         min-idle: 0
-    cache:
-      type: redis
-      redis:
-        time-to-live: 3600000
-  
-  # Cache configuration
+
+  # Cache configuration with Redis
   cache:
     type: redis
     redis:
-      key-prefix: public-service:
+      time-to-live: 3600000
+      key-prefix: "public-service:"
       use-key-prefix: true
       cache-null-values: false
 
