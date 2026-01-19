@@ -1,0 +1,70 @@
+# Ignore version control
+.git
+.gitignore
+.github
+
+# Ignore build artifacts
+node_modules/
+dist/
+build/
+target/
+__pycache__/
+*.egg-info/
+.pytest_cache/
+
+# Ignore IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Ignore logs
+logs/
+*.log
+
+# Ignore local environment files (in source, not here in docker)
+.env.local
+.env.*.local
+
+# Ignore cache
+.cache/
+*.cache
+
+# Ignore temporary files
+tmp/
+temp/
+*.tmp
+
+# Ignore documentation source files (keep built docs)
+docs/src/
+*.md
+
+# Ignore test files (optional - depends on your strategy)
+test/
+tests/
+**/*.test.js
+**/*.spec.js
+**/test_*.py
+
+# Ignore sample/example files
+examples/
+samples/
+*.example
+
+# Ignore node package lock if building from requirements.txt
+package-lock.json
+npm-shrinkwrap.json
+
+# Ignore virtual environments
+venv/
+env/
+.venv/
+
+# Ignore credentials
+.aws/
+.ssh/
+secrets/
+*.pem
+*.key
