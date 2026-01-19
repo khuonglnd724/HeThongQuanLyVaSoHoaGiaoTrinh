@@ -1,23 +1,24 @@
 package com.smd.workflow_service.service;
 
-import com.smd.workflow_service.domain.UserRole;
-import com.smd.workflow_service.domain.Workflow;
-import com.smd.workflow_service.domain.WorkflowEvent;
-import com.smd.workflow_service.domain.WorkflowState;
+import com.smd.workflow_service.domain.*;
 import com.smd.workflow_service.event.WorkflowApprovalEvent;
 import com.smd.workflow_service.messaging.WorkflowApprovalProducer;
-import com.smd.workflow_service.domain.WorkflowHistory;
-import com.smd.workflow_service.repository.WorkflowRepository;
 import com.smd.workflow_service.repository.WorkflowHistoryRepository;
+import com.smd.workflow_service.repository.WorkflowRepository;
+
+import org.slf4j.LoggerFactory;
 import org.springframework.messaging.support.MessageBuilder;
 import org.springframework.statemachine.StateMachine;
 import org.springframework.statemachine.config.StateMachineFactory;
 import org.springframework.statemachine.support.DefaultStateMachineContext;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
-import java.util.UUID;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Service
 public class WorkflowService {
@@ -27,7 +28,8 @@ public class WorkflowService {
     private final WorkflowHistoryRepository historyRepository;
     private final WorkflowAuditProducer auditProducer;
     private final WorkflowApprovalProducer approvalProducer;
-
+    private static final Logger log =
+        LoggerFactory.getLogger(WorkflowService.class);
 
     public WorkflowService(StateMachineFactory<WorkflowState, WorkflowEvent> factory,
                            WorkflowRepository repository,
@@ -54,6 +56,15 @@ public class WorkflowService {
                 .orElseThrow(() -> new RuntimeException("Workflow not found"));
     }
 
+    public List<Workflow> findByState(WorkflowState state) {
+        return repository.findByCurrentState(state);
+    }
+
+    public List<Workflow> findAll() {
+        return repository.findAll();
+    }
+
+    @Transactional
     public WorkflowState sendEvent(UUID workflowId,
                                    WorkflowEvent event,
                                    UserRole role,
@@ -71,9 +82,7 @@ public class WorkflowService {
 
         if ((event == WorkflowEvent.REJECT || event == WorkflowEvent.REQUIRE_EDIT)
                 && (comment == null || comment.isBlank())) {
-            throw new RuntimeException(
-                    "Comment is required for reject or require edit"
-            );
+            throw new RuntimeException("Comment is required");
         }
 
         validateRole(fromState, event, role);
@@ -84,14 +93,16 @@ public class WorkflowService {
         sm.stop();
         sm.getStateMachineAccessor().doWithAllRegions(access ->
                 access.resetStateMachine(
-                        new DefaultStateMachineContext<>(
-                                fromState, null, null, null
-                        )
+                        new DefaultStateMachineContext<>(fromState, null, null, null)
                 )
         );
         sm.start();
 
-        sm.sendEvent(MessageBuilder.withPayload(event).build());
+        boolean accepted = sm.sendEvent(event);
+
+        if (!accepted) {
+            throw new RuntimeException("Invalid workflow transition");
+        }
 
         WorkflowState toState = sm.getState().getId();
 
@@ -116,22 +127,29 @@ public class WorkflowService {
         historyRepository.save(history);
 
         if (event == WorkflowEvent.APPROVE || event == WorkflowEvent.REJECT) {
-            auditProducer.sendAudit(
-                    "Workflow " + workflowId +
-                    " from " + fromState +
-                    " to " + toState +
-                    " by " + actionBy
-            );
-        }
 
-        if (event == WorkflowEvent.APPROVE || event == WorkflowEvent.REJECT) {
-            WorkflowApprovalEvent approvalEvent = new WorkflowApprovalEvent();
-            approvalEvent.setWorkflowId(workflowId);
-            approvalEvent.setFromState(fromState);
-            approvalEvent.setToState(toState);
-            approvalEvent.setActionBy(actionBy);
+            try {
+                auditProducer.sendAudit(
+                        "Workflow " + workflowId +
+                                " from " + fromState +
+                                " to " + toState +
+                                " by " + actionBy
+                );
+            } catch (Exception e) {
+                log.error("Audit failed, but workflow already processed", e);
+            }
 
-            approvalProducer.send(approvalEvent);
+            try {
+                WorkflowApprovalEvent approvalEvent = new WorkflowApprovalEvent();
+                approvalEvent.setWorkflowId(workflowId);
+                approvalEvent.setFromState(fromState);
+                approvalEvent.setToState(toState);
+                approvalEvent.setActionBy(actionBy);
+
+                approvalProducer.send(approvalEvent);
+            } catch (Exception e) {
+                log.error("Failed to send approval event for workflow {}", workflowId, e);
+            }
         }
 
         return toState;
@@ -142,35 +160,32 @@ public class WorkflowService {
     }
 
     private void validateRole(WorkflowState state,
-                          WorkflowEvent event,
-                          UserRole role) {
+                              WorkflowEvent event,
+                              UserRole role) {
 
-    switch (event) {
-
-        case SUBMIT -> {
-            if (role != UserRole.LECTURER || state != WorkflowState.DRAFT) {
-                throw new RuntimeException(
-                        "Only Lecturer can submit from DRAFT"
-                );
+        switch (event) {
+            case SUBMIT -> {
+                if (role != UserRole.LECTURER || state != WorkflowState.DRAFT) {
+                    throw new RuntimeException("Only Lecturer can submit from DRAFT");
+                }
             }
-        }
-
-        case APPROVE, REJECT -> {
-            if ((role != UserRole.HOD && role != UserRole.PRINCIPAL)
-                    || state != WorkflowState.REVIEW) {
-                throw new RuntimeException(
-                        "Only HoD or Principal can approve/reject from REVIEW"
-                );
+            case APPROVE, REJECT -> {
+                if ((role != UserRole.HOD && role != UserRole.PRINCIPAL)
+                        || state != WorkflowState.REVIEW) {
+                    throw new RuntimeException(
+                            "Only HoD or Principal can approve/reject from REVIEW"
+                    );
+                }
             }
-        }
-
-        case REQUIRE_EDIT -> {
-            if (role != UserRole.LECTURER || state != WorkflowState.REJECTED) {
-                throw new RuntimeException(
-                        "Only Lecturer can require edit from REJECTED"
-                );
+            case REQUIRE_EDIT -> {
+                if ((role != UserRole.HOD && role != UserRole.PRINCIPAL)
+                        || state != WorkflowState.REVIEW) {
+                    throw new RuntimeException(
+                        "Only HoD or Principal can require edit from REVIEW"
+                    );
+                }
             }
+
         }
     }
-}
 }
