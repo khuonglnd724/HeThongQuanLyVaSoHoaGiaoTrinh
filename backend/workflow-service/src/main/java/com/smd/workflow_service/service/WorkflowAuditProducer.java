@@ -13,6 +13,10 @@ public class WorkflowAuditProducer {
     }
 
     public void sendAudit(String message) {
-        kafkaTemplate.send("workflow-audit", message);
+        kafkaTemplate.send("workflow-audit", message)
+                .whenComplete((result, ex) -> {
+                    if (ex != null) {
+                    }
+                });
     }
 }

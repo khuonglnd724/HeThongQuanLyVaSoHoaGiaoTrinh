@@ -1,6 +1,9 @@
 package com.smd.workflow_service.event;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.smd.workflow_service.domain.WorkflowState;
+
 import java.util.UUID;
 
 public class WorkflowApprovalEvent {
@@ -9,6 +12,21 @@ public class WorkflowApprovalEvent {
     private WorkflowState fromState;
     private WorkflowState toState;
     private String actionBy;
+
+    public WorkflowApprovalEvent() {
+    }
+
+    @JsonCreator
+    public WorkflowApprovalEvent(
+            @JsonProperty("workflowId") UUID workflowId,
+            @JsonProperty("fromState") WorkflowState fromState,
+            @JsonProperty("toState") WorkflowState toState,
+            @JsonProperty("actionBy") String actionBy) {
+        this.workflowId = workflowId;
+        this.fromState = fromState;
+        this.toState = toState;
+        this.actionBy = actionBy;
+    }
 
     public UUID getWorkflowId() {
         return workflowId;
@@ -40,5 +58,15 @@ public class WorkflowApprovalEvent {
 
     public void setActionBy(String actionBy) {
         this.actionBy = actionBy;
+    }
+
+    @Override
+    public String toString() {
+        return "WorkflowApprovalEvent{" +
+                "workflowId=" + workflowId +
+                ", fromState=" + fromState +
+                ", toState=" + toState +
+                ", actionBy='" + actionBy + '\'' +
+                '}';
     }
 }
