@@ -177,15 +177,25 @@ services:
       SPRING_DATASOURCE_USERNAME: postgres
       SPRING_DATASOURCE_PASSWORD: 123456
       EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE: http://discovery-server:8761/eureka
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      SPRING_RABBITMQ_HOST: smd-rabbitmq
+      SPRING_RABBITMQ_PORT: 5672
+      SPRING_RABBITMQ_USERNAME: guest
+      SPRING_RABBITMQ_PASSWORD: guest
+      SPRING_PROFILES_ACTIVE: docker
+      SYLLABUS_SERVICE_URL: http://syllabus-service:8082
+
     command: java -jar workflow-service-0.0.1-SNAPSHOT.jar
     depends_on:
       postgres:
         condition: service_healthy
       discovery-server:
         condition: service_healthy
+      syllabus-service:
+        condition: service_started
     networks:
       - smd-network
-
+ 
   # Public Service
   public-service:
     image: eclipse-temurin:21-jre
@@ -307,7 +317,7 @@ services:
   # AI Service (FastAPI + Celery producer)
   ai-service:
     build:
-      context: ./ai-service
+      context: ../backend/ai-service
       dockerfile: Dockerfile
     container_name: ai-service
     ports:
@@ -343,7 +353,7 @@ services:
   # AI Celery Worker
   ai-worker:
     build:
-      context: ./ai-service
+      context: ../backend/ai-service
       dockerfile: Dockerfile
     container_name: ai-worker
     command: ["celery", "-A", "app.workers.celery_app", "worker", "--loglevel=info", "--pool=solo"]
