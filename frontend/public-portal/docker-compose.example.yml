@@ -1,0 +1,33 @@
+# Docker Compose Configuration for Public Portal Frontend
+# Add this to your main docker-compose.yml or use separately
+
+services:
+  public-portal:
+    container_name: public-portal
+    image: smd/public-portal:latest
+    build:
+      context: ../..
+      dockerfile: docker/dockerfiles/Dockerfile.public-portal
+    ports:
+      - "3000:3000"
+    environment:
+      - REACT_APP_API_URL=http://api-gateway:8080/api/public
+      - REACT_APP_ENV=production
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000', (r) => {if (r.statusCode !== 200) throw new Error(r.statusCode)})"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+    networks:
+      - app-network
+    depends_on:
+      - api-gateway
+    restart: unless-stopped
+
+networks:
+  app-network:
+    driver: bridge
+
+# Usage:
+# docker-compose up -d public-portal

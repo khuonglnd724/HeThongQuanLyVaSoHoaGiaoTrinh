@@ -1,12 +1,24 @@
-# Docker Infrastructure
+# Docker Infrastructure & Containerization
 
-This directory contains all Docker Compose and infrastructure configuration for the SMD Microservices platform.
+Complete Docker configuration for the SMD (Syllabus Management & Digitalization) microservices platform with centralized Dockerfile management.
 
 ## 📁 Directory Structure
 
 ```
 docker/
+├── dockerfiles/                 # Centralized Dockerfile directory
+│   ├── Dockerfile.public-service
+│   ├── Dockerfile.discovery-server
+│   ├── Dockerfile.config-server
+│   ├── Dockerfile.api-gateway
+│   ├── Dockerfile.auth-service
+│   ├── Dockerfile.academic-service
+│   ├── Dockerfile.syllabus-service
+│   ├── Dockerfile.workflow-service
+│   ├── Dockerfile.ai-service
+│   └── Dockerfile.public-portal
 ├── docker-compose.yml           # Main orchestration file
+├── .dockerignore                # Docker build ignore file
 ├── .env                         # Environment variables (API keys, etc.)
 ├── .env.example                 # Template for .env
 ├── grafana-dashboard.json       # Pre-configured Grafana dashboard
@@ -14,16 +26,33 @@ docker/
 │   ├── init.sql                 # Creates all databases
 │   └── academic_schema.sql      # Academic service schema
 ├── observability/               # Monitoring & logging configs
-│   ├── prometheus/
-│   │   └── prometheus.yml       # Prometheus scrape config
-│   └── loki/
-│       └── loki-config.yml      # Loki logging config
-└── scripts/                     # Docker utility scripts
-    ├── build-all.ps1
-    ├── up.ps1
-    ├── down.ps1
-    └── health-check.ps1
+│   ├── prometheus.yml           # Prometheus scrape config
+│   ├── loki-config.yml          # Loki logging config
+│   └── promtail-config.yml      # Log collection config
+├── scripts/                     # Docker utility scripts
+│   ├── build-all.ps1
+│   ├── up.ps1
+│   ├── down.ps1
+│   └── health-check.ps1
+└── README.md                    # This file
 ```
+
+## 🏗️ Architecture
+
+### Build Context Strategy
+All services use a unified build context from the project root, allowing Dockerfiles to reference both frontend and backend code:
+
+```yaml
+build:
+  context: ..                                      # Project root
+  dockerfile: docker/dockerfiles/Dockerfile.service-name
+```
+
+This enables:
+- Reusable base images
+- Consistent build process
+- Centralized image management
+- Easy maintenance and updates
 
 ## 🚀 Quick Start
 

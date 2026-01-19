@@ -22,16 +22,15 @@ services:
 
   # Discovery Server (Eureka)
   discovery-server:
-    image: eclipse-temurin:21-jre
+    build:
+      context: ..
+      dockerfile: docker/dockerfiles/Dockerfile.discovery-server
+    image: smd/discovery-server:latest
     container_name: discovery-server
-    working_dir: /app
-    volumes:
-      - ../backend/discovery-server/target:/app
     ports:
       - "8761:8761"
     environment:
       JAVA_OPTS: "-Xmx256m -Xms256m"
-    command: java -jar discovery-server-0.0.1-SNAPSHOT.jar
     networks:
       - smd-network
     healthcheck:
@@ -42,11 +41,12 @@ services:
 
   # Config Server
   config-server:
-    image: eclipse-temurin:21-jre
+    build:
+      context: ..
+      dockerfile: docker/dockerfiles/Dockerfile.config-server
+    image: smd/config-server:latest
     container_name: config-server
-    working_dir: /app
     volumes:
-      - ../backend/config-server/target:/app
       - ../backend/config-repo:/config:ro
     ports:
       - "8888:8888"
@@ -55,7 +55,6 @@ services:
       SPRING_PROFILES_ACTIVE: native
       SPRING_CLOUD_CONFIG_SERVER_NATIVE_SEARCH_LOCATIONS: file:/config
       EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE: http://discovery-server:8761/eureka/
-    command: java -jar config-server-0.0.1-SNAPSHOT.jar
     depends_on:
       discovery-server:
         condition: service_healthy
@@ -69,18 +68,17 @@ services:
 
   # API Gateway
   api-gateway:
-    image: eclipse-temurin:21-jre
+    build:
+      context: ..
+      dockerfile: docker/dockerfiles/Dockerfile.api-gateway
+    image: smd/api-gateway:latest
     container_name: api-gateway
-    working_dir: /app
-    volumes:
-      - ../backend/api-gateway/target:/app
     ports:
       - "8080:8080"
     environment:
       JAVA_OPTS: "-Xmx256m -Xms256m"
       EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE: http://discovery-server:8761/eureka
       SPRING_CONFIG_IMPORT: "optional:configserver:http://config-server:8888"
-    command: java -jar api-gateway-0.0.1-SNAPSHOT.jar
     depends_on:
       discovery-server:
         condition: service_healthy
@@ -92,10 +90,11 @@ services:
   # Auth Service
   auth-service:
     image: eclipse-temurin:17-jre
+    build:
+      context: ..
+      dockerfile: docker/dockerfiles/Dockerfile.auth-service
+    image: smd/auth-service:latest
     container_name: auth-service
-    working_dir: /app
-    volumes:
-      - ../backend/auth-service/target:/app
     ports:
       - "8081:8081"
     environment:
@@ -105,8 +104,6 @@ services:
       SPRING_DATASOURCE_PASSWORD: 123456
       EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE: http://discovery-server:8761/eureka
       SPRING_CONFIG_IMPORT: "optional:configserver:http://config-server:8888"
-    command: java -jar auth-service-0.0.1-SNAPSHOT.jar
-    depends_on:
       postgres:
         condition: service_healthy
       discovery-server:
@@ -119,19 +116,23 @@ services:
   # Academic Service
   academic-service:
     image: eclipse-temurin:21-jre
+    build:
+      context: ..
+      dockerfile: docker/dockerfiles/Dockerfile.academic-service
+    image: smd/academic-service:latest
     container_name: academic-service
-    working_dir: /app
-    volumes:
-      - ../backend/academic-service/target:/app
     ports:
       - "8082:8082"
     environment:
       JAVA_OPTS: "-Xmx256m -Xms256m"
       EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE: http://discovery-server:8761/eureka
       SPRING_CONFIG_IMPORT: "optional:configserver:http://config-server:8888"
+<<<<<<< HEAD
       SPRING_JPA_HIBERNATE_DDL_AUTO: update
     command: java -jar academic-service-0.0.1-SNAPSHOT.jar
     depends_on:
+=======
+>>>>>>> feature/public-portal-search-v2
       discovery-server:
         condition: service_healthy
       config-server:
@@ -142,10 +143,11 @@ services:
   # Syllabus Service
   syllabus-service:
     image: eclipse-temurin:21-jre
+    build:
+      context: ..
+      dockerfile: docker/dockerfiles/Dockerfile.syllabus-service
+    image: smd/syllabus-service:latest
     container_name: syllabus-service
-    working_dir: /app
-    volumes:
-      - ../backend/syllabus-service/target:/app
     ports:
       - "8085:8085"
     environment:
@@ -154,8 +156,6 @@ services:
       SPRING_DATASOURCE_USERNAME: postgres
       SPRING_DATASOURCE_PASSWORD: 123456
       EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE: http://discovery-server:8761/eureka
-    command: java -jar syllabus-service-0.0.1-SNAPSHOT.jar
-    depends_on:
       postgres:
         condition: service_healthy
       discovery-server:
@@ -167,9 +167,11 @@ services:
   workflow-service:
     image: eclipse-temurin:21-jre
     container_name: workflow-service
-    working_dir: /app
-    volumes:
-      - ../backend/workflow-service/target:/app
+    build:
+      context: ..
+      dockerfile: docker/dockerfiles/Dockerfile.workflow-service
+    image: smd/workflow-service:latest
+    container_name: workflow-service
     ports:
       - "8084:8084"
     environment:
@@ -178,6 +180,7 @@ services:
       SPRING_DATASOURCE_USERNAME: postgres
       SPRING_DATASOURCE_PASSWORD: 123456
       EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE: http://discovery-server:8761/eureka
+<<<<<<< HEAD
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       SPRING_RABBITMQ_HOST: smd-rabbitmq
       SPRING_RABBITMQ_PORT: 5672
@@ -189,6 +192,8 @@ services:
     command: java -jar workflow-service-0.0.1-SNAPSHOT.jar
     depends_on:
       postgres:
+=======
+>>>>>>> feature/public-portal-search-v2
         condition: service_healthy
       discovery-server:
         condition: service_healthy
@@ -201,9 +206,11 @@ services:
   public-service:
     image: eclipse-temurin:21-jre
     container_name: public-service
-    working_dir: /app
-    volumes:
-      - ../backend/public-service/target:/app
+    build:
+      context: ..
+      dockerfile: docker/dockerfiles/Dockerfile.public-service
+    image: smd/public-service:latest
+    container_name: public-service
     ports:
       - "8083:8083"
     environment:
@@ -212,9 +219,6 @@ services:
       SPRING_DATASOURCE_USERNAME: postgres
       SPRING_DATASOURCE_PASSWORD: 123456
       EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE: http://discovery-server:8761/eureka
-    command: java -jar public-service-0.0.1-SNAPSHOT.jar
-    depends_on:
-      postgres:
         condition: service_healthy
       discovery-server:
         condition: service_healthy
@@ -323,7 +327,8 @@ services:
       dockerfile: Dockerfile
     container_name: ai-service
     env_file:
-      - ./.env
+      dockerfile: docker/dockerfiles/Dockerfile.ai-service
+    image: smd/ai-service:latest
     ports:
       - "8000:8000"
     environment:
@@ -357,11 +362,10 @@ services:
   # AI Celery Worker
   ai-worker:
     build:
-      context: ../backend/ai-service
-      dockerfile: Dockerfile
+      context: ..
+      dockerfile: docker/dockerfiles/Dockerfile.ai-service
+    image: smd/ai-service:latest
     container_name: ai-worker
-    env_file:
-      - ./.env
     command: ["celery", "-A", "app.workers.celery_app", "worker", "--loglevel=info", "--pool=solo"]
     volumes:
       - transformers_cache:/root/.cache/torch
