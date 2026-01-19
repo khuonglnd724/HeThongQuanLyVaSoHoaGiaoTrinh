@@ -194,7 +194,7 @@ SELECT
     ROUND(
         CASE 
             WHEN COUNT(DISTINCT c.id) > 0 
-            THEN (COUNT(DISTINCT CASE WHEN cm.id IS NOT NULL THEN c.id END)::FLOAT / COUNT(DISTINCT c.id) * 100)
+            THEN (COUNT(DISTINCT CASE WHEN cm.id IS NOT NULL THEN c.id END)::NUMERIC / COUNT(DISTINCT c.id)::NUMERIC * 100)
             ELSE 0 
         END, 2
     ) as coverage_percentage
@@ -247,7 +247,6 @@ COMMENT ON TABLE public.plo IS 'Program Learning Outcome - Chuẩn đầu ra ch�
 COMMENT ON TABLE public.clo IS 'Course Learning Outcome - Chuẩn đầu ra môn học';
 COMMENT ON TABLE public.clo_mapping IS 'Bản đồ liên kết giữa CLO và PLO';
 
-COMMENT ON COLUMN public.plo.strength_level IS '1=yếu, 2=khá, 3=trung bình, 4=mạnh, 5=rất mạnh';
 COMMENT ON COLUMN public.clo.bloom_level IS 'Remember, Understand, Apply, Analyze, Evaluate, Create';
 COMMENT ON COLUMN public.syllabus.status IS 'Draft, Submitted, Under Review, Approved, Rejected, Published';
 COMMENT ON COLUMN public.syllabus.approval_status IS 'Pending, Approved, Rejected';
