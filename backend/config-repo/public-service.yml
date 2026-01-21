@@ -3,6 +3,9 @@ server:
 spring:
   application:
     name: public-service
+  cloud:
+    compatibility-verifier:
+      enabled: false
 
 eureka:
   client:

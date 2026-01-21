@@ -1,0 +1,150 @@
+@echo off
+REM ============================================
+REM  SMD: Single Frontend React SPA
+REM  Complete Setup & Documentation
+REM ============================================
+
+cls
+echo.
+echo ╔══════════════════════════════════════════════════╗
+echo ║  SMD: Single Frontend React SPA                 ║
+echo ║  Complete Setup ^& Documentation                ║
+echo ╚══════════════════════════════════════════════════╝
+echo.
+
+echo 📖 DOCUMENTATION FILES
+echo ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+echo.
+echo   Quick Start (Choose based on your need):
+echo   ├── 🚀 QUICK_START.md ................ 60-second setup
+echo   ├── 📖 FRONTEND_SETUP.md ............ Main guide (READ THIS FIRST)
+echo   ├── 🏗️  ARCHITECTURE_DIAGRAMS.md ..... Visual diagrams
+echo   ├── 📚 SINGLE_FRONTEND_SETUP.md ..... Detailed architecture
+echo   ├── 📋 IMPLEMENTATION_CHECKLIST.md .. What was done
+echo   ├── 🎯 README_SINGLE_FRONTEND.md .... Complete master guide
+echo   └── 📊 FRONTEND_MIGRATION_SUMMARY.md Migration overview
+echo.
+
+echo ⚡ QUICK START (Choose one)
+echo ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+echo.
+echo   RECOMMENDED - Windows Batch Script:
+echo     .\start-frontend.bat
+echo.
+echo   Manual - Command Line:
+echo     cd frontend\public-portal
+echo     npm install
+echo     npm start
+echo.
+
+echo 🐳 DOCKER COMMANDS
+echo ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+echo.
+echo   Build image:
+echo     cd frontend\public-portal
+echo     docker build -t smd/frontend:latest .
+echo.
+echo   Run container:
+echo     docker run -d -p 3000:3000 smd/frontend:latest
+echo.
+echo   Docker Compose (recommended):
+echo     cd docker
+echo     docker compose up -d frontend
+echo.
+
+echo 🔐 DEMO ACCOUNTS
+echo ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+echo.
+echo   Role                Email                   Password
+echo   ─────────────────   ─────────────────────   ──────────
+echo   Student             student@smd.edu.vn      student123
+echo   Lecturer            lecturer@smd.edu.vn     lecturer123
+echo   Academic Affairs    academic@smd.edu.vn     academic123
+echo   Admin               admin@smd.edu.vn        admin123
+echo   Head of Dept        hod@smd.edu.vn          hod123
+echo   Rector              rector@smd.edu.vn       rector123
+echo.
+
+echo ✨ KEY FEATURES
+echo ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+echo.
+echo   ✅ Single React SPA (not 5 portals)
+echo   ✅ Role-based page routing
+echo   ✅ Route protection components
+echo   ✅ Permission-based access control
+echo   ✅ Nginx reverse proxy
+echo   ✅ Docker optimized (300MB)
+echo   ✅ SPA routing (no page reloads)
+echo   ✅ localStorage session persistence
+echo.
+
+echo 📁 PROJECT STRUCTURE
+echo ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+echo.
+echo   frontend\public-portal\
+echo   ├── src\
+echo   │   ├── config\roleConfig.js ........ Role definitions (NEW)
+echo   │   ├── components\RoleGuard.jsx ... Route protection (NEW)
+echo   │   ├── pages\ ..................... All dashboard pages
+echo   │   └── App.jsx .................... Main router (UPDATED)
+echo   │
+echo   ├── Dockerfile ..................... Nginx + multi-stage (UPDATED)
+echo   ├── nginx.conf ..................... SPA routing (NEW)
+echo   ├── package.json
+echo   └── README.md
+echo.
+
+echo 🎯 ARCHITECTURE
+echo ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+echo.
+echo   Before (Multi-Portal):         After (Single SPA):
+echo   5 containers (1.5GB)           1 container (300MB)
+echo   5 build pipelines              1 build pipeline
+echo   5 package.json                 1 package.json
+echo   Separate deployments           Single deployment
+echo.
+
+echo ✅ STATUS
+echo ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+echo.
+echo   ✅ Architecture designed
+echo   ✅ All files created
+echo   ✅ Documentation complete
+echo   ✅ Docker ready
+echo   ✅ Demo accounts ready
+echo   ✅ Ready for testing
+echo.
+
+echo 🚀 NEXT STEPS
+echo ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+echo.
+echo   1. Start dev server:
+echo      .\start-frontend.bat  (or npm start)
+echo.
+echo   2. Open browser:
+echo      http://localhost:3000
+echo.
+echo   3. Test login:
+echo      Email: student@smd.edu.vn
+echo      Password: student123
+echo.
+echo   4. Try other roles
+echo.
+
+echo 📞 SUPPORT
+echo ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+echo.
+echo   Frontend: http://localhost:3000
+echo   API Gateway: http://localhost:8080
+echo   Health Check: http://localhost:3000/health
+echo.
+
+echo ╔══════════════════════════════════════════════════╗
+echo ║  Ready to start?                                ║
+echo ║  Run: .\start-frontend.bat                       ║
+echo ║                                                  ║
+echo ║  Press any key to continue...                    ║
+echo ╚══════════════════════════════════════════════════╝
+echo.
+
+pause

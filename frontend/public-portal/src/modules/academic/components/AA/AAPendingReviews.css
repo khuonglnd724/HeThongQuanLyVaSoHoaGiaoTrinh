@@ -1,0 +1,197 @@
+.aa-pending-reviews {
+  padding: 24px;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.aa-pending-reviews .header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 32px;
+  flex-wrap: wrap;
+  gap: 20px;
+}
+
+.aa-pending-reviews h1 {
+  font-size: 28px;
+  color: #1a1a1a;
+  margin: 0;
+}
+
+.aa-pending-reviews .stats {
+  display: flex;
+  gap: 16px;
+}
+
+.aa-pending-reviews .stat-card {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  padding: 16px 24px;
+  border-radius: 12px;
+  color: white;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 120px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.aa-pending-reviews .stat-card.urgent {
+  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+}
+
+.aa-pending-reviews .stat-value {
+  font-size: 32px;
+  font-weight: bold;
+  margin-bottom: 4px;
+}
+
+.aa-pending-reviews .stat-label {
+  font-size: 13px;
+  opacity: 0.9;
+}
+
+.aa-pending-reviews .filters {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+}
+
+.aa-pending-reviews .filters button {
+  padding: 10px 20px;
+  border: 2px solid #e0e0e0;
+  background: white;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  color: #666;
+  transition: all 0.3s ease;
+}
+
+.aa-pending-reviews .filters button:hover {
+  border-color: #667eea;
+  color: #667eea;
+}
+
+.aa-pending-reviews .filters button.active {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border-color: transparent;
+}
+
+.aa-pending-reviews .syllabuses-table {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+}
+
+.aa-pending-reviews table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.aa-pending-reviews thead {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: linear-gradient(135deg, #667eea 0%, #6f7ddb 100%);
+  color: white;
+}
+
+.aa-pending-reviews thead th {
+  padding: 16px;
+  text-align: left;
+  font-weight: 600;
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.aa-pending-reviews tbody tr {
+  border-bottom: 1px solid #f0f0f0;
+  transition: background-color 0.2s ease;
+}
+
+.aa-pending-reviews tbody tr:hover {
+  background-color: #f8f9ff;
+}
+
+.aa-pending-reviews tbody tr:nth-child(odd) {
+  background-color: #fcfcff;
+}
+
+.aa-pending-reviews tbody tr.urgent-row {
+  background-color: #fff5f5;
+}
+
+.aa-pending-reviews tbody tr.urgent-row:hover {
+  background-color: #ffe5e5;
+}
+
+.aa-pending-reviews tbody td {
+  padding: 16px;
+  font-size: 14px;
+  color: #333;
+}
+
+.aa-pending-reviews .no-data {
+  text-align: center;
+  padding: 48px !important;
+  color: #999;
+  font-style: italic;
+}
+
+.aa-pending-reviews .urgent-badge {
+  background: #ff4444;
+  color: white;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.aa-pending-reviews .review-btn {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  padding: 8px 20px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.3s ease;
+}
+
+.aa-pending-reviews .review-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+.aa-pending-reviews .loading {
+  text-align: center;
+  padding: 60px;
+  font-size: 18px;
+  color: #666;
+}
+
+@media (max-width: 1200px) {
+  .aa-pending-reviews {
+    padding: 16px;
+  }
+
+  .aa-pending-reviews .header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .aa-pending-reviews .syllabuses-table {
+    overflow-x: auto;
+  }
+
+  .aa-pending-reviews table {
+    min-width: 1000px;
+  }
+}

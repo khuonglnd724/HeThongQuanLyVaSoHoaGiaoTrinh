@@ -8,10 +8,17 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
-@Configuration
+/**
+ * CORS Configuration - DISABLED
+ * 
+ * CORS is handled by API Gateway (port 8080)
+ * This service runs behind the gateway, so no need for CORS here
+ * Keeping this configuration would cause duplicate CORS headers
+ */
+// @Configuration  // COMMENTED OUT - CORS handled by API Gateway
 public class CorsConfig {
 
-    @Bean
+    // @Bean  // DISABLED - API Gateway handles CORS
     CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
         
