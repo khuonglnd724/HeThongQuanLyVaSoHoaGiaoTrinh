@@ -23,8 +23,8 @@ services:
   # Discovery Server (Eureka)
   discovery-server:
     build:
-      context: ..
-      dockerfile: docker/dockerfiles/Dockerfile.discovery-server
+      context: ../backend/discovery-server
+      dockerfile: Dockerfile
     image: smd/discovery-server:latest
     container_name: discovery-server
     ports:
@@ -42,8 +42,8 @@ services:
   # Config Server
   config-server:
     build:
-      context: ..
-      dockerfile: docker/dockerfiles/Dockerfile.config-server
+      context: ../backend/config-server
+      dockerfile: Dockerfile
     image: smd/config-server:latest
     container_name: config-server
     volumes:
@@ -69,8 +69,8 @@ services:
   # API Gateway
   api-gateway:
     build:
-      context: ..
-      dockerfile: docker/dockerfiles/Dockerfile.api-gateway
+      context: ../backend/api-gateway
+      dockerfile: Dockerfile
     image: smd/api-gateway:latest
     container_name: api-gateway
     ports:
@@ -90,8 +90,8 @@ services:
   # Auth Service
   auth-service:
     build:
-      context: ..
-      dockerfile: docker/dockerfiles/Dockerfile.auth-service
+      context: ../backend/auth-service
+      dockerfile: Dockerfile
     image: smd/auth-service:latest
     container_name: auth-service
     ports:
@@ -116,8 +116,8 @@ services:
   # Academic Service
   academic-service:
     build:
-      context: ..
-      dockerfile: docker/dockerfiles/Dockerfile.academic-service
+      context: ../backend/academic-service
+      dockerfile: Dockerfile
     image: smd/academic-service:latest
     container_name: academic-service
     ports:
@@ -139,8 +139,8 @@ services:
   # Syllabus Service
   syllabus-service:
     build:
-      context: ..
-      dockerfile: docker/dockerfiles/Dockerfile.syllabus-service
+      context: ../backend/syllabus-service
+      dockerfile: Dockerfile
     image: smd/syllabus-service:latest
     container_name: syllabus-service
     ports:
@@ -162,8 +162,8 @@ services:
   # Workflow Service
   workflow-service:
     build:
-      context: ..
-      dockerfile: docker/dockerfiles/Dockerfile.workflow-service
+      context: ../backend/workflow-service
+      dockerfile: Dockerfile
     image: smd/workflow-service:latest
     container_name: workflow-service
     ports:
@@ -180,7 +180,7 @@ services:
       SPRING_RABBITMQ_USERNAME: guest
       SPRING_RABBITMQ_PASSWORD: guest
       SPRING_PROFILES_ACTIVE: docker
-      SYLLABUS_SERVICE_URL: http://syllabus-service:8082
+      SYLLABUS_SERVICE_URL: http://syllabus-service:8085
     command: java -jar workflow-service-0.0.1-SNAPSHOT.jar
     depends_on:
       postgres:
@@ -195,8 +195,8 @@ services:
   # Public Service
   public-service:
     build:
-      context: ..
-      dockerfile: docker/dockerfiles/Dockerfile.public-service
+      context: ../backend/public-service
+      dockerfile: Dockerfile
     image: smd/public-service:latest
     container_name: public-service
     ports:
@@ -353,9 +353,9 @@ services:
   # AI Celery Worker
   ai-worker:
     build:
-      context: ..
-      dockerfile: docker/dockerfiles/Dockerfile.ai-service
-    image: smd/ai-service:latest
+      context: ../backend/ai-service
+      dockerfile: Dockerfile
+    image: smd/ai-worker:latest
     container_name: ai-worker
     command: ["celery", "-A", "app.workers.celery_app", "worker", "--loglevel=info", "--pool=solo"]
     volumes:
@@ -454,6 +454,31 @@ services:
       - smd-network
     restart: unless-stopped
 
+  # =====================================================
+  # Frontend Service - Single React SPA
+  # =====================================================
+  frontend:
+    build:
+      context: ..
+      dockerfile: frontend/public-portal/Dockerfile
+    image: smd/frontend:latest
+    container_name: smd-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - REACT_APP_API_URL=http://api-gateway:8080
+      - NODE_ENV=production
+    depends_on:
+      - api-gateway
+    networks:
+      - smd-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
 networks:
   smd-network:
     driver: bridge
@@ -479,29 +504,3 @@ volumes:
     driver: local
   transformers_cache:
     driver: local
-
-# =====================================================
-# Frontend Service - Single React SPA
-# =====================================================
-  frontend:
-    build:
-      context: ..
-      dockerfile: frontend/public-portal/Dockerfile
-    image: smd/frontend:latest
-    container_name: smd-frontend
-    ports:
-      - "3000:3000"
-    environment:
-      - REACT_APP_API_URL=http://api-gateway:8080
-      - NODE_ENV=production
-    depends_on:
-      - api-gateway
-    networks:
-      - smd-network
-    healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-    restart: unless-stopped
-

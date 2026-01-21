@@ -165,20 +165,20 @@ public class WorkflowService {
 
         switch (event) {
             case SUBMIT -> {
-                if (role != UserRole.LECTURER || state != WorkflowState.DRAFT) {
+                if (role != UserRole.ROLE_LECTURER || state != WorkflowState.DRAFT) {
                     throw new RuntimeException("Only Lecturer can submit from DRAFT");
                 }
             }
             case APPROVE, REJECT -> {
-                if ((role != UserRole.HOD && role != UserRole.PRINCIPAL)
-                        || state != WorkflowState.REVIEW) {
+                if ((role != UserRole.ROLE_HOD && role != UserRole.ROLE_RECTOR)
+                    || state != WorkflowState.REVIEW) {
                     throw new RuntimeException(
                             "Only HoD or Principal can approve/reject from REVIEW"
                     );
                 }
             }
             case REQUIRE_EDIT -> {
-                if ((role != UserRole.HOD && role != UserRole.PRINCIPAL)
+                if ((role != UserRole.ROLE_HOD && role != UserRole.ROLE_RECTOR)
                         || state != WorkflowState.REVIEW) {
                     throw new RuntimeException(
                         "Only HoD or Principal can require edit from REVIEW"
