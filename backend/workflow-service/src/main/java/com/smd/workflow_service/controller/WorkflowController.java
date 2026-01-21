@@ -45,11 +45,11 @@ public class WorkflowController {
     public WorkflowState submit(@PathVariable UUID id,
                                 @RequestParam String actionBy) {
         return service.sendEvent(
-                id,
-                WorkflowEvent.SUBMIT,
-                UserRole.LECTURER,
-                actionBy,
-                null
+            id,
+            WorkflowEvent.SUBMIT,
+            UserRole.ROLE_LECTURER,
+            actionBy,
+            null
         );
     }
 
