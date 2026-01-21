@@ -41,10 +41,10 @@ public class SecurityConfig {
     }
 
     @Bean
-        public SecurityFilterChain filterChain(HttpSecurity http, AuthTokenFilter authTokenFilter, CorsConfigurationSource corsConfigurationSource) throws Exception {
+        public SecurityFilterChain filterChain(HttpSecurity http, AuthTokenFilter authTokenFilter) throws Exception {
         http
                 .csrf(csrf -> csrf.disable())
-            .cors(withDefaults()) // enable CORS using CorsConfigurationSource bean
+            // .cors(withDefaults()) // DISABLED - CORS handled by API Gateway
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(

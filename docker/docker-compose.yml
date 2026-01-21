@@ -89,7 +89,6 @@ services:
 
   # Auth Service
   auth-service:
-    image: eclipse-temurin:17-jre
     build:
       context: ..
       dockerfile: docker/dockerfiles/Dockerfile.auth-service
@@ -104,6 +103,7 @@ services:
       SPRING_DATASOURCE_PASSWORD: 123456
       EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE: http://discovery-server:8761/eureka
       SPRING_CONFIG_IMPORT: "optional:configserver:http://config-server:8888"
+    depends_on:
       postgres:
         condition: service_healthy
       discovery-server:
@@ -115,7 +115,6 @@ services:
 
   # Academic Service
   academic-service:
-    image: eclipse-temurin:21-jre
     build:
       context: ..
       dockerfile: docker/dockerfiles/Dockerfile.academic-service
@@ -127,12 +126,9 @@ services:
       JAVA_OPTS: "-Xmx256m -Xms256m"
       EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE: http://discovery-server:8761/eureka
       SPRING_CONFIG_IMPORT: "optional:configserver:http://config-server:8888"
-<<<<<<< HEAD
       SPRING_JPA_HIBERNATE_DDL_AUTO: update
     command: java -jar academic-service-0.0.1-SNAPSHOT.jar
     depends_on:
-=======
->>>>>>> feature/public-portal-search-v2
       discovery-server:
         condition: service_healthy
       config-server:
@@ -142,7 +138,6 @@ services:
 
   # Syllabus Service
   syllabus-service:
-    image: eclipse-temurin:21-jre
     build:
       context: ..
       dockerfile: docker/dockerfiles/Dockerfile.syllabus-service
@@ -156,6 +151,7 @@ services:
       SPRING_DATASOURCE_USERNAME: postgres
       SPRING_DATASOURCE_PASSWORD: 123456
       EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE: http://discovery-server:8761/eureka
+    depends_on:
       postgres:
         condition: service_healthy
       discovery-server:
@@ -165,8 +161,6 @@ services:
 
   # Workflow Service
   workflow-service:
-    image: eclipse-temurin:21-jre
-    container_name: workflow-service
     build:
       context: ..
       dockerfile: docker/dockerfiles/Dockerfile.workflow-service
@@ -180,7 +174,6 @@ services:
       SPRING_DATASOURCE_USERNAME: postgres
       SPRING_DATASOURCE_PASSWORD: 123456
       EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE: http://discovery-server:8761/eureka
-<<<<<<< HEAD
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       SPRING_RABBITMQ_HOST: smd-rabbitmq
       SPRING_RABBITMQ_PORT: 5672
@@ -188,12 +181,9 @@ services:
       SPRING_RABBITMQ_PASSWORD: guest
       SPRING_PROFILES_ACTIVE: docker
       SYLLABUS_SERVICE_URL: http://syllabus-service:8082
-
     command: java -jar workflow-service-0.0.1-SNAPSHOT.jar
     depends_on:
       postgres:
-=======
->>>>>>> feature/public-portal-search-v2
         condition: service_healthy
       discovery-server:
         condition: service_healthy
@@ -204,8 +194,6 @@ services:
  
   # Public Service
   public-service:
-    image: eclipse-temurin:21-jre
-    container_name: public-service
     build:
       context: ..
       dockerfile: docker/dockerfiles/Dockerfile.public-service
@@ -219,6 +207,9 @@ services:
       SPRING_DATASOURCE_USERNAME: postgres
       SPRING_DATASOURCE_PASSWORD: 123456
       EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE: http://discovery-server:8761/eureka
+      SPRING_CLOUD_COMPATIBILITY_VERIFIER_ENABLED: "false"
+    depends_on:
+      postgres:
         condition: service_healthy
       discovery-server:
         condition: service_healthy
@@ -326,9 +317,9 @@ services:
       context: ../backend/ai-service
       dockerfile: Dockerfile
     container_name: ai-service
-    env_file:
-      dockerfile: docker/dockerfiles/Dockerfile.ai-service
     image: smd/ai-service:latest
+    env_file:
+      - ../.env
     ports:
       - "8000:8000"
     environment:
@@ -451,7 +442,7 @@ services:
     image: grafana/promtail:latest
     container_name: smd-promtail
     ports:
-      - "9080:9080"
+      - "19080:9080"
     volumes:
       - ./observability/promtail-config.yml:/etc/promtail/config.yml:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
@@ -488,4 +479,29 @@ volumes:
     driver: local
   transformers_cache:
     driver: local
+
+# =====================================================
+# Frontend Service - Single React SPA
+# =====================================================
+  frontend:
+    build:
+      context: ..
+      dockerfile: frontend/public-portal/Dockerfile
+    image: smd/frontend:latest
+    container_name: smd-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - REACT_APP_API_URL=http://api-gateway:8080
+      - NODE_ENV=production
+    depends_on:
+      - api-gateway
+    networks:
+      - smd-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
 

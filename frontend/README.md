@@ -1,36 +1,46 @@
-﻿# Frontend
+﻿# Frontend - SMD Microservices
 
-Frontend cho hệ thống SMD Microservices.
+## 🚀 Cách chạy
 
-## Công nghệ dự kiến
-- React/Vue/Angular
-- TypeScript
-- Tailwind CSS / Material UI
+```powershell
+cd frontend/public-portal
+npm start
+```
 
-## Cấu trúc dự kiến
-\\\
-frontend/
- admin-portal/     # Admin dashboard
- student-portal/   # Student interface  
- teacher-portal/   # Teacher interface
- shared/           # Shared components
-\\\
+**URL:** http://localhost:3001
 
-## Sẽ được phát triển trong tương lai
-Admin System (port 3002):
+---
 
-Username: admin
-Password: admin123
-🎓 Academic Portal (port 5174):
+## 🔐 Tài khoản trong Database
 
-Username: academic
-Password: academic123
-Họ tên: Academic Staff
-👨‍🏫 Lecturer (cho quản lý syllabus):
+**Mật khẩu chung cho tất cả:** `Lecturer@123`
 
-Username: lecturer1
-Password: lecturer123
-👨‍🎓 Student:
+### 1. 👤 ADMIN
+- **Email:** admin@smd.edu.vn
+- **Password:** Lecturer@123
+- **Role:** ROLE_ADMIN
 
-Username: student1
-Password: student123
+### 2. 👨‍🏫 LECTURER 1
+- **Email:** lecturer1@smd.edu.vn
+- **Password:** Lecturer@123
+- **Role:** ROLE_LECTURER
+- **Tên:** Nguyễn Văn A
+
+### 3. 👨‍🏫 LECTURER 2
+- **Email:** lecturer2@smd.edu.vn
+- **Password:** Lecturer@123
+- **Role:** ROLE_LECTURER
+- **Tên:** Trần Thị B
+
+### 4. 🎓 ACADEMIC AFFAIRS
+- **Email:** academic@smd.edu.vn
+- **Password:** Lecturer@123
+- **Role:** ROLE_ACADEMIC_AFFAIRS
+- **Tên:** Phòng Đào Tạo
+
+---
+
+## 📝 Lưu ý
+- Backend API: http://localhost:8080
+- Tất cả tài khoản đã được khởi tạo sẵn trong database
+- CORS đã được cấu hình cho port 3001

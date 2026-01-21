@@ -16,7 +16,7 @@
   <description>Shared utilities, errors, and response models for SMD services</description>
 
   <properties>
-    <java.version>21</java.version>
+    <java.version>17</java.version>
   </properties>
 
   <dependencies>

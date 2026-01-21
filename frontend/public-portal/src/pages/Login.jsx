@@ -1,0 +1,164 @@
+import React, { useState } from 'react'
+import authService from '../services/auth/authService'
+
+const Login = ({ onLoginSuccess, onBackToLanding }) => {
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [rememberMe, setRememberMe] = useState(false)
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    setError('')
+    setLoading(true)
+
+    // Validate inputs
+    if (!email || !password) {
+      setError('Email and password are required')
+      setLoading(false)
+      return
+    }
+
+    if (!email.includes('@')) {
+      setError('Please enter a valid email')
+      setLoading(false)
+      return
+    }
+
+    try {
+      // Call real auth API
+      const response = await authService.login({ email, password })
+      
+      // Save token
+      if (response.token) {
+        localStorage.setItem('token', response.token)
+      }
+      if (response.refreshToken) {
+        localStorage.setItem('refreshToken', response.refreshToken)
+      }
+
+      // Extract role from roles Set (convert to array and get first role)
+      const userRoles = Array.isArray(response.roles) 
+        ? response.roles 
+        : (response.roles ? Array.from(response.roles) : ['ROLE_STUDENT'])
+      
+      const primaryRole = userRoles[0] || 'ROLE_STUDENT'
+
+      // Save user data
+      const userData = {
+        email: response.email || email,
+        name: response.fullName || response.username || email.split('@')[0],
+        username: response.username,
+        role: primaryRole,
+        roles: userRoles,
+        userId: response.userId
+      }
+
+      localStorage.setItem('user', JSON.stringify(userData))
+
+      if (rememberMe) {
+        localStorage.setItem('rememberEmail', email)
+      }
+
+      console.log('Login successful:', userData)
+      onLoginSuccess(userData)
+    } catch (err) {
+      console.error('Login error:', err)
+      const errorMsg = err.message || err.error || 'Login failed. Please check your credentials.'
+      setError(errorMsg)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center px-4">
+      <div className="w-full max-w-md">
+        {/* Card */}
+        <div className="bg-white rounded-lg shadow-lg p-8 space-y-6">
+          {/* Header */}
+          <div className="text-center space-y-2">
+            <h1 className="text-3xl font-bold text-slate-900">SMD System</h1>
+            <p className="text-slate-600 text-sm">Sign in to your account</p>
+          </div>
+
+          {/* Error Message */}
+          {error && (
+            <div className="rounded-lg bg-red-50 border border-red-200 p-3 text-sm text-red-700">
+              ⚠️ {error}
+            </div>
+          )}
+
+          {/* Form */}
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {/* Email */}
+            <div className="space-y-1">
+              <label className="block text-sm font-semibold text-slate-700">Email Address</label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@example.com"
+                className="w-full rounded-md border border-slate-300 px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+              />
+            </div>
+
+            {/* Password */}
+            <div className="space-y-1">
+              <label className="block text-sm font-semibold text-slate-700">Password</label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                className="w-full rounded-md border border-slate-300 px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+              />
+            </div>
+
+            {/* Checkbox & Link */}
+            <div className="flex items-center justify-between">
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
+                  className="rounded border-slate-300"
+                />
+                <span className="text-sm text-slate-600">Remember me</span>
+              </label>
+              <a href="#forgot" className="text-sm text-emerald-600 hover:underline">
+                Forgot password?
+              </a>
+            </div>
+
+            {/* Submit Button */}
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-emerald-500 transition disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {loading ? '🔄 Signing in...' : '🔐 Sign In'}
+            </button>
+          </form>
+
+          {/* Back Button */}
+          <button
+            type="button"
+            onClick={onBackToLanding}
+            className="w-full text-sm text-slate-600 hover:text-slate-900 transition"
+          >
+            ← Back to Home
+          </button>
+        </div>
+
+        {/* Footer */}
+        <p className="text-center text-xs text-slate-400 mt-6">
+          SMD System © 2025. All rights reserved.
+        </p>
+      </div>
+    </div>
+  )
+}
+
+export default Login

@@ -1,10 +1,10 @@
-# Build stage
-FROM node:18-alpine AS builder
+# Stage 1: Build
+FROM node:18-alpine as builder
 
 WORKDIR /app
 
 # Copy package files
-COPY package.json package-lock.json* ./
+COPY package*.json ./
 
 # Install dependencies
 RUN npm ci
@@ -15,23 +15,24 @@ COPY . .
 # Build the app
 RUN npm run build
 
-# Production stage
-FROM node:18-alpine
+# Stage 2: Runtime (Nginx + SPA)
+FROM nginx:alpine
 
-WORKDIR /app
+# Remove default nginx config
+RUN rm /etc/nginx/conf.d/default.conf
 
-# Install serve to run the app
-RUN npm install -g serve
+# Copy custom nginx config for SPA
+COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 # Copy built app from builder
-COPY --from=builder /app/build ./build
+COPY --from=builder /app/build /usr/share/nginx/html
 
 # Expose port
 EXPOSE 3000
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-  CMD node -e "require('http').get('http://localhost:3000', (r) => {if (r.statusCode !== 200) throw new Error(r.statusCode)})"
+  CMD wget --quiet --tries=1 --spider http://localhost:3000/ || exit 1
 
-# Start the app
-CMD ["serve", "-s", "build", "-l", "3000"]
+# Start Nginx
+CMD ["nginx", "-g", "daemon off;"]

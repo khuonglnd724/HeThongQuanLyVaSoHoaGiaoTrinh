@@ -1,0 +1,168 @@
+version: '3.8'
+
+services:
+  # Frontend - React (Public Portal)
+  frontend:
+    build:
+      context: ./frontend/public-portal
+      dockerfile: Dockerfile
+    container_name: smd-frontend
+    ports:
+      - "3000:3000"
+      - "3001:3000"
+    environment:
+      - NODE_ENV=production
+      - REACT_APP_API_URL=http://localhost:8080
+    depends_on:
+      - api-gateway
+    networks:
+      - smd-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # API Gateway
+  api-gateway:
+    build:
+      context: ./backend/api-gateway
+      dockerfile: Dockerfile
+    container_name: smd-api-gateway
+    ports:
+      - "8080:8080"
+    environment:
+      - SERVER_PORT=8080
+      - EUREKA_SERVER_URL=http://discovery-server:8761/eureka
+    depends_on:
+      - discovery-server
+    networks:
+      - smd-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # Discovery Server (Eureka)
+  discovery-server:
+    build:
+      context: ./backend/discovery-server
+      dockerfile: Dockerfile
+    container_name: smd-discovery-server
+    ports:
+      - "8761:8761"
+    environment:
+      - SERVER_PORT=8761
+    networks:
+      - smd-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8761/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # Config Server
+  config-server:
+    build:
+      context: ./backend/config-server
+      dockerfile: Dockerfile
+    container_name: smd-config-server
+    ports:
+      - "8888:8888"
+    environment:
+      - SERVER_PORT=8888
+    networks:
+      - smd-network
+    restart: unless-stopped
+
+  # Auth Service
+  auth-service:
+    build:
+      context: ./backend/auth-service
+      dockerfile: Dockerfile
+    container_name: smd-auth-service
+    ports:
+      - "8001:8001"
+    environment:
+      - SERVER_PORT=8001
+      - EUREKA_SERVER_URL=http://discovery-server:8761/eureka
+      - CONFIG_SERVER_URL=http://config-server:8888
+    depends_on:
+      - discovery-server
+      - config-server
+    networks:
+      - smd-network
+    restart: unless-stopped
+
+  # Syllabus Service
+  syllabus-service:
+    build:
+      context: ./syllabus-service
+      dockerfile: Dockerfile
+    container_name: smd-syllabus-service
+    ports:
+      - "8002:8002"
+    environment:
+      - SERVER_PORT=8002
+      - EUREKA_SERVER_URL=http://discovery-server:8761/eureka
+      - CONFIG_SERVER_URL=http://config-server:8888
+    depends_on:
+      - discovery-server
+      - config-server
+    networks:
+      - smd-network
+    restart: unless-stopped
+
+  # Academic Service
+  academic-service:
+    build:
+      context: ./academic-service
+      dockerfile: Dockerfile
+    container_name: smd-academic-service
+    ports:
+      - "8003:8003"
+    environment:
+      - SERVER_PORT=8003
+      - EUREKA_SERVER_URL=http://discovery-server:8761/eureka
+      - CONFIG_SERVER_URL=http://config-server:8888
+    depends_on:
+      - discovery-server
+      - config-server
+    networks:
+      - smd-network
+    restart: unless-stopped
+
+  # Public Service
+  public-service:
+    build:
+      context: ./public-service
+      dockerfile: Dockerfile
+    container_name: smd-public-service
+    ports:
+      - "8004:8004"
+    environment:
+      - SERVER_PORT=8004
+      - EUREKA_SERVER_URL=http://discovery-server:8761/eureka
+      - CONFIG_SERVER_URL=http://config-server:8888
+    depends_on:
+      - discovery-server
+      - config-server
+    networks:
+      - smd-network
+    restart: unless-stopped
+
+networks:
+  smd-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  mongodb_data:
+  redis_data:

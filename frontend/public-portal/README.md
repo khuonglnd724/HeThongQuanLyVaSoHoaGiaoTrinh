@@ -379,3 +379,10 @@ Liên hệ: support@example.com
 ## 📄 License
 
 MIT License - © 2026
+
+Role	Email	Password	Trang chủ	Module
+👨‍🎓 Student	student@smd.edu	demo123	StudentDashboard	/modules/student/pages/
+👨‍🏫 Lecturer	lecturer@smd.edu	demo123	LecturerDashboard	/modules/lecturer/pages/
+🔐 Admin	admin@smd.edu	demo123	AdminDashboard	/modules/admin/pages/
+📚 Academic Officer	academic@smd.edu	demo123	AcademicDashboard	/modules/academic/pages/
+👔 Head of Department	hod@smd.edu	demo123	Trang HoD	/modules/

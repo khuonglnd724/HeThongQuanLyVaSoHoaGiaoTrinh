@@ -1,6 +1,8 @@
 # Build stage
 FROM maven:3.9.9-eclipse-temurin-21 AS build
 WORKDIR /workspace
+COPY backend/common-lib ./common-lib
+RUN cd common-lib && mvn -q -B -DskipTests clean install
 COPY backend/workflow-service/pom.xml ./
 RUN mvn -q -B -DskipTests dependency:go-offline
 COPY backend/workflow-service/src ./src
