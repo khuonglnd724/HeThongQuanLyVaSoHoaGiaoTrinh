@@ -6,8 +6,6 @@ import com.smd.public_service.service.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.Cacheable;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -48,8 +46,7 @@ public class SyllabusDetailController {
         log.info("Fetching syllabus detail for id: {}", id);
         
         try {
-            Syllabus syllabus = searchService.getSyllabusById(id);
-            SyllabusDetailDto detail = convertToDetailDto(syllabus);
+            SyllabusDetailDto detail = convertToDetailDto(searchService.getSyllabusById(id));
             
             return ResponseEntity.ok(detail);
         } catch (Exception e) {
@@ -138,8 +135,6 @@ public class SyllabusDetailController {
         log.info("User {} following syllabus {}", userId, id);
         
         try {
-            Syllabus syllabus = searchService.getSyllabusById(id);
-            
             FollowService.FollowResponse followResult = followService.followSyllabus(id, userId, email);
             
             FollowResponseDto response = new FollowResponseDto();
@@ -197,8 +192,6 @@ public class SyllabusDetailController {
                 request.getSyllabusId(), request.getFeedbackType());
         
         try {
-            Syllabus syllabus = searchService.getSyllabusById(request.getSyllabusId());
-            
             FeedbackService.CreateFeedbackRequest feedbackRequest = new FeedbackService.CreateFeedbackRequest();
             feedbackRequest.syllabusId = request.getSyllabusId();
             feedbackRequest.userId = request.getUserId();

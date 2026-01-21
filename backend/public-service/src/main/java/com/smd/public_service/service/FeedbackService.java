@@ -55,8 +55,9 @@ public class FeedbackService {
     @Transactional
     public FeedbackResponse createFeedback(CreateFeedbackRequest request) {
         // Kiểm tra giáo trình tồn tại
-        syllabusRepository.findById(request.syllabusId)
-                .orElseThrow(() -> new RuntimeException("Syllabus not found: " + request.syllabusId));
+        if (!syllabusRepository.existsById(request.syllabusId)) {
+            throw new RuntimeException("Syllabus not found: " + request.syllabusId);
+        }
         
         // Validate feedback
         if (request.title == null || request.title.trim().isEmpty()) {
