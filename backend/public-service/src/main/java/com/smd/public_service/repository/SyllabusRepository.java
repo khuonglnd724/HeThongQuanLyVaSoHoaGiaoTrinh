@@ -57,4 +57,18 @@ public interface SyllabusRepository extends JpaRepository<Syllabus, Long> {
     @Query(value = "SELECT * FROM syllabus WHERE subject_id = :subjectId " +
             "ORDER BY version DESC LIMIT 1", nativeQuery = true)
     Optional<Syllabus> findLatestVersionBySubjectId(@Param("subjectId") Long subjectId);
+    
+    // Simple search for H2 database (no full-text search support)
+    @Query("SELECT s FROM Syllabus s WHERE " +
+            "(LOWER(s.subject.subjectName) LIKE LOWER(CONCAT('%', :query, '%')) OR " +
+            "LOWER(s.subject.subjectCode) LIKE LOWER(CONCAT('%', :query, '%')) OR " +
+            "LOWER(s.content) LIKE LOWER(CONCAT('%', :query, '%'))) AND " +
+            "s.status IN ('APPROVED', 'Published')")
+    Page<Syllabus> searchBySimpleQuery(@Param("query") String query, Pageable pageable);
+    
+    // Find by subject code
+    @Query("SELECT s FROM Syllabus s WHERE " +
+            "LOWER(s.subject.subjectCode) LIKE LOWER(CONCAT('%', :subjectCode, '%')) AND " +
+            "s.status IN ('APPROVED', 'Published')")
+    Page<Syllabus> findBySubjectCodeSimple(@Param("subjectCode") String subjectCode, Pageable pageable);
 }

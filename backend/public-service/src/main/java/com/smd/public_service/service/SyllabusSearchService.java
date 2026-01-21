@@ -50,24 +50,15 @@ public class SyllabusSearchService {
         Pageable pageable = PageRequest.of(page - 1, size);
         Page<Syllabus> resultPage;
         
-        // Nếu có query (full-text search)
+        // Nếu có query (simple search - không dùng fullText vì H2 không hỗ trợ)
         if (query != null && !query.trim().isEmpty()) {
-            resultPage = syllabusRepository.fullTextSearch(query.trim(), pageable);
+            resultPage = syllabusRepository.searchBySimpleQuery(query.trim(), pageable);
+        } else if (subjectCode != null && !subjectCode.isEmpty()) {
+            // Search by subject code
+            resultPage = syllabusRepository.findBySubjectCodeSimple(subjectCode, pageable);
         } else {
-            // Ngược lại, dùng filter
-            Long majorId = null;
-            if (majorName != null && !majorName.isEmpty()) {
-                // TODO: Cần tìm majorId từ majorName
-                // majorId = programRepository.findByName(majorName).getId();
-            }
-            
-            resultPage = syllabusRepository.searchByCriteria(
-                    null,
-                    subjectCode,
-                    majorId,
-                    semester,
-                    pageable
-            );
+            // Return all approved syllabi
+            resultPage = syllabusRepository.findByStatus("APPROVED", pageable);
         }
         
         // Convert to DTO

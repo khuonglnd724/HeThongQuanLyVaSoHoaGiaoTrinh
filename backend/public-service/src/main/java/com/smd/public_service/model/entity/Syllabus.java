@@ -61,8 +61,8 @@ public class Syllabus extends BaseEntity {
     
     @Column(name = "approval_comments", columnDefinition = "TEXT")
     private String approvalComments;
-    
-    // Full-text search support
-    @Column(name = "search_vector", columnDefinition = "tsvector")
-    private String searchVector;
+
+    // Full-text search support (PostgreSQL only - disabled for H2)
+    // @Column(name = "search_vector", columnDefinition = "tsvector")
+    // private String searchVector;
 }
