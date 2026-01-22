@@ -2,9 +2,10 @@ package com.smd.public_service.model.entity;
 
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
-import lombok.Data;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
-import lombok.EqualsAndHashCode;
+import lombok.Setter;
+import lombok.ToString;
 import lombok.experimental.SuperBuilder;
 
 /**
@@ -15,8 +16,9 @@ import lombok.experimental.SuperBuilder;
     @Index(name = "idx_feedback_syllabus_id", columnList = "syllabus_id"),
     @Index(name = "idx_feedback_status", columnList = "status")
 })
-@Data
-@EqualsAndHashCode(callSuper = false)
+@Getter
+@Setter
+@ToString(callSuper = true)
 @NoArgsConstructor
 @AllArgsConstructor
 @SuperBuilder
