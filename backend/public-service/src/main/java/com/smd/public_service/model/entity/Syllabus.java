@@ -2,11 +2,11 @@ package com.smd.public_service.model.entity;
 
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
-import lombok.Data;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
-import lombok.EqualsAndHashCode;
+import lombok.Setter;
+import lombok.ToString;
 import lombok.experimental.SuperBuilder;
-import java.time.LocalDateTime;
 
 /**
  * Syllabus (Giáo trình) - Read-only replica cho public-service
@@ -18,8 +18,9 @@ import java.time.LocalDateTime;
     @Index(name = "idx_syllabus_status", columnList = "status"),
     @Index(name = "idx_syllabus_updated_at", columnList = "updated_at")
 })
-@Data
-@EqualsAndHashCode(callSuper = false)
+@Getter
+@Setter
+@ToString(callSuper = true, exclude = {"subject"})
 @NoArgsConstructor
 @AllArgsConstructor
 @SuperBuilder

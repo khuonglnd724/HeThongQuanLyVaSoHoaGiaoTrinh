@@ -191,7 +191,7 @@ export const Footer = () => {
             <ul className="text-sm space-y-2 text-gray-400">
               <li><Link to="/" className="hover:text-white transition">Trang chủ</Link></li>
               <li><Link to="/search" className="hover:text-white transition">Tìm kiếm</Link></li>
-              <li><a href="#" className="hover:text-white transition">Hỗ trợ</a></li>
+              <li><button type="button" className="hover:text-white transition bg-transparent border-none cursor-pointer p-0">Hỗ trợ</button></li>
             </ul>
           </div>
           <div>
@@ -211,4 +211,5 @@ export const Footer = () => {
   )
 }
 
-export default { Header, Footer }
+const Layout = { Header, Footer }
+export default Layout
