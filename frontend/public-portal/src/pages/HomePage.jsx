@@ -1,7 +1,14 @@
 import React from 'react'
+import { useNavigate } from 'react-router-dom'
 import { BookOpen, Search, Zap, Shield } from 'lucide-react'
 
-export const HomePage = ({ onSearchClick }) => {
+export const HomePage = () => {
+  const navigate = useNavigate()
+
+  const handleSearchClick = () => {
+    navigate('/search')
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-white to-gray-50">
       {/* Hero Section */}
@@ -14,7 +21,7 @@ export const HomePage = ({ onSearchClick }) => {
             Tìm kiếm, xem chi tiết, so sánh và quản lý giáo trình học phần một cách dễ dàng
           </p>
           <button
-            onClick={onSearchClick}
+            onClick={handleSearchClick}
             className="btn btn-primary text-lg px-8 py-4 gap-2"
           >
             <Search size={24} />
@@ -33,25 +40,25 @@ export const HomePage = ({ onSearchClick }) => {
               icon: Search,
               title: '🔍 Tìm Kiếm Nâng Cao',
               description: 'Tìm kiếm theo tên, mã môn hoặc lọc theo chuyên ngành/học kỳ',
-              action: onSearchClick,
+              action: handleSearchClick,
             },
             {
               icon: BookOpen,
               title: '📖 Xem Chi Tiết',
               description: 'Xem toàn bộ nội dung giáo trình với thông tin chi tiết',
-              action: onSearchClick,
+              action: handleSearchClick,
             },
             {
               icon: Zap,
               title: '⚡ AI Summary',
               description: 'Tóm tắt tự động dùng AI để nắm nhanh nội dung',
-              action: onSearchClick,
+              action: handleSearchClick,
             },
             {
               icon: Shield,
               title: '✅ Theo Dõi',
               description: 'Đăng ký theo dõi để nhận thông báo khi giáo trình thay đổi',
-              action: onSearchClick,
+              action: handleSearchClick,
             },
           ].map((feature, idx) => (
             <button
@@ -137,7 +144,7 @@ export const HomePage = ({ onSearchClick }) => {
             Bắt đầu tìm kiếm giáo trình ngay bây giờ
           </p>
           <button
-            onClick={onSearchClick}
+            onClick={handleSearchClick}
             className="btn bg-white text-primary-600 hover:bg-primary-50 px-8 py-3 font-semibold"
           >
             Tìm Kiếm Ngay

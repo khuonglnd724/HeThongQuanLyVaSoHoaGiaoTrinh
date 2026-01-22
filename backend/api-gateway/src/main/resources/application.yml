@@ -55,7 +55,10 @@ spring:
         cors-configurations:
           '[/**]':
             allowedOrigins:
+              - "http://localhost:3000"
               - "http://localhost:3001"
+              - "http://localhost:3002"
+              - "http://localhost:3005"
             allowedMethods:
               - "GET"
               - "POST"
@@ -63,7 +66,7 @@ spring:
               - "DELETE"
               - "OPTIONS"
             allowedHeaders: "*"
-            allowCredentials: false
+            allowCredentials: true
             maxAge: 3600
 
 security:

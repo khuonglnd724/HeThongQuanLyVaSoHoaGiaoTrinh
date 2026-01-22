@@ -319,7 +319,7 @@ services:
     container_name: ai-service
     image: smd/ai-service:latest
     env_file:
-      - ../.env
+      - .env
     ports:
       - "8000:8000"
     environment:
