@@ -1,4 +1,4 @@
-import apiClient from '@/services/api/apiClient';
+import apiClient from '../../../services/api/apiClient';
 
 // Syllabus approval API using academic-service SyllabusController via gateway
 const syllabusApprovalAPI = {

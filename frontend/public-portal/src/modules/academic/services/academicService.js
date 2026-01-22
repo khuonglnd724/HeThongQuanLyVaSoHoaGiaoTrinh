@@ -1,4 +1,4 @@
-import apiClient from '@/services/api/apiClient';
+import apiClient from '../../../services/api/apiClient';
 
 // Academic module API client aligned with academic-service backend
 const academicAPI = {
