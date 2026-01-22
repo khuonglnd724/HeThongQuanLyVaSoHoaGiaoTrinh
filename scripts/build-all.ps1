@@ -137,6 +137,27 @@ foreach ($p in $projects) {
 }
 Write-Host "`nAll Java builds done." -ForegroundColor Green
 
+# Build frontend Docker image (SPA) so compose doesn't try to pull missing image
+Write-Host "`n" + "="*60 -ForegroundColor Cyan
+Write-Host "Building Frontend (React) image" -ForegroundColor Cyan
+Write-Host "="*60 -ForegroundColor Cyan
+
+$repoRoot = (Join-Path $PSScriptRoot "..")
+if (Test-Path (Join-Path $repoRoot "frontend\public-portal\Dockerfile")) {
+  Push-Location $repoRoot
+  Write-Host "Building frontend image 'smd/frontend:latest'..." -ForegroundColor Yellow
+  $frontendBuildCmd = "docker build -t smd/frontend:latest -f frontend/public-portal/Dockerfile ."
+  if (Retry-Command $frontendBuildCmd 3 10) {
+    Write-Host "[OK] frontend image built" -ForegroundColor Green
+  } else {
+    Write-Host "[WARN] frontend image build failed after retries; compose may attempt to pull the image instead" -ForegroundColor Yellow
+    $global:buildFailed = $true
+  }
+  Pop-Location
+} else {
+  Write-Host "[INFO] frontend Dockerfile not found at frontend/public-portal/Dockerfile — skipping frontend build" -ForegroundColor Gray
+}
+
 # Build Docker images for all backend services
 Write-Host "`n" + "="*60 -ForegroundColor Cyan
 Write-Host "Building Docker Images for Backend Services" -ForegroundColor Cyan
@@ -156,19 +177,22 @@ $dockerServices = @(
 Write-Host "Building Docker images using docker compose..." -ForegroundColor Yellow
 Push-Location (Join-Path $PSScriptRoot "..\docker")
 
+# Build each docker service with retry on network/transient failures
+$composeAttempts = 3
+$composeDelay = 10
 foreach ($service in $dockerServices) {
   Write-Host "`nBuilding $service..." -ForegroundColor Cyan
   $cmdStr = "docker compose build $service"
-  if (Retry-Command $cmdStr 1 0) {
+  if (Retry-Command $cmdStr $composeAttempts $composeDelay) {
     Write-Host "[OK] $service image built successfully" -ForegroundColor Green
   } else {
-    Write-Host "[ERROR] $service build failed" -ForegroundColor Red
+    Write-Host "[ERROR] $service build failed after $composeAttempts attempts" -ForegroundColor Red
+    Write-Host "  Tip: network/TLS errors often resolve after retry; try `docker pull` for base images or `docker login`." -ForegroundColor Yellow
     $global:buildFailed = $true
   }
 }
 
 Pop-Location
-Write-Host "`nAll backend Docker images built." -ForegroundColor Green
 
 # Build AI service Docker image
 Write-Host "`n" + "="*60 -ForegroundColor Cyan
@@ -209,14 +233,78 @@ if (-not (Test-Path $envPath)) {
       } else {
         Write-Host "[ERROR] AI service build failed" -ForegroundColor Red
         $global:buildFailed = $true
-        Pop-Location
       }
+      
       Pop-Location
     } else {
       Write-Host "[WARNING] AI service Dockerfile not found" -ForegroundColor Yellow
     }
   }
 }
+
+ 
+Write-Host "`nAll backend Docker images built." -ForegroundColor Green
+
+# --- Ensure Postgres is running and required DBs exist ---
+Write-Host "`nStarting Postgres (only) via docker compose to ensure DBs exist..." -ForegroundColor Cyan
+Push-Location (Join-Path $PSScriptRoot "..\docker")
+
+$upCmd = "docker compose up -d postgres"
+if (Retry-Command $upCmd 3 5) {
+  Write-Host "[OK] postgres compose up issued" -ForegroundColor Green
+} else {
+  Write-Host "[WARN] Failed to start postgres via compose after retries" -ForegroundColor Yellow
+}
+
+# Wait for postgres to be ready (pg_isready inside the container)
+$waitSec = 120
+$start = Get-Date
+Write-Host "Waiting for postgres to be ready (pg_isready)..." -ForegroundColor Gray
+while ($true) {
+  try {
+    docker exec -u postgres smd-postgres pg_isready -U postgres | Out-Null
+    if ($LASTEXITCODE -eq 0) { break }
+  } catch {}
+  if (((Get-Date) - $start).TotalSeconds -gt $waitSec) {
+    Write-Host "[ERROR] Postgres did not become ready within $waitSec seconds." -ForegroundColor Red
+    break
+  }
+  Start-Sleep -Seconds 2
+}
+
+# Databases to ensure exist
+# Include ai_service_db so it's created even when the postgres volume
+# already exists (init-scripts only run on first initialization).
+$databases = @('workflow_db','auth_db','syllabus_db','public_db','academic_db','ai_service_db')
+foreach ($db in $databases) {
+  try {
+    $exists = docker exec -u postgres smd-postgres psql -U postgres -tAc "SELECT 1 FROM pg_database WHERE datname='$db';" 2>$null
+    if ($exists -and $exists.Trim() -eq '1') {
+      Write-Host "Database exists: $db" -ForegroundColor Gray
+    } else {
+      Write-Host "Creating database: $db" -ForegroundColor Yellow
+      docker exec -u postgres smd-postgres psql -U postgres -c "CREATE DATABASE \"$db\";"
+    }
+  } catch {
+    Write-Host "[WARN] Could not verify/create database ($db): $($_.Exception.Message)" -ForegroundColor Yellow
+  }
+}
+
+Pop-Location
+
+# Start all services (using the images we just built)
+Write-Host "`nStarting all services via docker compose..." -ForegroundColor Cyan
+Push-Location (Join-Path $PSScriptRoot "..\docker")
+
+$upAllCmd = "docker compose up -d"
+if (Retry-Command $upAllCmd 3 10) {
+  Write-Host "[OK] all services started" -ForegroundColor Green
+} else {
+  Write-Host "[WARN] Failed to start all services via compose after retries" -ForegroundColor Yellow
+  $global:buildFailed = $true
+}
+
+Pop-Location
 
 if ($global:buildFailed) {
   Write-Host "`n" + "="*60 -ForegroundColor Red
@@ -228,13 +316,3 @@ if ($global:buildFailed) {
   Write-Host "BUILD COMPLETE!" -ForegroundColor Green
   Write-Host "="*60 -ForegroundColor Green
 }
-Write-Host "`nSummary:" -ForegroundColor Cyan
-Write-Host "  - Backend services (Java): Built and packaged as JAR files" -ForegroundColor White
-Write-Host "  - Backend Docker images: Built for all services" -ForegroundColor White
-Write-Host "  - AI Service (Python): Docker images built" -ForegroundColor White
-Write-Host "`nNext steps:" -ForegroundColor Cyan
-Write-Host "  1. Verify images with: docker images" -ForegroundColor Gray
-Write-Host "  2. Run 'cd docker && docker compose up -d' to start all services" -ForegroundColor Gray
-Write-Host "  3. Check health: docker compose ps" -ForegroundColor Gray
-Write-Host "  4. View logs: docker compose logs -f [service-name]" -ForegroundColor Gray
-Write-Host ""

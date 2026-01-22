@@ -1,18 +1,19 @@
 -- Initial data for Auth Service
 -- This script will run automatically when the application starts
 
--- Insert Roles
-INSERT IGNORE INTO roles (role_id, name, description) VALUES
+-- Insert Roles (Postgres compatible)
+INSERT INTO roles (role_id, name, description) VALUES
 (1, 'ROLE_ADMIN', 'Quản trị viên hệ thống'),
 (2, 'ROLE_RECTOR', 'Hiệu trưởng'),
 (3, 'ROLE_ACADEMIC_AFFAIRS', 'Phòng đào tạo'),
 (4, 'ROLE_HOD', 'Trưởng khoa'),
 (5, 'ROLE_LECTURER', 'Giảng viên'),
 (6, 'ROLE_STUDENT', 'Sinh viên'),
-(7, 'ROLE_COUNCIL_MEMBER', 'Thành viên hội đồng');
+(7, 'ROLE_COUNCIL_MEMBER', 'Thành viên hội đồng')
+ON CONFLICT DO NOTHING;
 
--- Insert Permissions
-INSERT IGNORE INTO permissions (permission_id, name, description) VALUES
+-- Insert Permissions (Postgres compatible)
+INSERT INTO permissions (permission_id, name, description) VALUES
 (1, 'USER_READ', 'Đọc thông tin người dùng'),
 (2, 'USER_CREATE', 'Tạo người dùng mới'),
 (3, 'USER_UPDATE', 'Cập nhật thông tin người dùng'),
@@ -22,10 +23,11 @@ INSERT IGNORE INTO permissions (permission_id, name, description) VALUES
 (7, 'SYLLABUS_UPDATE', 'Cập nhật đề cương'),
 (8, 'SYLLABUS_DELETE', 'Xóa đề cương'),
 (9, 'SYLLABUS_APPROVE', 'Phê duyệt đề cương'),
-(10, 'REPORT_VIEW', 'Xem báo cáo');
+(10, 'REPORT_VIEW', 'Xem báo cáo')
+ON CONFLICT DO NOTHING;
 
 -- Map Roles to Permissions
-INSERT IGNORE INTO role_permissions (role_id, permission_id) VALUES
+INSERT INTO role_permissions (role_id, permission_id) VALUES
 -- ADMIN has all permissions
 (1, 1), (1, 2), (1, 3), (1, 4), (1, 5), (1, 6), (1, 7), (1, 8), (1, 9), (1, 10),
 -- RECTOR
@@ -41,27 +43,31 @@ INSERT IGNORE INTO role_permissions (role_id, permission_id) VALUES
 -- COUNCIL_MEMBER
 (7, 1), (7, 5), (7, 9);
 
-INSERT IGNORE INTO users (user_id, username, email, password, full_name, phone_number, is_active, is_locked, created_at, updated_at, failed_attempts)
-VALUES (1, 'admin', 'admin@smd.edu.vn', '$2a$10$XptfskLsT6KrGfFfX8yVpOaK2FLCwaMGrFRww5/HaZZCCpGwh3Wf2', 'System Administrator', '0123456789', true, false, NOW(), NOW(), 0);
+INSERT INTO users (user_id, username, email, password, full_name, phone_number, is_active, is_locked, created_at, updated_at, failed_attempts)
+VALUES (1, 'admin', 'admin@smd.edu.vn', '$2a$10$XptfskLsT6KrGfFfX8yVpOaK2FLCwaMGrFRww5/HaZZCCpGwh3Wf2', 'System Administrator', '0123456789', true, false, NOW(), NOW(), 0)
+ON CONFLICT DO NOTHING;
 
-INSERT IGNORE INTO user_roles (user_id, role_id) VALUES (1, 1);
+INSERT INTO user_roles (user_id, role_id) VALUES (1, 1) ON CONFLICT DO NOTHING;
 
 -- Create sample lecturer users
 -- Password: Lecturer@123 (BCrypt encoded)
-INSERT IGNORE INTO users (user_id, username, email, password, full_name, phone_number, is_active, is_locked, created_at, updated_at, failed_attempts)
+INSERT INTO users (user_id, username, email, password, full_name, phone_number, is_active, is_locked, created_at, updated_at, failed_attempts)
 VALUES 
 (2, 'lecturer1', 'lecturer1@smd.edu.vn', '$2a$10$XptfskLsT6KrGfFfX8yVpOaK2FLCwaMGrFRww5/HaZZCCpGwh3Wf2', 'Nguyễn Văn A', '0912345678', true, false, NOW(), NOW(), 0),
-(3, 'lecturer2', 'lecturer2@smd.edu.vn', '$2a$10$XptfskLsT6KrGfFfX8yVpOaK2FLCwaMGrFRww5/HaZZCCpGwh3Wf2', 'Trần Thị B', '0923456789', true, false, NOW(), NOW(), 0);
+(3, 'lecturer2', 'lecturer2@smd.edu.vn', '$2a$10$XptfskLsT6KrGfFfX8yVpOaK2FLCwaMGrFRww5/HaZZCCpGwh3Wf2', 'Trần Thị B', '0923456789', true, false, NOW(), NOW(), 0)
+ON CONFLICT DO NOTHING;
 
 -- Assign LECTURER role to lecturer users
-INSERT IGNORE INTO user_roles (user_id, role_id) VALUES 
+INSERT INTO user_roles (user_id, role_id) VALUES 
 (2, 5),
-(3, 5);
+(3, 5)
+ON CONFLICT DO NOTHING;
 
 -- Create sample Academic Affairs user
 -- Password: AA@123 (BCrypt encoded)
-INSERT IGNORE INTO users (user_id, username, email, password, full_name, phone_number, is_active, is_locked, created_at, updated_at, failed_attempts)
-VALUES (4, 'academic', 'academic@smd.edu.vn', '$2a$10$XptfskLsT6KrGfFfX8yVpOaK2FLCwaMGrFRww5/HaZZCCpGwh3Wf2', 'Phòng Đào Tạo', '0934567890', true, false, NOW(), NOW(), 0);
+INSERT INTO users (user_id, username, email, password, full_name, phone_number, is_active, is_locked, created_at, updated_at, failed_attempts)
+VALUES (4, 'academic', 'academic@smd.edu.vn', '$2a$10$XptfskLsT6KrGfFfX8yVpOaK2FLCwaMGrFRww5/HaZZCCpGwh3Wf2', 'Phòng Đào Tạo', '0934567890', true, false, NOW(), NOW(), 0)
+ON CONFLICT DO NOTHING;
 
 -- Assign ACADEMIC_AFFAIRS role
-INSERT IGNORE INTO user_roles (user_id, role_id) VALUES (4, 3);
+INSERT INTO user_roles (user_id, role_id) VALUES (4, 3) ON CONFLICT DO NOTHING;

@@ -195,7 +195,6 @@ SELECT
         CASE 
             WHEN COUNT(DISTINCT c.id) > 0 
             THEN (COUNT(DISTINCT CASE WHEN cm.id IS NOT NULL THEN c.id END)::NUMERIC / COUNT(DISTINCT c.id)::NUMERIC * 100)
-            THEN (COUNT(DISTINCT CASE WHEN cm.id IS NOT NULL THEN c.id END)::NUMERIC / COUNT(DISTINCT c.id) * 100)
             ELSE 0 
         END, 2
     ) as coverage_percentage

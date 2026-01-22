@@ -1,43 +1,39 @@
-import React, { useState } from 'react'
-import { Header, Footer } from './components/Layout'
+import React from 'react'
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
+import { Header, Footer } from './shared/components/Layout'
 import HomePage from './pages/HomePage'
 import SearchPage from './pages/SearchPage'
 import SyllabusDetailPage from './pages/SyllabusDetailPage'
+import Login from './pages/Login'
+import StudentDashboard from './pages/StudentDashboard'
+import LecturerDashboard from './pages/LecturerDashboard'
+import AdminDashboard from './pages/AdminDashboard'
+import AcademicDashboard from './modules/academic/pages/AcademicDashboard'
 
 function App() {
-  const [currentPage, setCurrentPage] = useState('home')
-  const [selectedSyllabusId, setSelectedSyllabusId] = useState(null)
-
-  const goToHome = () => setCurrentPage('home')
-  const goToSearch = () => setCurrentPage('search')
-  const viewSyllabus = (id) => {
-    setSelectedSyllabusId(id)
-    setCurrentPage('detail')
-  }
-  const backFromDetail = () => setCurrentPage('search')
+  const location = useLocation()
+  const isLoginPage = location.pathname === '/login'
 
   return (
     <div className="flex flex-col min-h-screen">
-      <Header onHomeClick={goToHome} onSearchClick={goToSearch} />
+      {!isLoginPage && <Header />}
 
       <main className="flex-1">
-        {currentPage === 'home' && (
-          <HomePage onSearchClick={goToSearch} />
-        )}
-
-        {currentPage === 'search' && (
-          <SearchPage onSyllabusSelect={viewSyllabus} />
-        )}
-
-        {currentPage === 'detail' && selectedSyllabusId && (
-          <SyllabusDetailPage
-            syllabusId={selectedSyllabusId}
-            onBack={backFromDetail}
-          />
-        )}
+        <Routes>
+          <Route path="/" element={<HomePage />} />
+          <Route path="/home" element={<HomePage />} />
+          <Route path="/search" element={<SearchPage />} />
+          <Route path="/syllabus/:id" element={<SyllabusDetailPage />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/student/dashboard" element={<StudentDashboard />} />
+          <Route path="/lecturer/dashboard" element={<LecturerDashboard />} />
+          <Route path="/admin/dashboard" element={<AdminDashboard />} />
+          <Route path="/academic/dashboard" element={<AcademicDashboard />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
       </main>
 
-      <Footer />
+      {!isLoginPage && <Footer />}
     </div>
   )
 }
