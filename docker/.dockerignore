@@ -61,6 +61,7 @@ npm-shrinkwrap.json
 venv/
 env/
 .venv/
+.env/
 
 # Ignore credentials
 .aws/
