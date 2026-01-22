@@ -9,6 +9,7 @@ import StudentDashboard from './pages/StudentDashboard'
 import LecturerDashboard from './pages/LecturerDashboard'
 import AdminDashboard from './pages/AdminDashboard'
 import AcademicDashboard from './modules/academic/pages/AcademicDashboard'
+import ProgramManagement from './modules/academic/pages/ProgramManagement'
 
 function App() {
   const location = useLocation()
@@ -29,6 +30,7 @@ function App() {
           <Route path="/lecturer/dashboard" element={<LecturerDashboard />} />
           <Route path="/admin/dashboard" element={<AdminDashboard />} />
           <Route path="/academic/dashboard" element={<AcademicDashboard />} />
+          <Route path="/academic/programs" element={<ProgramManagement />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>

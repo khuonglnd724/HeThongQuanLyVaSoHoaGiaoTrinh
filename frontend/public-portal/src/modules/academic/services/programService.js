@@ -1,4 +1,4 @@
-import apiClient from '@/services/api/apiClient';
+import apiClient from '../../../services/api/apiClient';
 
 const programAPI = {
   getPrograms: () => apiClient.get('/api/academic/programs'),
