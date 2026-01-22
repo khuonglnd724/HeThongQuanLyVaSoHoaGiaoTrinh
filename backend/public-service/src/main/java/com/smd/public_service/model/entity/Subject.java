@@ -3,10 +3,12 @@ package com.smd.public_service.model.entity;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
-import lombok.Data;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
-import lombok.EqualsAndHashCode;
+import lombok.Setter;
+import lombok.ToString;
 import lombok.experimental.SuperBuilder;
+
 import java.util.HashSet;
 import java.util.Set;
 
@@ -18,8 +20,9 @@ import java.util.Set;
     @Index(name = "idx_subject_code", columnList = "subject_code"),
     @Index(name = "idx_subject_program_id", columnList = "program_id")
 })
-@Data
-@EqualsAndHashCode(callSuper = false)
+@Getter
+@Setter
+@ToString(callSuper = true, exclude = {"syllabuses", "outgoingRelationships", "incomingRelationships"})
 @NoArgsConstructor
 @AllArgsConstructor
 @SuperBuilder
