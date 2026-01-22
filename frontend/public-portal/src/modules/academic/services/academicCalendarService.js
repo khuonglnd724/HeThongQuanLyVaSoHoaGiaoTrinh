@@ -1,4 +1,4 @@
-import apiClient from '@/services/api/apiClient';
+import apiClient from '../../../services/api/apiClient';
 
 const academicCalendarAPI = {
   getCalendar: () => apiClient.get('/api/academic/calendar'),

@@ -1,7 +1,9 @@
 import React from 'react'
+import { useNavigate } from 'react-router-dom'
 import { BookOpen, Users, CheckCircle, AlertCircle, Settings, LogOut, BarChart3 } from 'lucide-react'
 
 const AcademicDashboard = ({ user, onLogout }) => {
+  const navigate = useNavigate()
   return (
     <div className="min-h-screen bg-gradient-to-b from-purple-50 to-white">
       {/* Header */}
@@ -68,9 +70,12 @@ const AcademicDashboard = ({ user, onLogout }) => {
 
         {/* Actions */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
-          <button className="bg-gradient-to-r from-purple-500 to-purple-600 text-white px-8 py-4 rounded-xl font-semibold hover:shadow-lg transition flex items-center justify-center gap-3">
+          <button
+            onClick={() => navigate('/academic/programs')}
+            className="bg-gradient-to-r from-purple-500 to-purple-600 text-white px-8 py-4 rounded-xl font-semibold hover:shadow-lg transition flex items-center justify-center gap-3"
+          >
             <CheckCircle size={20} />
-            Duyệt giáo trình
+            Quản lý CTĐT & học phần
           </button>
           <button className="bg-gradient-to-r from-blue-500 to-blue-600 text-white px-8 py-4 rounded-xl font-semibold hover:shadow-lg transition flex items-center justify-center gap-3">
             <BarChart3 size={20} />
