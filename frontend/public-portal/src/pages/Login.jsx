@@ -70,12 +70,20 @@ const Login = () => {
         localStorage.setItem('refreshToken', response.refreshToken)
       }
 
-      // Extract role from roles Set (convert to array and get first role)
-      const userRoles = Array.isArray(response.roles) 
-        ? response.roles 
-        : (response.roles ? Array.from(response.roles) : ['ROLE_STUDENT'])
-      
-      const primaryRole = userRoles[0] || 'ROLE_STUDENT'
+      // Normalize roles to array
+      const userRoles = Array.isArray(response.roles)
+        ? response.roles
+        : (response.roles ? Array.from(response.roles) : [])
+
+      // Determine primary role by priority to avoid defaulting to STUDENT
+      const rolePriority = ['ROLE_ADMIN', 'ROLE_LECTURER', 'ROLE_ACADEMIC_AFFAIRS', 'ROLE_STUDENT']
+      let primaryRole = 'ROLE_STUDENT'
+      for (const r of rolePriority) {
+        if (userRoles.includes(r)) {
+          primaryRole = r
+          break
+        }
+      }
 
       // Save user data
       const userData = {
@@ -89,6 +97,12 @@ const Login = () => {
 
       console.log('[Login] User data prepared:', userData)
       localStorage.setItem('user', JSON.stringify(userData))
+      // also store role separately for older modules/hooks that read `role`
+      try {
+        localStorage.setItem('role', primaryRole)
+      } catch (e) {
+        console.warn('Failed to set localStorage role', e)
+      }
       setCurrentUser(userData)
       console.log('[Login] User data saved, navigating to dashboard')
 

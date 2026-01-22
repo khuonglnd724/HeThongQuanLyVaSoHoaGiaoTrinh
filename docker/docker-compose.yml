@@ -455,29 +455,29 @@ services:
     restart: unless-stopped
 
   # =====================================================
-  # Frontend Service - Single React SPA
+  # Frontend Service - Single React SPA (COMMENTED OUT)
   # =====================================================
-  frontend:
-    build:
-      context: ..
-      dockerfile: frontend/public-portal/Dockerfile
-    image: smd/frontend:latest
-    container_name: smd-frontend
-    ports:
-      - "3000:3000"
-    environment:
-      - REACT_APP_API_URL=http://api-gateway:8080
-      - NODE_ENV=production
-    depends_on:
-      - api-gateway
-    networks:
-      - smd-network
-    healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-    restart: unless-stopped
+#  frontend:
+#    build:
+#      context: ..
+#      dockerfile: frontend/public-portal/Dockerfile
+#    image: smd/frontend:latest
+#    container_name: smd-frontend
+#    ports:
+#      - "3001:3001"
+#    environment:
+#      - REACT_APP_API_URL=http://api-gateway:8080
+#      - NODE_ENV=production
+#    depends_on:
+#      - api-gateway
+#    networks:
+#      - smd-network
+#    healthcheck:
+#      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3001/health"]
+#      interval: 30s
+#      timeout: 10s
+#      retries: 3
+#    restart: unless-stopped
 
 networks:
   smd-network:
