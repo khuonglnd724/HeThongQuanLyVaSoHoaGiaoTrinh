@@ -28,7 +28,7 @@ const academicAPI = {
     apiClient.get(`/api/academic/syllabus/${id}/versions/${versionNumber}`),
   getLatestVersion: (id) => apiClient.get(`/api/academic/syllabus/${id}/versions/latest`),
   compareVersions: (id, version1, version2) =>
-    apiClient.get('/api/academic/syllabus/${id}/compare', {
+    apiClient.get(`/api/academic/syllabus/${id}/compare`, {
       params: { version1, version2 },
     }),
 
