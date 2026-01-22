@@ -42,7 +42,7 @@ public interface SyllabusRepository extends JpaRepository<Syllabus, Long> {
     @Query("SELECT s FROM Syllabus s WHERE " +
             "(:subjectName IS NULL OR LOWER(s.subject.subjectName) LIKE LOWER(CONCAT('%', :subjectName, '%'))) AND " +
             "(:subjectCode IS NULL OR LOWER(s.subject.subjectCode) LIKE LOWER(CONCAT('%', :subjectCode, '%'))) AND " +
-            "(:major IS NULL OR s.subject.programId = :majorId) AND " +
+            "(:majorId IS NULL OR s.subject.programId = :majorId) AND " +
             "(:semester IS NULL OR s.semester = :semester) AND " +
             "s.status = 'Published'")
     Page<Syllabus> searchByCriteria(
