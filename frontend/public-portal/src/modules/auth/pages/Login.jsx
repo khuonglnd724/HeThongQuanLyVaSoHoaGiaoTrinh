@@ -24,38 +24,42 @@ const Login = ({ onLoginSuccess, onBackToLanding }) => {
     setLoading(true)
 
     try {
+      // Use shared authService to keep behavior consistent with other login flows
       const usernameInput = email?.includes('@') ? email.split('@')[0] : email
+      const resp = await authService.login({ username: usernameInput, password })
 
-      const response = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          username: usernameInput,
-          password: password
-        })
-      })
-
-      if (!response.ok) {
-        if (response.status === 401) {
-          setError('❌ Email hoặc mật khẩu không chính xác')
-        } else {
-          setError('❌ Lỗi đăng nhập. Vui lòng thử lại')
-        }
+      if (!resp) {
+        setError('❌ Lỗi đăng nhập. Vui lòng thử lại')
         setLoading(false)
         return
       }
 
-      const data = await response.json()
-      
-      // Lưu token và user info
-      localStorage.setItem('token', data.token)
-      localStorage.setItem('user', JSON.stringify(data.user))
-      localStorage.setItem('role', data.user.role)
-      
-      // Gọi callback để chuyển đến trang phù hợp theo role
-      onLoginSuccess(data.user)
+      // Normalize roles
+      const userRoles = Array.isArray(resp.roles) ? resp.roles : (resp.roles ? Array.from(resp.roles) : [])
+      const rolePriority = ['ROLE_ADMIN', 'ROLE_LECTURER', 'ROLE_ACADEMIC_AFFAIRS', 'ROLE_STUDENT']
+      let primaryRole = 'ROLE_STUDENT'
+      for (const r of rolePriority) {
+        if (userRoles.includes(r)) {
+          primaryRole = r
+          break
+        }
+      }
+
+      const userObj = {
+        email: resp.email || email,
+        name: resp.fullName || resp.username || usernameInput,
+        username: resp.username || usernameInput,
+        role: primaryRole,
+        roles: userRoles,
+        userId: resp.userId || resp.id
+      }
+
+      if (resp.token) localStorage.setItem('token', resp.token)
+      if (resp.refreshToken) localStorage.setItem('refreshToken', resp.refreshToken)
+      try { localStorage.setItem('user', JSON.stringify(userObj)) } catch(e) { /* ignore */ }
+      try { localStorage.setItem('role', userObj.role) } catch(e) { /* ignore */ }
+
+      onLoginSuccess(userObj)
     } catch (err) {
       console.error('Login error:', err)
       setError('❌ Không thể kết nối đến máy chủ. Vui lòng kiểm tra kết nối mạng.')

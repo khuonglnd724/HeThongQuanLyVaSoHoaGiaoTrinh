@@ -23,7 +23,7 @@ export const userService = {
 
   changePassword: async (oldPassword, newPassword) => {
     try {
-      const response = await apiClient.put('/user/change-password', {
+      const response = await apiClient.put(API_ENDPOINTS.CHANGE_PASSWORD, {
         oldPassword,
         newPassword,
       })
@@ -37,7 +37,7 @@ export const userService = {
     try {
       const formData = new FormData()
       formData.append('avatar', file)
-      const response = await apiClient.post('/user/avatar', formData, {
+      const response = await apiClient.post(API_ENDPOINTS.UPLOAD_AVATAR, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       })
       return response.data

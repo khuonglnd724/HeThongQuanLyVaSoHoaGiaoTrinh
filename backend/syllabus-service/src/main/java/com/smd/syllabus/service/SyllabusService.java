@@ -10,6 +10,8 @@ import com.smd.syllabus.dto.SyllabusMapper;
 import com.smd.syllabus.dto.SyllabusResponse;
 import com.smd.syllabus.dto.UpdateSyllabusRequest;
 import com.smd.syllabus.repository.SyllabusRepository;
+import com.smd.syllabus.repository.SyllabusDocumentRepository;
+import com.smd.syllabus.domain.SyllabusDocument;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -24,12 +26,15 @@ public class SyllabusService {
 
     private final SyllabusRepository syllabusRepository;
     private final NotificationService notificationService;
+    private final SyllabusDocumentRepository documentRepository;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public SyllabusService(SyllabusRepository syllabusRepository,
-            NotificationService notificationService) {
+            NotificationService notificationService,
+            SyllabusDocumentRepository documentRepository) {
         this.syllabusRepository = syllabusRepository;
         this.notificationService = notificationService;
+        this.documentRepository = documentRepository;
     }
 
     // helper
@@ -121,6 +126,33 @@ public class SyllabusService {
             nv.setContent(latest.getContent());
 
         Syllabus saved = syllabusRepository.save(nv);
+
+        // Copy existing documents from the latest version into the new version
+        try {
+            List<SyllabusDocument> docs = documentRepository.findBySyllabusIdAndDeletedFalse(latest.getId());
+            if (docs != null && !docs.isEmpty()) {
+                for (SyllabusDocument d : docs) {
+                    SyllabusDocument copy = new SyllabusDocument();
+                    copy.setSyllabusId(saved.getId());
+                    copy.setFileName(d.getFileName());
+                    copy.setOriginalName(d.getOriginalName());
+                    copy.setFilePath(d.getFilePath());
+                    copy.setMimeType(d.getMimeType());
+                    copy.setFileSize(d.getFileSize());
+                    copy.setFileType(d.getFileType());
+                    copy.setUploadedBy(d.getUploadedBy());
+                    copy.setSyllabusVersion(saved.getVersionNo());
+                    copy.setStatus(d.getStatus());
+                    copy.setDescription(d.getDescription());
+                    documentRepository.save(copy);
+                }
+            }
+        } catch (Exception ex) {
+            // Do not fail version creation if document copy fails; log and continue
+            // Logging via System.err to avoid adding logger here; keep behavior simple
+            System.err.println("Failed to copy syllabus documents to new version: " + ex.getMessage());
+        }
+
         return SyllabusMapper.toResponse(saved);
     }
 
@@ -305,4 +337,24 @@ public class SyllabusService {
 
         return SyllabusMapper.toResponse(saved);
     }
+
+    @Transactional
+    public void delete(UUID id, String userId) {
+        String actor = requireUser(userId);
+        Syllabus s = getOrThrow(id);
+
+        // Soft delete: mark as deleted
+        s.setDeleted(true);
+        s.setUpdatedBy(actor);
+
+        syllabusRepository.save(s);
+
+        notificationService.notifyFollowers(
+                s.getRootId(),
+                s.getId(),
+                NotificationType.SYLLABUS_REJECTED,
+                "Syllabus " + safeCode(s) + " deleted",
+                actor);
+    }
 }
+

@@ -41,6 +41,8 @@ eureka:
   client:
     service-url:
       defaultZone: http://discovery-server:8761/eureka
+    region: default
+    avoid-url-based-aws-ec2-metadata-service: true
   instance:
     prefer-ip-address: true
 

@@ -461,8 +461,8 @@ Expected: Connected and lists tables.
 ## 🔧 Configuration
 
 ### JWT Authentication
-- Secret: `smdMicroservicesSecretKeyForJWTTokenGenerationAndValidation2024`
-- Algorithm: HS256
+- Secret: `smdMicroservicesSecretKeyForJWTTokenGenerationAndValidation2024SuperSecureKeyWithEnoughBytesForHS512HS512HS512`
+ - Algorithm: HS512
 - Token expiry: 30 minutes
 - Whitelisted routes: `/api/auth/**`, `/actuator/health`, `/actuator/prometheus`, `/`
 
@@ -651,7 +651,7 @@ cd ..
 ### JWT token invalid
 ```powershell
 # Verify secret matches between services
-# Secret should be: smdMicroservicesSecretKeyForJWTTokenGenerationAndValidation2024
+# Secret should be: smdMicroservicesSecretKeyForJWTTokenGenerationAndValidation2024SuperSecureKeyWithEnoughBytesForHS512HS512HS512
 
 # Get a fresh token
 $response = Invoke-RestMethod -Uri "http://localhost:8080/api/auth/login" `
