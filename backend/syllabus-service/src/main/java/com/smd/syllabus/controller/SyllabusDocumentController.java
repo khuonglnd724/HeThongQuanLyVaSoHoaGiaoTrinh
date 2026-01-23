@@ -13,6 +13,8 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -26,6 +28,7 @@ import java.util.UUID;
 public class SyllabusDocumentController {
 
     private final SyllabusDocumentService documentService;
+    private static final Logger LOGGER = LoggerFactory.getLogger(SyllabusDocumentController.class);
 
     public SyllabusDocumentController(SyllabusDocumentService documentService) {
         this.documentService = documentService;
@@ -40,14 +43,26 @@ public class SyllabusDocumentController {
             @RequestParam("file") MultipartFile file,
             @RequestParam("syllabusId") UUID syllabusId,
             @RequestParam(value = "description", required = false) String description,
+            @RequestHeader(value = "X-User-Id", required = false) String userId,
             Authentication authentication) {
         try {
-            String username = authentication.getName();
+            String username = authentication != null ? authentication.getName() : userId;
+            if (username == null || username.isBlank()) {
+            LOGGER.warn("Upload attempt without authentication header: syllabusId={} userHeader={} authPresent={}",
+                syllabusId, userId, authentication != null);
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(Map.of("error", "Unauthorized"));
+            }
+            LOGGER.info("Upload request: syllabusId={}, user={}, filename={}, size={}, contentType={}",
+                    syllabusId, username, file.getOriginalFilename(), file.getSize(), file.getContentType());
+
             DocumentResponse response = documentService.uploadDocument(syllabusId, file, username, description);
             return ResponseEntity.status(HttpStatus.CREATED).body(response);
         } catch (IllegalArgumentException e) {
+            LOGGER.warn("Validation error during upload: {}", e.getMessage());
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         } catch (IOException e) {
+            LOGGER.error("IOException while uploading file for syllabusId={}", syllabusId, e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(Map.of("error", "Failed to upload file: " + e.getMessage()));
         }
@@ -129,12 +144,20 @@ public class SyllabusDocumentController {
     @DeleteMapping("/{documentId}")
     public ResponseEntity<?> deleteDocument(
             @PathVariable UUID documentId,
+            @RequestHeader(value = "X-User-Id", required = false) String userId,
             Authentication authentication) {
         try {
-            String username = authentication.getName();
+            String username = authentication != null ? authentication.getName() : userId;
+            if (username == null || username.isBlank()) {
+                LOGGER.warn("Delete attempt without authentication header: documentId={} userHeader={} authPresent= {}",
+                        documentId, userId, authentication != null);
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body(Map.of("error", "Unauthorized"));
+            }
             documentService.deleteDocument(documentId, username);
             return ResponseEntity.ok(Map.of("message", "Document deleted successfully"));
         } catch (IOException e) {
+            LOGGER.error("IOException while deleting documentId={}", documentId, e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(Map.of("error", "Failed to delete document: " + e.getMessage()));
         }
