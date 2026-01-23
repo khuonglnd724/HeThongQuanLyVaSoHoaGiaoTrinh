@@ -8,6 +8,13 @@ import Login from './pages/Login'
 import StudentDashboard from './pages/StudentDashboard'
 import LecturerDashboard from './pages/LecturerDashboard'
 import AdminDashboard from './pages/AdminDashboard'
+import AboutPage from './pages/AboutPage'
+import CoursesPage from './pages/CoursesPage'
+import ProfilePage from './pages/ProfilePage'
+import NotificationsPage from './pages/NotificationsPage'
+import HelpPage from './pages/HelpPage'
+import ContactPage from './pages/ContactPage'
+import FAQPage from './pages/FAQPage'
 import AcademicDashboard from './modules/academic/pages/AcademicDashboard'
 import HODDashboard from './modules/academic/pages/HODDashboard'
 import ProgramManagement from './modules/academic/pages/ProgramManagement'
@@ -32,6 +39,13 @@ function App() {
           <Route path="/search" element={<SearchPage />} />
           <Route path="/syllabus/:id" element={<SyllabusDetailPage />} />
           <Route path="/login" element={<Login />} />
+          <Route path="/about" element={<AboutPage />} />
+          <Route path="/courses" element={<CoursesPage />} />
+          <Route path="/profile" element={<ProfilePage />} />
+          <Route path="/notifications" element={<NotificationsPage />} />
+          <Route path="/help" element={<HelpPage />} />
+          <Route path="/contact" element={<ContactPage />} />
+          <Route path="/faq" element={<FAQPage />} />
           <Route path="/student/dashboard" element={<StudentDashboard />} />
           <Route path="/lecturer/dashboard" element={<LecturerDashboard />} />
           <Route path="/admin/dashboard" element={<AdminDashboard />} />
