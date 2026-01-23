@@ -1,28 +1,36 @@
 // API Endpoints Constants
 export const API_ENDPOINTS = {
   // Auth
-  LOGIN: '/auth/login',
-  LOGOUT: '/auth/logout',
-  VERIFY: '/auth/verify',
-  REFRESH: '/auth/refresh',
+  LOGIN: '/api/auth/login',
+  LOGOUT: '/api/auth/logout',
+  VERIFY: '/api/auth/verify',
+  REFRESH: '/api/auth/refresh',
   
   // Syllabi
-  SYLLABI: '/public/syllabi',
-  SYLLABI_SEARCH: '/public/syllabi/search',
-  SYLLABI_DETAIL: '/public/syllabi/:id',
-  SYLLABI_BY_LECTURER: '/lecturer/syllabi',
-  SYLLABI_CREATE: '/lecturer/syllabi',
-  SYLLABI_UPDATE: '/lecturer/syllabi/:id',
+  SYLLABI: '/api/public/syllabi',
+  SYLLABI_SEARCH: '/api/public/syllabi/search',
+  SYLLABI_DETAIL: '/api/public/syllabi/:id',
+  SYLLABI_BY_LECTURER: '/api/lecturer/syllabi',
+  SYLLABI_CREATE: '/api/lecturer/syllabi',
+  SYLLABI_UPDATE: '/api/lecturer/syllabi/:id',
   
   // Users
-  USERS: '/admin/users',
-  USER_PROFILE: '/user/profile',
-  UPDATE_PROFILE: '/user/profile',
+  USERS: '/api/admin/users',
+  USER_PROFILE: '/api/user/profile',
+  UPDATE_PROFILE: '/api/user/profile',
   
   // Admin
-  STATS: '/admin/stats',
-  LOGS: '/admin/logs',
-  PERMISSIONS: '/admin/permissions',
+  STATS: '/api/admin/stats',
+  LOGS: '/api/admin/logs',
+  PERMISSIONS: '/api/admin/permissions',
+  
+  // Public
+  PUBLIC_LANDING: '/api/public/landing',
+  PUBLIC_STATS: '/api/public/stats',
+  
+  // User actions
+  CHANGE_PASSWORD: '/api/user/change-password',
+  UPLOAD_AVATAR: '/api/user/avatar',
 }
 
 export const ROLES = {

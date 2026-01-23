@@ -29,9 +29,13 @@ public class CloService {
     public CloDto createClo(CloDto cloDto, String createdBy) {
         log.info("Creating CLO with code: {}", cloDto.getCloCode());
         
-        Subject subject = subjectRepository.findById(cloDto.getSubjectId())
-            .orElseThrow(() -> new RuntimeException("Subject not found with id: " + cloDto.getSubjectId()));
-        
+        // Resolve subject and syllabus; both can be null (CLO as standalone/reusable resource)
+        Subject subject = null;
+        if (cloDto.getSubjectId() != null) {
+            subject = subjectRepository.findById(cloDto.getSubjectId())
+                .orElseThrow(() -> new RuntimeException("Subject not found with id: " + cloDto.getSubjectId()));
+        }
+
         Syllabus syllabus = null;
         if (cloDto.getSyllabusId() != null) {
             syllabus = syllabusRepository.findById(cloDto.getSyllabusId())

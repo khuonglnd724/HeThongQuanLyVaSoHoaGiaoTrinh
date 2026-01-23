@@ -128,10 +128,10 @@ export const DEMO_ACCOUNTS = [
  * API Endpoints
  */
 export const API_ENDPOINTS = {
-  AUTH_LOGIN: 'http://localhost:8080/api/auth/login',
-  PUBLIC_SEARCH: 'http://localhost:8080/api/public/syllabi/search',
-  USER_PROFILE: 'http://localhost:8080/api/auth/profile',
-  LOGOUT: 'http://localhost:8080/api/auth/logout'
+  AUTH_LOGIN: '/api/auth/login',
+  PUBLIC_SEARCH: '/api/public/syllabi/search',
+  USER_PROFILE: '/api/auth/profile',
+  LOGOUT: '/api/auth/logout'
 }
 
 export default {

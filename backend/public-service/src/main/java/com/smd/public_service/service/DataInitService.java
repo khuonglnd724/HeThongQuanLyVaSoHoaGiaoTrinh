@@ -24,12 +24,17 @@ public class DataInitService implements CommandLineRunner {
     @Override
     @Transactional
     public void run(String... args) throws Exception {
-        if (subjectRepository.count() > 0) {
-            log.info("Data already exists, skipping initialization");
-            return;
+        try {
+            if (subjectRepository.count() > 0) {
+                log.info("Data already exists, skipping initialization");
+                return;
+            }
+            log.info("Initializing sample data...");
+            initializeSampleData();
+        } catch (Exception e) {
+            log.warn("Failed to initialize data - tables may not be created yet: {}", e.getMessage());
+            log.debug("Stack trace:", e);
         }
-        log.info("Initializing sample data...");
-        initializeSampleData();
     }
     
     private void initializeSampleData() {

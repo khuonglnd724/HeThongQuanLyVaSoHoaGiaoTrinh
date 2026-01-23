@@ -34,7 +34,7 @@ export const publicService = {
   // Landing page content
   getLandingContent: async () => {
     try {
-      const response = await apiClient.get('/public/landing')
+      const response = await apiClient.get(API_ENDPOINTS.PUBLIC_LANDING)
       return response.data
     } catch (error) {
       throw error.response?.data || error.message
@@ -44,7 +44,7 @@ export const publicService = {
   // Statistics
   getPublicStats: async () => {
     try {
-      const response = await apiClient.get('/public/stats')
+      const response = await apiClient.get(API_ENDPOINTS.PUBLIC_STATS)
       return response.data
     } catch (error) {
       throw error.response?.data || error.message
