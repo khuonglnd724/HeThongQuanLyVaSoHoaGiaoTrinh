@@ -12,7 +12,8 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/v1/clo")
+// Note: servlet context-path is already /api/v1 (see application.yml). Keep controller path relative.
+@RequestMapping("/clo")
 @RequiredArgsConstructor
 @Slf4j
 public class CloController {

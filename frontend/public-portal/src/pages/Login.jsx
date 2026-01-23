@@ -75,9 +75,18 @@ const Login = () => {
         ? response.roles
         : (response.roles ? Array.from(response.roles) : [])
 
-      // Determine primary role by priority to avoid defaulting to STUDENT
-      const rolePriority = ['ROLE_ADMIN', 'ROLE_LECTURER', 'ROLE_ACADEMIC_AFFAIRS', 'ROLE_STUDENT']
-      let primaryRole = 'ROLE_STUDENT'
+      // Determine primary role by priority (HOD, RECTOR, AA highest priority)
+      const rolePriority = [
+        'ROLE_RECTOR',           // Highest priority
+        'ROLE_ACADEMIC_AFFAIRS', // Academic Affairs
+        'ROLE_HOD',              // Head of Department
+        'ROLE_ADMIN',            // Admin
+        'ROLE_LECTURER',         // Lecturer
+        'ROLE_STUDENT'           // Lowest priority
+      ]
+      
+      // Use roles array (not singular role field) for routing
+      let primaryRole = userRoles.length > 0 ? userRoles[0] : 'ROLE_STUDENT'
       for (const r of rolePriority) {
         if (userRoles.includes(r)) {
           primaryRole = r
@@ -113,12 +122,15 @@ const Login = () => {
       console.log('[Login] Login successful, navigating...')
       // Navigate based on primary role (small delay to ensure state updates)
       const roleToPath = {
+        'ROLE_RECTOR': '/academic/dashboard',          // Rector → Academic Dashboard (publish)
+        'ROLE_ACADEMIC_AFFAIRS': '/academic/dashboard', // AA → Academic Dashboard (approve)
+        'ROLE_HOD': '/hod/dashboard',                   // HOD → HOD Dashboard (review)
         'ROLE_ADMIN': '/admin/dashboard',
         'ROLE_LECTURER': '/lecturer/dashboard',
-        'ROLE_ACADEMIC_AFFAIRS': '/academic/dashboard',
         'ROLE_STUDENT': '/student/dashboard'
       }
       const targetPath = roleToPath[primaryRole] || '/student/dashboard'
+      console.log(`[Login] Routing ${primaryRole} → ${targetPath}`)
       setTimeout(() => navigate(targetPath), 100)
     } catch (err) {
       console.error('[Login] Error caught:', err)

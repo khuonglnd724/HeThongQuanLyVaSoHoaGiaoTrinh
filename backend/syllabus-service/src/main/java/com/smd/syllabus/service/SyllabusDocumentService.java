@@ -9,6 +9,8 @@ import com.smd.syllabus.exception.ResourceNotFoundException;
 import com.smd.syllabus.repository.SyllabusDocumentRepository;
 import com.smd.syllabus.repository.SyllabusRepository;
 import org.springframework.beans.factory.annotation.Value;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -23,6 +25,8 @@ import java.util.stream.Collectors;
 
 @Service
 public class SyllabusDocumentService {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(SyllabusDocumentService.class);
 
     private final SyllabusDocumentRepository documentRepository;
     private final SyllabusRepository syllabusRepository;
@@ -49,6 +53,9 @@ public class SyllabusDocumentService {
     @Transactional
     public DocumentResponse uploadDocument(UUID syllabusId, MultipartFile file,
                                          String uploadedBy, String description) throws IOException {
+        LOGGER.info("Service uploadDocument: syllabusId={}, uploadedBy={}, originalName={}, size={}, contentType={}, uploadDir={}",
+            syllabusId, uploadedBy, file.getOriginalFilename(), file.getSize(), file.getContentType(), uploadDirectory);
+
         // Validate file
         validateFile(file);
 
@@ -69,7 +76,12 @@ public class SyllabusDocumentService {
 
         // Save file to disk
         Path filePath = uploadPath.resolve(uniqueFileName);
-        Files.copy(file.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
+        try {
+            Files.copy(file.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
+        } catch (IOException e) {
+            LOGGER.error("Failed to save uploaded file to disk: {}", filePath, e);
+            throw e;
+        }
 
         // Create document entity
         SyllabusDocument document = new SyllabusDocument();
@@ -93,6 +105,11 @@ public class SyllabusDocumentService {
      * Get all documents for a syllabus
      */
     public List<DocumentResponse> getDocumentsBySyllabus(UUID syllabusId) {
+        // Validate syllabus exists
+        if (syllabusId == null) {
+            return new ArrayList<>();
+        }
+        
         List<SyllabusDocument> documents = documentRepository.findBySyllabusIdAndDeletedFalse(syllabusId);
         return documents.stream()
                 .map(DocumentResponse::fromEntity)
@@ -179,8 +196,22 @@ public class SyllabusDocumentService {
      * Get statistics for syllabus documents
      */
     public Map<String, Object> getDocumentStatistics(UUID syllabusId) {
+        // Handle null syllabusId
+        if (syllabusId == null) {
+            Map<String, Object> emptyStats = new HashMap<>();
+            emptyStats.put("totalDocuments", 0L);
+            emptyStats.put("totalSizeBytes", 0L);
+            emptyStats.put("totalSizeMB", 0.0);
+            return emptyStats;
+        }
+        
         long count = documentRepository.countBySyllabusId(syllabusId);
-        long totalSize = documentRepository.getTotalFileSizeBySyllabusId(syllabusId);
+        Long totalSize = documentRepository.getTotalFileSizeBySyllabusId(syllabusId);
+        
+        // Handle null case when no documents exist
+        if (totalSize == null) {
+            totalSize = 0L;
+        }
 
         Map<String, Object> stats = new HashMap<>();
         stats.put("totalDocuments", count);

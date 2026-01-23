@@ -1,46 +1,18 @@
 import React, { useEffect, useState } from 'react'
+import { CheckCircle, Clock, XCircle, FileText, Download, LogOut, AlertCircle } from 'lucide-react'
 import { useSyllabusApproval } from '../hooks/useSyllabusApproval'
-import academicAPI from '../services/academicService'
 import syllabusApprovalService from '../services/syllabusApprovalService'
+import syllabusServiceV2 from '../../lecturer/services/syllabusServiceV2'
 
-export const SyllabusApproval = () => {
-  const { syllabi, loading, error, fetchSyllabi } = useSyllabusApproval()
+const SyllabusApproval = ({ user, onLogout, approvalStage = 'REVIEW' }) => {
+  const { syllabi, loading, error, fetchSyllabi } = useSyllabusApproval(approvalStage)
 
   const [selected, setSelected] = useState(null)
   const [detail, setDetail] = useState(null)
   const [versionHistory, setVersionHistory] = useState([])
-  const [approvalValidation, setApprovalValidation] = useState(null)
-  const [prereqValidation, setPrereqValidation] = useState(null)
   const [actionLoading, setActionLoading] = useState(false)
   const [message, setMessage] = useState('')
-
-  const loadDetailAndVersions = async (syllabus) => {
-    if (!syllabus?.id) return
-    try {
-      setActionLoading(true)
-      setMessage('')
-
-      const [detailRes, versionsRes] = await Promise.all([
-        syllabusApprovalService.getDetails(syllabus.id),
-        academicAPI.getVersionHistory(syllabus.id),
-      ])
-
-      setDetail(detailRes?.data?.data || null)
-      setVersionHistory(versionsRes?.data?.data || [])
-      setApprovalValidation(null)
-      setPrereqValidation(null)
-    } catch (err) {
-      console.error('Failed to load syllabus detail or versions', err)
-      setMessage('Không tải được chi tiết hoặc lịch sử phiên bản giáo trình')
-    } finally {
-      setActionLoading(false)
-    }
-  }
-
-  const handleSelect = (syllabus) => {
-    setSelected(syllabus)
-    loadDetailAndVersions(syllabus)
-  }
+  const [messageType, setMessageType] = useState('info')
 
   const getCurrentUserId = () => {
     try {
@@ -53,75 +25,149 @@ export const SyllabusApproval = () => {
     }
   }
 
-  const handleApproveReject = async (type) => {
+  const loadDetailAndVersions = async (syllabus) => {
+    if (!syllabus?.id) return
+    try {
+      setActionLoading(true)
+      setMessage('')
+
+      const [detailRes, versionsRes] = await Promise.all([
+        syllabusApprovalService.getDetails(syllabus.id),
+        syllabusApprovalService.getVersionHistory(syllabus.rootSyllabusId || syllabus.id)
+      ])
+
+      setDetail(detailRes?.data || null)
+      setVersionHistory(versionsRes?.data || [])
+    } catch (err) {
+      console.error('Failed to load syllabus detail:', err)
+      setMessage('Không tải được chi tiết giáo trình')
+      setMessageType('error')
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
+  const handleSelect = (syllabus) => {
+    setSelected(syllabus)
+    loadDetailAndVersions(syllabus)
+  }
+
+  const handleReviewApprove = async () => {
     if (!selected?.id) return
-    const isApprove = type === 'approve'
-    const comment = window.prompt(
-      isApprove ? 'Nhập nhận xét khi duyệt (tuỳ chọn):' : 'Nhập lý do từ chối (bắt buộc):',
-    )
-    if (!isApprove && !comment) {
+    const comment = window.prompt('Nhập nhận xét (tuỳ chọn):')
+    if (comment === null) return
+
+    try {
+      setActionLoading(true)
+      setMessage('')
+      const userId = getCurrentUserId()
+      
+      // HOD: review-approve (PENDING_REVIEW → PENDING_APPROVAL)
+      await syllabusApprovalService.reviewApprove(selected.id, userId)
+      
+      setMessage('Đã gửi để phê duyệt tiếp theo')
+      setMessageType('success')
+      setSelected(null)
+      setDetail(null)
+      await fetchSyllabi()
+    } catch (err) {
+      console.error('Review-approve failed:', err)
+      const errMsg = err?.response?.data?.message || err?.message || 'Gửi phê duyệt thất bại'
+      setMessage(errMsg)
+      setMessageType('error')
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
+  const handleApprove = async () => {
+    if (!selected?.id) return
+    const comment = window.prompt('Nhập nhận xét (tuỳ chọn):')
+    if (comment === null) return
+
+    try {
+      setActionLoading(true)
+      setMessage('')
+      const userId = getCurrentUserId()
+      
+      // ACADEMIC_AFFAIRS/RECTOR: approve (PENDING_APPROVAL → APPROVED)
+      await syllabusApprovalService.approve(selected.id, userId, comment)
+      
+      setMessage('Đã phê duyệt giáo trình')
+      setMessageType('success')
+      setSelected(null)
+      setDetail(null)
+      await fetchSyllabi()
+    } catch (err) {
+      console.error('Approve failed:', err)
+      const errMsg = err?.response?.data?.message || err?.message || 'Phê duyệt thất bại'
+      setMessage(errMsg)
+      setMessageType('error')
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
+  const handleReject = async () => {
+    if (!selected?.id) return
+    const reason = window.prompt('Nhập lý do từ chối (bắt buộc):')
+    if (!reason) {
+      setMessage('Phải nhập lý do từ chối')
+      setMessageType('warning')
       return
     }
 
     try {
       setActionLoading(true)
       setMessage('')
-      const approvedBy = getCurrentUserId()
-
-      if (isApprove) {
-        await syllabusApprovalService.approve(selected.id, comment || '', approvedBy)
-        setMessage('Đã duyệt giáo trình thành công')
-      } else {
-        await syllabusApprovalService.reject(selected.id, comment || '', approvedBy)
-        setMessage('Đã từ chối giáo trình')
-      }
-
+      const userId = getCurrentUserId()
+      
+      await syllabusApprovalService.reject(selected.id, userId, reason)
+      
+      setMessage('Đã từ chối giáo trình')
+      setMessageType('success')
       setSelected(null)
       setDetail(null)
-      setVersionHistory([])
-      setApprovalValidation(null)
-      setPrereqValidation(null)
       await fetchSyllabi()
     } catch (err) {
-      console.error('Failed to update approval status', err)
-      setMessage('Cập nhật trạng thái duyệt thất bại')
+      console.error('Reject failed:', err)
+      const errMsg = err?.response?.data?.message || err?.message || 'Từ chối thất bại'
+      setMessage(errMsg)
+      setMessageType('error')
     } finally {
       setActionLoading(false)
     }
   }
 
-  const handleValidateApproval = async () => {
+  const handlePublish = async () => {
     if (!selected?.id) return
-    try {
-      setActionLoading(true)
-      setMessage('')
-      const res = await academicAPI.validateForApproval(selected.id)
-      setApprovalValidation(res?.data?.data || null)
-    } catch (err) {
-      console.error('Failed to validate for approval', err)
-      setMessage('Kiểm tra trước khi duyệt thất bại')
-    } finally {
-      setActionLoading(false)
-    }
-  }
+    if (!window.confirm('Bạn chắc chắn muốn xuất bản giáo trình này?')) return
 
-  const handleValidatePrereq = async () => {
-    if (!selected?.id) return
     try {
       setActionLoading(true)
       setMessage('')
-      const res = await academicAPI.validatePrerequisites(selected.id)
-      setPrereqValidation(res?.data?.data || null)
+      const userId = getCurrentUserId()
+      
+      // RECTOR only: publish (APPROVED → PUBLISHED)
+      await syllabusApprovalService.publish(selected.id, userId)
+      
+      setMessage('Đã xuất bản giáo trình')
+      setMessageType('success')
+      setSelected(null)
+      setDetail(null)
+      await fetchSyllabi()
     } catch (err) {
-      console.error('Failed to validate prerequisites', err)
-      setMessage('Kiểm tra tiên quyết thất bại')
+      console.error('Publish failed:', err)
+      const errMsg = err?.response?.data?.message || err?.message || 'Xuất bản thất bại'
+      setMessage(errMsg)
+      setMessageType('error')
     } finally {
       setActionLoading(false)
     }
   }
 
   useEffect(() => {
-    if (!selected && syllabi?.length) {
+    if (!selected && syllabi?.length > 0) {
       const first = syllabi[0]
       setSelected(first)
       loadDetailAndVersions(first)
@@ -129,278 +175,220 @@ export const SyllabusApproval = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [syllabi])
 
+  const getStatusBadge = (status) => {
+    const map = {
+      'DRAFT': { bg: 'bg-gray-100', color: 'text-gray-800', text: 'Nháp' },
+      'PENDING_REVIEW': { bg: 'bg-yellow-100', color: 'text-yellow-800', text: 'Chờ review' },
+      'PENDING_APPROVAL': { bg: 'bg-blue-100', color: 'text-blue-800', text: 'Chờ phê duyệt' },
+      'APPROVED': { bg: 'bg-green-100', color: 'text-green-800', text: 'Đã phê duyệt' },
+      'PUBLISHED': { bg: 'bg-purple-100', color: 'text-purple-800', text: 'Đã xuất bản' },
+      'REJECTED': { bg: 'bg-red-100', color: 'text-red-800', text: 'Bị từ chối' }
+    }
+    const badge = map[status] || map['DRAFT']
+    return <span className={`inline-block px-3 py-1 rounded-full text-xs font-semibold ${badge.bg} ${badge.color}`}>{badge.text}</span>
+  }
+
   return (
-    <div className="p-6 space-y-4">
-      <h1 className="text-3xl font-bold mb-2">Duyệt Giáo Trình</h1>
-
-      {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-2 rounded text-sm">
-          {error}
-        </div>
-      )}
-      {message && (
-        <div className="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-2 rounded text-sm">
-          {message}
-        </div>
-      )}
-
-      {loading ? (
-        <p>Đang tải danh sách giáo trình chờ duyệt...</p>
-      ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          {/* Danh sách giáo trình chờ duyệt */}
-          <div className="lg:col-span-1 bg-white rounded-lg shadow p-4">
-            <h2 className="text-lg font-semibold mb-3">Danh sách chờ duyệt</h2>
-            <div className="space-y-2 max-h-[70vh] overflow-y-auto">
-              {syllabi?.map((s) => (
-                <button
-                  key={s.id}
-                  type="button"
-                  onClick={() => handleSelect(s)}
-                  className={`w-full text-left border rounded px-3 py-2 text-sm hover:bg-indigo-50 ${
-                    selected?.id === s.id ? 'border-indigo-500 bg-indigo-50' : 'border-gray-200 bg-white'
-                  }`}
-                >
-                  <div className="flex justify-between items-center mb-1">
-                    <span className="font-semibold">{s.syllabusCode || `Syllabus #${s.id}`}</span>
-                    <span className="text-xs text-gray-500">Version {s.version}</span>
-                  </div>
-                  <div className="flex flex-wrap gap-1 text-[11px] text-gray-600">
-                    <span>Năm: {s.academicYear || '-'}</span>
-                    <span>| Kỳ: {s.semester ?? '-'}</span>
-                  </div>
-                  <div className="mt-1 flex gap-2 items-center text-[11px]">
-                    <span
-                      className="px-2 py-0.5 rounded-full bg-gray-100 text-gray-700"
-                    >
-                      Trạng thái: {s.status || 'N/A'}
-                    </span>
-                    <span
-                      className={`px-2 py-0.5 rounded-full ${
-                        s.approvalStatus === 'PENDING'
-                          ? 'bg-yellow-100 text-yellow-700'
-                          : s.approvalStatus === 'APPROVED'
-                          ? 'bg-green-100 text-green-700'
-                          : s.approvalStatus === 'REJECTED'
-                          ? 'bg-red-100 text-red-700'
-                          : 'bg-gray-100 text-gray-700'
-                      }`}
-                    >
-                      Duyệt: {s.approvalStatus || 'Chưa rõ'}
-                    </span>
-                  </div>
-                </button>
-              ))}
-              {!syllabi?.length && (
-                <p className="text-sm text-gray-500">Hiện không có giáo trình nào chờ duyệt.</p>
-              )}
-            </div>
+    <div className="min-h-screen bg-gradient-to-b from-purple-50 to-white">
+      {/* Header */}
+      <div className="bg-white shadow-md border-b border-gray-200">
+        <div className="container mx-auto px-6 py-6 flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">
+              {approvalStage === 'REVIEW' ? '👀 Duyệt Review' : '✓ Phê Duyệt'} Giáo Trình
+            </h1>
+            <p className="text-gray-600 mt-1">Xin chào, <span className="font-semibold">{user?.name || 'User'}</span></p>
           </div>
+          <button
+            onClick={onLogout}
+            className="flex items-center gap-2 bg-red-600 text-white px-6 py-2 rounded-lg hover:bg-red-700 transition font-medium"
+          >
+            <LogOut size={18} />
+            Đăng xuất
+          </button>
+        </div>
+      </div>
 
-          {/* Chi tiết + hành động */}
-          <div className="lg:col-span-2 space-y-4">
-            <div className="bg-white rounded-lg shadow p-4">
-              <div className="flex justify-between items-center mb-3">
-                <div>
-                  <h2 className="text-lg font-semibold mb-1">Chi tiết giáo trình</h2>
-                  {detail && (
-                    <p className="text-sm text-gray-600">
-                      [{detail.syllabusCode}] Năm {detail.academicYear} - Kỳ {detail.semester}
-                    </p>
+      {/* Main Content */}
+      <div className="container mx-auto px-6 py-8">
+        {/* Messages */}
+        {error && (
+          <div className="mb-6 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg flex items-center gap-3">
+            <AlertCircle size={20} />
+            {error}
+          </div>
+        )}
+        {message && (
+          <div className={`mb-6 px-4 py-3 rounded-lg flex items-center gap-3 border ${
+            messageType === 'success' ? 'bg-green-50 border-green-200 text-green-700' :
+            messageType === 'error' ? 'bg-red-50 border-red-200 text-red-700' :
+            messageType === 'warning' ? 'bg-yellow-50 border-yellow-200 text-yellow-700' :
+            'bg-blue-50 border-blue-200 text-blue-700'
+          }`}>
+            {messageType === 'success' && <CheckCircle size={20} />}
+            {messageType === 'error' && <XCircle size={20} />}
+            {messageType === 'warning' && <AlertCircle size={20} />}
+            {message}
+          </div>
+        )}
+
+        {loading ? (
+          <div className="text-center py-12">
+            <p className="text-gray-600">Đang tải danh sách giáo trình...</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+            {/* Syllabus List */}
+            <div className="lg:col-span-1">
+              <div className="bg-white rounded-lg shadow-lg p-6">
+                <h2 className="text-lg font-bold mb-4">Danh sách chờ {approvalStage === 'REVIEW' ? 'review' : 'phê duyệt'}</h2>
+                <div className="space-y-3 max-h-[70vh] overflow-y-auto">
+                  {syllabi?.length > 0 ? (
+                    syllabi.map((s) => (
+                      <button
+                        key={s.id}
+                        onClick={() => handleSelect(s)}
+                        className={`w-full text-left p-3 rounded-lg border-2 transition ${
+                          selected?.id === s.id
+                            ? 'border-purple-500 bg-purple-50'
+                            : 'border-gray-200 bg-white hover:border-purple-300'
+                        }`}
+                      >
+                        <div className="font-semibold text-gray-900">{s.subjectCode || s.syllabusCode || 'N/A'}</div>
+                        <div className="text-xs text-gray-600 mt-1">{s.subjectName || 'Chưa rõ'}</div>
+                        <div className="text-xs mt-2">{getStatusBadge(s.status)}</div>
+                      </button>
+                    ))
+                  ) : (
+                    <p className="text-sm text-gray-500 text-center py-6">Không có giáo trình nào chờ xử lý</p>
                   )}
                 </div>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={handleValidateApproval}
-                    disabled={!selected || actionLoading}
-                    className="px-3 py-1.5 text-xs rounded bg-sky-600 text-white hover:bg-sky-700 disabled:opacity-50"
-                  >
-                    Kiểm tra trước khi duyệt
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleValidatePrereq}
-                    disabled={!selected || actionLoading}
-                    className="px-3 py-1.5 text-xs rounded bg-amber-600 text-white hover:bg-amber-700 disabled:opacity-50"
-                  >
-                    Kiểm tra tiên quyết
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleApproveReject('approve')}
-                    disabled={!selected || actionLoading}
-                    className="px-3 py-1.5 text-xs rounded bg-green-600 text-white hover:bg-green-700 disabled:opacity-50"
-                  >
-                    Duyệt
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleApproveReject('reject')}
-                    disabled={!selected || actionLoading}
-                    className="px-3 py-1.5 text-xs rounded bg-red-600 text-white hover:bg-red-700 disabled:opacity-50"
-                  >
-                    Từ chối
-                  </button>
-                </div>
-              </div>
-
-              {detail ? (
-                <div className="space-y-3 text-sm">
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <span className="font-semibold">Mã giáo trình:</span> {detail.syllabusCode}
-                    </div>
-                    <div>
-                      <span className="font-semibold">Version hiện tại:</span> {detail.version}
-                    </div>
-                    <div>
-                      <span className="font-semibold">Trạng thái:</span> {detail.status}
-                    </div>
-                    <div>
-                      <span className="font-semibold">Trạng thái duyệt:</span> {detail.approvalStatus}
-                    </div>
-                  </div>
-
-                  <div>
-                    <span className="font-semibold">Mục tiêu học tập:</span>
-                    <p className="mt-1 text-gray-700 whitespace-pre-line">
-                      {detail.learningObjectives || 'Chưa cập nhật'}
-                    </p>
-                  </div>
-                  <div>
-                    <span className="font-semibold">Nội dung môn học:</span>
-                    <p className="mt-1 text-gray-700 whitespace-pre-line">
-                      {detail.content || 'Chưa cập nhật'}
-                    </p>
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <span className="font-semibold">Phương pháp giảng dạy:</span>
-                      <p className="mt-1 text-gray-700 whitespace-pre-line">
-                        {detail.teachingMethods || 'Chưa cập nhật'}
-                      </p>
-                    </div>
-                    <div>
-                      <span className="font-semibold">Đánh giá:</span>
-                      <p className="mt-1 text-gray-700 whitespace-pre-line">
-                        {detail.assessmentMethods || 'Chưa cập nhật'}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <p className="text-sm text-gray-500">Chọn một giáo trình ở danh sách bên trái để xem chi tiết.</p>
-              )}
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              {/* Kết quả validate duyệt */}
-              <div className="bg-white rounded-lg shadow p-4">
-                <h3 className="text-sm font-semibold mb-2">Kết quả kiểm tra trước khi duyệt</h3>
-                {approvalValidation ? (
-                  <div className="space-y-2 text-xs text-gray-700">
-                    <p>
-                      Tổng quan:{' '}
-                      <span
-                        className={
-                          approvalValidation.isReadyForApproval
-                            ? 'text-green-600 font-semibold'
-                            : 'text-red-600 font-semibold'
-                        }
-                      >
-                        {approvalValidation.isReadyForApproval
-                          ? 'ĐỦ điều kiện duyệt'
-                          : 'CHƯA đủ điều kiện duyệt'}
-                      </span>
-                    </p>
-                    <p>Điểm đánh giá: {approvalValidation.approvalScore}/100</p>
-                    <p>Thông điệp: {approvalValidation.message}</p>
-                    {approvalValidation.warnings?.length > 0 && (
-                      <div>
-                        <p className="font-semibold text-amber-700">Cảnh báo:</p>
-                        <ul className="list-disc list-inside">
-                          {approvalValidation.warnings.map((w, idx) => (
-                            <li key={idx}>{w}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                    {approvalValidation.errors?.length > 0 && (
-                      <div>
-                        <p className="font-semibold text-red-700">Lỗi cần xử lý:</p>
-                        <ul className="list-disc list-inside">
-                          {approvalValidation.errors.map((e, idx) => (
-                            <li key={idx}>{e}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <p className="text-xs text-gray-500">
-                    Bấm "Kiểm tra trước khi duyệt" để xem kết quả đánh giá tự động.
-                  </p>
-                )}
-              </div>
-
-              {/* Kết quả kiểm tra tiên quyết */}
-              <div className="bg-white rounded-lg shadow p-4">
-                <h3 className="text-sm font-semibold mb-2">Kết quả kiểm tra tiên quyết</h3>
-                {prereqValidation ? (
-                  <pre className="text-xs text-gray-700 bg-gray-50 rounded p-2 max-h-40 overflow-auto">
-                    {JSON.stringify(prereqValidation, null, 2)}
-                  </pre>
-                ) : (
-                  <p className="text-xs text-gray-500">
-                    Bấm "Kiểm tra tiên quyết" để xem kết quả.
-                  </p>
-                )}
               </div>
             </div>
 
-            {/* Lịch sử phiên bản */}
-            <div className="bg-white rounded-lg shadow p-4">
-              <h3 className="text-sm font-semibold mb-2">Lịch sử phiên bản giáo trình</h3>
-              {versionHistory?.length ? (
-                <div className="max-h-52 overflow-y-auto">
-                  <table className="min-w-full text-xs">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="px-2 py-1 text-left">Phiên bản</th>
-                        <th className="px-2 py-1 text-left">Loại thay đổi</th>
-                        <th className="px-2 py-1 text-left">Trạng thái</th>
-                        <th className="px-2 py-1 text-left">Duyệt</th>
-                        <th className="px-2 py-1 text-left">Thời gian</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {versionHistory.map((v) => (
-                        <tr key={v.auditId} className="border-t">
-                          <td className="px-2 py-1">{v.versionNumber}</td>
-                          <td className="px-2 py-1">{v.changeType}</td>
-                          <td className="px-2 py-1">{v.status}</td>
-                          <td className="px-2 py-1">{v.approvalStatus}</td>
-                          <td className="px-2 py-1 text-gray-500">
-                            {v.createdAt ? new Date(v.createdAt).toLocaleString() : ''}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+            {/* Detail & Actions */}
+            <div className="lg:col-span-3 space-y-6">
+              {selected && detail ? (
+                <>
+                  {/* Detail Card */}
+                  <div className="bg-white rounded-lg shadow-lg p-6">
+                    <div className="flex justify-between items-start mb-6">
+                      <div>
+                        <h2 className="text-2xl font-bold text-gray-900">{detail.subjectName || detail.subject || 'N/A'}</h2>
+                        <p className="text-gray-600 mt-1">Mã: {detail.subjectCode || detail.courseCode || 'N/A'}</p>
+                      </div>
+                      <div className="text-right">
+                        {getStatusBadge(detail.status)}
+                        <p className="text-sm text-gray-600 mt-2">Phiên bản: {detail.version || 1}</p>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4 mb-6">
+                      <div className="bg-gray-50 p-4 rounded">
+                        <p className="text-xs text-gray-600 mb-1">Giảng viên</p>
+                        <p className="font-semibold text-gray-900">{detail.lecturer || detail.createdByName || 'N/A'}</p>
+                      </div>
+                      <div className="bg-gray-50 p-4 rounded">
+                        <p className="text-xs text-gray-600 mb-1">Năm học / Kỳ</p>
+                        <p className="font-semibold text-gray-900">{detail.academicYear || 'N/A'} / Kỳ {detail.semester || 'N/A'}</p>
+                      </div>
+                    </div>
+
+                    {detail.content && (
+                      <>
+                        <h3 className="font-semibold text-gray-900 mb-3">Nội dung giáo trình</h3>
+                        <div className="grid grid-cols-2 gap-4 text-sm text-gray-700 bg-gray-50 p-4 rounded mb-6">
+                          {typeof detail.content === 'object' ? (
+                            <>
+                              <p><strong>Số lượng Modules:</strong> {detail.content.modules?.length || 0}</p>
+                              <p><strong>Mục tiêu CLO:</strong> {detail.content.objectives?.length || 0}</p>
+                              <p><strong>Số tín chỉ:</strong> {detail.content.credits || 'Chưa xác định'}</p>
+                              <p><strong>Đánh giá:</strong> {detail.content.assessment ? 'Có' : 'Không'}</p>
+                            </>
+                          ) : (
+                            <p>Nội dung: {detail.content}</p>
+                          )}
+                        </div>
+                      </>
+                    )}
+
+                    {/* Action Buttons */}
+                    <div className="flex gap-3 flex-wrap">
+                      {approvalStage === 'REVIEW' ? (
+                        <>
+                          <button
+                            onClick={handleReviewApprove}
+                            disabled={actionLoading}
+                            className="flex-1 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition font-medium"
+                          >
+                            Gửi để phê duyệt
+                          </button>
+                          <button
+                            onClick={handleReject}
+                            disabled={actionLoading}
+                            className="flex-1 bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 disabled:opacity-50 transition font-medium"
+                          >
+                            Từ chối
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <button
+                            onClick={handleApprove}
+                            disabled={actionLoading}
+                            className="flex-1 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 disabled:opacity-50 transition font-medium"
+                          >
+                            ✓ Phê duyệt
+                          </button>
+                          <button
+                            onClick={handlePublish}
+                            disabled={actionLoading}
+                            className="flex-1 bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 disabled:opacity-50 transition font-medium"
+                          >
+                            📢 Xuất bản
+                          </button>
+                          <button
+                            onClick={handleReject}
+                            disabled={actionLoading}
+                            className="flex-1 bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 disabled:opacity-50 transition font-medium"
+                          >
+                            Từ chối
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Version History */}
+                  {versionHistory && versionHistory.length > 0 && (
+                    <div className="bg-white rounded-lg shadow-lg p-6">
+                      <h3 className="text-lg font-bold mb-4">Lịch sử phiên bản</h3>
+                      <div className="space-y-2 max-h-48 overflow-y-auto">
+                        {versionHistory.map((v, idx) => (
+                          <div key={idx} className="p-3 border border-gray-200 rounded text-sm bg-gray-50">
+                            <p className="font-semibold">Phiên bản {v.version || idx + 1}</p>
+                            <p className="text-xs text-gray-600">Trạng thái: {v.status || 'N/A'}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </>
               ) : (
-                <p className="text-xs text-gray-500">Chưa có lịch sử phiên bản hoặc chưa chọn giáo trình.</p>
+                <div className="bg-white rounded-lg shadow-lg p-12 text-center">
+                  <FileText size={48} className="mx-auto text-gray-400 mb-4" />
+                  <p className="text-gray-600">Chọn một giáo trình từ danh sách bên trái để xem chi tiết</p>
+                </div>
               )}
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {actionLoading && (
-        <div className="fixed inset-0 bg-black/10 flex items-center justify-center pointer-events-none">
-          <div className="bg-white shadow px-4 py-2 rounded text-sm text-gray-700">
-            Đang xử lý...
+        <div className="fixed inset-0 bg-black/20 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-lg px-6 py-4">
+            <p className="text-gray-700 font-medium">Đang xử lý...</p>
           </div>
         </div>
       )}

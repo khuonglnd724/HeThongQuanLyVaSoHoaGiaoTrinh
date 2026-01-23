@@ -332,7 +332,7 @@ echo "Token: $TOKEN"
 **Option B: Generate Manual JWT (for testing)**
 ```powershell
 # PowerShell - Install-Module -Name PSJwt first
-$secret = "smdMicroservicesSecretKeyForJWTTokenGenerationAndValidation2024"
+$secret = "smdMicroservicesSecretKeyForJWTTokenGenerationAndValidation2024SuperSecureKeyWithEnoughBytesForHS512HS512HS512"
 $payload = @{
     sub = "test-user"
     roles = @("USER")

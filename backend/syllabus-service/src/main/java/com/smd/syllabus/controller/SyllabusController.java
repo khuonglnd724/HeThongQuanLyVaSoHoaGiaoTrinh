@@ -151,4 +151,16 @@ public class SyllabusController {
             @RequestBody RejectSyllabusRequest req) {
         return ResponseEntity.ok(syllabusService.reject(id, userId, req.getReason()));
     }
+
+    /**
+     * Delete syllabus (soft delete / mark as deleted)
+     * DELETE /api/syllabuses/{id}
+     */
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> delete(
+            @RequestHeader("X-User-Id") String userId,
+            @PathVariable UUID id) {
+        syllabusService.delete(id, userId);
+        return ResponseEntity.ok().build();
+    }
 }

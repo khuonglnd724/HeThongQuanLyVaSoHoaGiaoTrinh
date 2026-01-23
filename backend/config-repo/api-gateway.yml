@@ -22,22 +22,24 @@ spring:
         - id: auth-service
           uri: lb://auth-service
           predicates:
-            - Path=/api/auth/**
+            - Path=/api/auth/**,/api/users/**,/api/roles/**,/api/system/**,/api/services/**
         
         - id: academic-service
           uri: lb://academic-service
           predicates:
-            - Path=/api/academic/**
+            - Path=/api/academic/**,/api/v1/**
+          filters:
+            - RewritePath=/api/academic(?<segment>/?.*), /api/v1${segment}
         
         - id: syllabus-service
           uri: lb://syllabus-service
           predicates:
-            - Path=/api/syllabus/**
+            - Path=/api/syllabuses/**,/api/syllabuses,/api/syllabus/**,/api/syllabus,/api/issues/**,/api/notifications/**,/api/review-comments/**,/api/syllabus/documents/**
         
         - id: workflow-service
           uri: lb://workflow-service
           predicates:
-            - Path=/api/workflow/**
+            - Path=/api/workflow/**,/api/workflows/**
         
         - id: public-service
           uri: lb://public-service
@@ -47,9 +49,9 @@ spring:
         - id: ai-service
           uri: http://ai-service:8000
           predicates:
-            - Path=/api/ai/**
+            - Path=/api/ai/**,/ai/**
           filters:
-            - RewritePath=/api/ai/(?<segment>.*), /${segment}
+            - RewritePath=/api/ai(?<segment>/?.*), ${segment}
             - RemoveResponseHeader=Access-Control-Allow-Origin
             - RemoveResponseHeader=Access-Control-Allow-Methods
             - RemoveResponseHeader=Access-Control-Allow-Headers
@@ -65,6 +67,8 @@ eureka:
   client:
     service-url:
       defaultZone: http://discovery-server:8761/eureka/
+    region: default
+    avoid-url-based-aws-ec2-metadata-service: true
 
 management:
   endpoints:
@@ -78,7 +82,7 @@ management:
 security:
   jwt:
     enabled: true
-    secret: smdMicroservicesSecretKeyForJWTTokenGenerationAndValidation2024
+    secret: smdMicroservicesSecretKeyForJWTTokenGenerationAndValidation2024SuperSecureKeyWithEnoughBytesForHS512HS512HS512
     whitelist:
       - /api/auth/**
       - /api/ai/**
