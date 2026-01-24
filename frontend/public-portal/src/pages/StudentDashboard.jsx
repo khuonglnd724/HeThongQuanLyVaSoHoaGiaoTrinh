@@ -4,7 +4,7 @@ import studentAPI from '../modules/student/services/studentService'
 
 const StudentDashboard = ({ user, onLogout = () => {} }) => {
   const [dashboard, setDashboard] = useState({ syllabi: 0, averageGrade: 0, progress: 0 })
-  const [loading, setLoading] = useState(true)
+  const [, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
   const loadDashboard = useCallback(async () => {

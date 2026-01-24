@@ -43,7 +43,7 @@ export default function AdminPortalLayout() {
       console.error('[AdminPortalLayout] Invalid user data:', e)
       navigate('/login')
     }
-  }, [])
+  }, [navigate])
 
   const navItems = [
     {
