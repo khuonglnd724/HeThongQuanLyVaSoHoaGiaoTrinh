@@ -5,6 +5,9 @@
 -- Create academic_db database (already created in init.sql)
 -- Tables for PLO, CLO, Mapping, Program, Subject, Syllabus
 
+-- Ensure we are operating inside academic_db
+\c academic_db;
+
 -- ============================================================
 -- TABLE: program (Chương trình đào tạo)
 -- ============================================================

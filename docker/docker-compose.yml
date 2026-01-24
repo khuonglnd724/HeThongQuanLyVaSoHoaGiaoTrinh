@@ -124,11 +124,16 @@ services:
       - "8082:8082"
     environment:
       JAVA_OPTS: "-Xmx256m -Xms256m"
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/academic_db
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: 123456
       EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE: http://discovery-server:8761/eureka
       SPRING_CONFIG_IMPORT: "optional:configserver:http://config-server:8888"
       SPRING_JPA_HIBERNATE_DDL_AUTO: update
     command: java -jar academic-service-0.0.1-SNAPSHOT.jar
     depends_on:
+      postgres:
+        condition: service_healthy
       discovery-server:
         condition: service_healthy
       config-server:
@@ -150,6 +155,7 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/syllabus_db
       SPRING_DATASOURCE_USERNAME: postgres
       SPRING_DATASOURCE_PASSWORD: 123456
+      SPRING_RABBITMQ_HOST: smd-rabbitmq
       EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE: http://discovery-server:8761/eureka
     depends_on:
       postgres:
@@ -189,6 +195,8 @@ services:
         condition: service_healthy
       syllabus-service:
         condition: service_started
+      rabbitmq:
+        condition: service_healthy
     networks:
       - smd-network
  

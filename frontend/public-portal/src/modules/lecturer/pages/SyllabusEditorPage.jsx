@@ -1,182 +1,297 @@
-import React, { useState, useEffect } from 'react'
-import { ArrowLeft, Save, Send, PlusCircle, Trash2, Search } from 'lucide-react'
+import React, { useEffect, useState } from 'react'
+import {
+  ArrowLeft,
+  Save,
+  Send,
+  Upload,
+  Trash2,
+  File,
+  Plus,
+  X,
+  ChevronDown,
+  Check,
+  AlertCircle
+} from 'lucide-react'
 import syllabusServiceV2 from '../services/syllabusServiceV2'
+import { academicAPI } from '../services/academicAPI'
+import { syllabusApprovalService } from '../services/syllabusApprovalService'
 
 const SyllabusEditorPage = ({ syllabusId, rootId, user, onBack }) => {
-  const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
-  const mode = syllabusId ? 'edit' : 'create' // create or edit
-  const [formData, setFormData] = useState({
-    subjectCode: '',
-    subjectName: '',
-    description: '',
-    content: {} // Structured content
-  })
-  const [activeTab, setActiveTab] = useState('basic') // basic, clos
-  const [builderOpen, setBuilderOpen] = useState(false)
-  const [modulesDraft, setModulesDraft] = useState([])
-  const [syllabus, setSyllabus] = useState(null)
-  const [objectivesDraft, setObjectivesDraft] = useState([])
-  const [assessmentDraft, setAssessmentDraft] = useState({ midterm: '', final: '', assignments: '' })
-  const [creditsDraft, setCreditsDraft] = useState('')
-  const [newObjective, setNewObjective] = useState('')
-  
-  // CLO Management States
-  const [showCLOModal, setShowCLOModal] = useState(false)
-  const [showSelectCLOModal, setShowSelectCLOModal] = useState(false)
-  const [existingCLOs, setExistingCLOs] = useState([])
-  const [selectedCLOs, setSelectedCLOs] = useState([])
-  const [cloLoading, setCloLoading] = useState(false)
-  const [cloError, setCloError] = useState(null)
-  const [newCLOForm, setNewCLOForm] = useState({ code: '', description: '', level: 'COMPREHENSION' })
-
+  const mode = syllabusId ? 'edit' : 'create'
   const userId = user?.userId || user?.id
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const [uploading, setUploading] = useState(false)
+  const [activeTab, setActiveTab] = useState('basic') // basic | clos | structure | files
+
+  const [subjects, setSubjects] = useState([])
+  const [subjectsLoading, setSubjectsLoading] = useState(false)
+  const [clos, setClos] = useState([])
+  const [closLoading, setClosLoading] = useState(false)
+  const [plos, setPlos] = useState([])
+  const [plosLoading, setPlosLoading] = useState(false)
+  const [programInfo, setProgramInfo] = useState(null)
+  const [formData, setFormData] = useState({
+    subjectId: '',
+    description: '',
+    cloPairIds: [],
+    modules: []
+  })
+  const [selectedFiles, setSelectedFiles] = useState([])
+  const [showCloModal, setShowCloModal] = useState(false)
+  const [showAddCloModal, setShowAddCloModal] = useState(false)
+  const [creatingClo, setCreatingClo] = useState(false)
+  const [showModuleForm, setShowModuleForm] = useState(false)
+  const [newModule, setNewModule] = useState({
+    week: '',
+    topic: '',
+    content: '',
+    learning_objectives: ''
+  })
+  const [newClo, setNewClo] = useState({
+    cloCode: '',
+    description: '',
+    selectedPloIds: []
+  })
+
   useEffect(() => {
-    if (syllabusId && mode === 'edit') {
-      loadSyllabus()
-    } else {
+    const init = async () => {
+      await loadSubjects()
+      if (mode === 'edit' && syllabusId) {
+        await loadSyllabus()
+      }
       setLoading(false)
     }
-    loadExistingCLOs()
+    init()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [syllabusId, mode])
 
-  // sync modulesDraft when formData.content changes
-  useEffect(() => {
+  const loadSubjects = async () => {
+    setSubjectsLoading(true)
     try {
-      const mods = formData.content?.modules || []
-      setModulesDraft(Array.isArray(mods) ? mods : [])
-
-      const objs = formData.content?.objectives || []
-      setObjectivesDraft(Array.isArray(objs) ? objs : [])
-
-      const assess = formData.content?.assessment || {}
-      setAssessmentDraft({
-        midterm: assess.midterm ?? '',
-        final: assess.final ?? '',
-        assignments: assess.assignments ?? ''
-      })
-
-      const creditsVal = formData.content?.credits
-      setCreditsDraft(creditsVal ?? '')
-    } catch (e) {
-      setModulesDraft([])
-      setObjectivesDraft([])
-      setAssessmentDraft({ midterm: '', final: '', assignments: '' })
-      setCreditsDraft('')
-    }
-  }, [formData.content])
-
-  const loadExistingCLOs = async () => {
-    try {
-      setCloLoading(true)
-      setCloError(null)
-      const res = await syllabusServiceV2.getAllCLOs()
-      const clos = res.data?.data || res.data || []
-      console.log('[SyllabusEditorPage] Loaded existing CLOs:', clos)
-      setExistingCLOs(Array.isArray(clos) ? clos : [])
+      const res = await syllabusServiceV2.getSubjects()
+      const data = res.data?.data || res.data || []
+      const normalized = Array.isArray(data)
+        ? data.map(s => ({
+          ...s,
+          // normalize subjectCode from possible backend keys and trim spaces
+          subjectCode: (s.subjectCode || s.code || s.subject_code || s.subjectcode || '').trim(),
+          // normalize subjectName for downstream payloads
+          subjectName: (s.subjectName || s.name || s.subject_name || s.subjectname || '').trim()
+        }))
+        : []
+      setSubjects(normalized)
     } catch (err) {
-      console.error('[SyllabusEditorPage] Failed to load CLOs:', err)
-      // Show server error message when available, otherwise generic
-      const msg = err?.response?.data?.message || err.message || 'Không thể tải CLOs'
-      const errorCode = err?.response?.data?.errorCode || null
-      const correlationId = err?.response?.headers?.['x-correlation-id'] || err?.response?.headers?.['X-Correlation-Id'] || null
-      setCloError({ message: msg, errorCode, correlationId })
-      try { alert('Lỗi khi tải CLOs: ' + msg) } catch (e) { console.error(msg) }
-      setExistingCLOs([])
+      console.error('Failed to load subjects', err)
+      alert('Không thể tải danh sách môn học')
     } finally {
-      setCloLoading(false)
-    }
-  }
-
-  const copyCLOError = () => {
-    if (!cloError) return
-    const text = JSON.stringify(cloError, null, 2)
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(text).then(() => alert('Đã sao chép thông tin lỗi vào clipboard'))
-        .catch(() => { try { alert('Không thể sao chép, vui lòng sao chép thủ công') } catch (e) {} })
-    } else {
-      // Fallback
-      const ta = document.createElement('textarea')
-      ta.value = text
-      document.body.appendChild(ta)
-      ta.select()
-      try { document.execCommand('copy'); alert('Đã sao chép thông tin lỗi vào clipboard') } catch (e) { alert('Không thể sao chép, vui lòng sao chép thủ công') }
-      ta.remove()
+      setSubjectsLoading(false)
     }
   }
 
   const loadSyllabus = async () => {
-    setLoading(true)
     try {
       const res = await syllabusServiceV2.getById(syllabusId)
-      const data = res.data
-      setSyllabus(data)
+      const data = res.data?.data || res.data || {}
       setFormData({
-        subjectCode: data.subjectCode || '',
-        subjectName: data.subjectName || '',
-        description: data.description || '',
-        content: data.content || {}
+        subjectId: data.subjectId || '',
+        description: data.content || '',
+        cloPairIds: data.cloPairIds || [],
+        modules: data.modules || []
       })
-      const mods = data.content?.modules || []
-      setModulesDraft(Array.isArray(mods) ? mods : [])
-      const objs = data.content?.objectives || []
-      setObjectivesDraft(Array.isArray(objs) ? objs : [])
-      const assess = data.content?.assessment || {}
-      setAssessmentDraft({
-        midterm: assess.midterm ?? '',
-        final: assess.final ?? '',
-        assignments: assess.assignments ?? ''
-      })
-      setCreditsDraft(data.content?.credits ?? '')
+      if (data.subjectId) {
+        await loadClos(data.subjectId)
+      }
     } catch (err) {
-      console.error('Failed to load syllabus:', err)
+      console.error('Failed to load syllabus', err)
       alert('Không thể tải giáo trình')
+    }
+  }
+
+  const loadClos = async (subjectId) => {
+    if (!subjectId) {
+      setClos([])
+      return
+    }
+    setClosLoading(true)
+    try {
+      const res = await academicAPI.getClosBySubject(subjectId)
+      const closList = res.data?.data || res.data || []
+      setClos(Array.isArray(closList) ? closList : [])
+    } catch (err) {
+      console.error('Load CLOs failed:', err)
+      setClos([])
     } finally {
-      setLoading(false)
+      setClosLoading(false)
+    }
+  }
+
+  const loadPlos = async (programId) => {
+    if (!programId) {
+      setPlos([])
+      setProgramInfo(null)
+      return
+    }
+    setPlosLoading(true)
+    try {
+      // Fetch PLOs
+      const res = await academicAPI.getPlosByProgram(programId)
+      const plosList = res.data?.data || res.data || []
+      setPlos(Array.isArray(plosList) ? plosList : [])
+      
+      // Fetch program details
+      try {
+        const progRes = await academicAPI.getProgramById(programId)
+        setProgramInfo(progRes.data?.data || progRes.data || null)
+      } catch (progErr) {
+        console.warn('Failed to load program details:', progErr)
+        setProgramInfo(null)
+      }
+    } catch (err) {
+      console.error('Load PLOs failed:', err)
+      setPlos([])
+      setProgramInfo(null)
+    } finally {
+      setPlosLoading(false)
+    }
+  }
+
+  // Load CLOs/PLOs when subject changes
+  useEffect(() => {
+    if (formData.subjectId) {
+      const subject = subjects.find(s => String(s.id) === String(formData.subjectId))
+      if (subject) {
+        loadClos(formData.subjectId)
+        if (subject.programId) {
+          loadPlos(subject.programId)
+        }
+      }
+    }
+  }, [formData.subjectId, subjects])
+
+  const onChangeField = (key, value) => {
+    setFormData(prev => ({ ...prev, [key]: value }))
+  }
+
+  const handleSubjectChange = (value) => {
+    setFormData(prev => ({ ...prev, subjectId: value }))
+  }
+
+  const toggleCloPair = (cloId) => {
+    setFormData(prev => {
+      const cloPairIds = prev.cloPairIds.includes(cloId)
+        ? prev.cloPairIds.filter(id => id !== cloId)
+        : [...prev.cloPairIds, cloId]
+      return { ...prev, cloPairIds }
+    })
+  }
+
+  const handleAddModule = () => {
+    if (!newModule.week || !newModule.topic) {
+      alert('Vui lòng nhập tuần và chủ đề')
+      return
+    }
+    setFormData(prev => ({
+      ...prev,
+      modules: [
+        ...prev.modules,
+        {
+          ...newModule,
+          id: Date.now(),
+          week: parseInt(newModule.week)
+        }
+      ]
+    }))
+    setNewModule({ week: '', topic: '', content: '', learning_objectives: '' })
+    setShowModuleForm(false)
+  }
+
+  const handleRemoveModule = (moduleId) => {
+    setFormData(prev => ({
+      ...prev,
+      modules: prev.modules.filter(m => m.id !== moduleId)
+    }))
+  }
+
+  const handleFileUpload = (e) => {
+    const files = e.target.files
+    if (!files || files.length === 0) return
+    const list = Array.from(files)
+    setSelectedFiles(prev => [...prev, ...list])
+  }
+
+  const removeFile = (index) => {
+    setSelectedFiles(prev => prev.filter((_, i) => i !== index))
+  }
+
+  const uploadDocuments = async (savedId) => {
+    if (!savedId || selectedFiles.length === 0) return
+    setUploading(true)
+    try {
+      for (const file of selectedFiles) {
+        await syllabusServiceV2.uploadDocument(savedId, file, file.name, formData.description, userId)
+      }
+    } catch (err) {
+      console.error('Upload documents failed', err)
+      alert('Tải tệp thất bại cho một số tài liệu')
+    } finally {
+      setUploading(false)
     }
   }
 
   const handleSave = async () => {
-    if (!formData.subjectCode || !formData.subjectName) {
-      alert('Vui lòng điền đầy đủ thông tin')
+    if (!formData.subjectId) {
+      alert('Vui lòng chọn môn học')
       return
     }
-    // For now only save basic info; content development postponed
-    const compiled = {} // leave content empty; CLOs are saved separately
+
+    const subject = subjects.find(s => String(s.id) === String(formData.subjectId))
+    if (!subject || !subject.subjectCode) {
+      alert('Môn học thiếu mã môn (subjectCode). Vui lòng chọn lại hoặc tải lại danh sách môn học.')
+      return
+    }
+
+    const subjectCode = subject.subjectCode.trim()
+    const subjectName = (subject.subjectName || subject.name || '').trim()
+
+    const payload = {
+      subjectCode,
+      subjectName,
+      subjectId: Number(formData.subjectId),
+      content: formData.description || '',
+      summary: formData.description || '',
+      cloPairIds: formData.cloPairIds,
+      modules: formData.modules
+    }
 
     setSaving(true)
     try {
-      let savedSyllabusId = syllabusId
+      let savedId = syllabusId
       if (mode === 'create') {
-        const res = await syllabusServiceV2.create({ subjectCode: formData.subjectCode, subjectName: formData.subjectName, description: formData.description, content: compiled }, userId)
-        savedSyllabusId = res.data?.id || res.data?.syllabusId
-        console.log('[SyllabusEditorPage] Created syllabus with ID:', savedSyllabusId)
+        const res = await syllabusServiceV2.create(payload, userId)
+        savedId = res.data?.data?.id || res.data?.id || res.data?.syllabusId
+        console.log('[SyllabusEditorPage] Created syllabus', savedId)
+        await uploadDocuments(savedId)
+        alert('Tạo giáo trình thành công')
       } else {
-        // Create new version (only basic info change)
         const res = await syllabusServiceV2.createNewVersion(
           rootId || syllabusId,
           {
-            content: compiled,
-            changes: 'Cập nhật thông tin cơ bản'
+            content: formData.description || '',
+            changes: 'Cập nhật thông tin cơ bản',
+            subjectCode,
+            subjectName,
+            cloPairIds: formData.cloPairIds,
+            modules: formData.modules
           },
           userId
         )
-        savedSyllabusId = res.data?.id || res.data?.syllabusId
-        console.log('[SyllabusEditorPage] Updated syllabus with ID:', savedSyllabusId)
+        savedId = res.data?.data?.id || res.data?.id || savedId
+        await uploadDocuments(savedId)
+        alert('Cập nhật giáo trình thành công')
       }
-
-      // Link CLOs to syllabus if objectives exist and syllabus was saved
-      // Note: CLOs were already created from modal (without syllabusId).
-      // Now we just add their descriptions to the syllabus for reference.
-      if (savedSyllabusId && objectivesDraft && objectivesDraft.length > 0) {
-        console.log('[SyllabusEditorPage] Linking', objectivesDraft.length, 'CLOs to syllabus', savedSyllabusId)
-        // In future: implement CLO-Syllabus linking if needed (e.g., via junction table)
-        // For now, CLOs are standalone and referenced by description in objectivesDraft
-      }
-
-      alert('Lưu giáo trình thành công')
       onBack?.()
     } catch (err) {
       console.error('Save failed:', err)
@@ -186,200 +301,81 @@ const SyllabusEditorPage = ({ syllabusId, rootId, user, onBack }) => {
     }
   }
 
-  const compileContent = () => {
-    const assessment = {}
-    if (assessmentDraft.midterm !== '') assessment.midterm = Number(assessmentDraft.midterm)
-    if (assessmentDraft.final !== '') assessment.final = Number(assessmentDraft.final)
-    if (assessmentDraft.assignments !== '') assessment.assignments = Number(assessmentDraft.assignments)
-
-    const content = {
-      ...(formData.content || {}),
-      modules: modulesDraft,
-      objectives: objectivesDraft,
-      assessment: Object.keys(assessment).length ? assessment : undefined,
-      credits: creditsDraft === '' ? undefined : Number(creditsDraft)
-    }
-
-    // remove undefined fields
-    Object.keys(content).forEach(k => content[k] === undefined && delete content[k])
-    return content
-  }
-
-  const downloadJson = () => {
-    const content = compileContent()
-    const blob = new Blob([JSON.stringify(content, null, 2)], { type: 'application/json' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `syllabus-${formData.subjectCode || 'content'}.json`
-    document.body.appendChild(a)
-    a.click()
-    a.remove()
-    URL.revokeObjectURL(url)
-  }
-
-  const handleCreateNewCLO = async () => {
-    if (!newCLOForm.description.trim()) {
-      alert('Vui lòng nhập mô tả CLO')
-      return
-    }
-
-    try {
-      setCloLoading(true)
-      const cloData = {
-        cloCode: newCLOForm.code || `CLO_${Date.now()}`,
-        description: newCLOForm.description,
-        level: newCLOForm.level
-        // Note: Do NOT send syllabusId when creating from modal; only send when saving syllabus
-      }
-      console.log('[SyllabusEditorPage] Creating new CLO:', cloData)
-      const res = await syllabusServiceV2.createCLO(cloData)
-      const createdCLO = res.data?.data || res.data
-      console.log('[SyllabusEditorPage] CLO created:', createdCLO)
-
-      // Reload CLOs
-      await loadExistingCLOs()
-
-      // Add to objectives
-      addObjective(newCLOForm.description)
-
-      // Reset form
-      setNewCLOForm({ code: '', description: '', level: 'COMPREHENSION' })
-      setShowCLOModal(false)
-      alert('Tạo CLO thành công')
-    } catch (err) {
-      console.error('[SyllabusEditorPage] Failed to create CLO:', err)
-      alert('Lỗi: ' + (err.response?.data?.message || err.message))
-    } finally {
-      setCloLoading(false)
-    }
-  }
-
-  const handleSelectExistingCLO = (clo) => {
-    // Add CLO description to objectives
-    const desc = clo.description || clo.cloCode
-    if (!objectivesDraft.includes(desc)) {
-      addObjective(desc)
-    }
-  }
-
-  const TEMPLATE = {
-    modules: [
-      { title: 'Giới thiệu', topics: ['Tổng quan', 'Cài đặt môi trường'] },
-      { title: 'Cấu trúc dữ liệu', topics: ['Mảng', 'Danh sách liên kết'] }
-    ],
-    objectives: ['Hiểu cơ bản về môn học', 'Áp dụng kỹ thuật cơ bản'],
-    assessment: { midterm: 30, final: 50, assignments: 20 },
-    credits: 3
-  }
-
-  const insertTemplate = () => {
-    setFormData({ ...formData, content: TEMPLATE })
-    setModulesDraft(TEMPLATE.modules)
-    setObjectivesDraft(TEMPLATE.objectives)
-    setAssessmentDraft(TEMPLATE.assessment)
-    setCreditsDraft(TEMPLATE.credits)
-  }
-
-  const addModule = (title, topics) => {
-    const newModules = [...modulesDraft, { title, topics }]
-    setModulesDraft(newModules)
-    setFormData({ ...formData, content: { ...(formData.content || {}), modules: newModules } })
-  }
-
-  const removeModuleAt = (index) => {
-    const newModules = modulesDraft.filter((_, i) => i !== index)
-    setModulesDraft(newModules)
-    setFormData({ ...formData, content: { ...(formData.content || {}), modules: newModules } })
-  }
-
-  const addObjective = (text) => {
-    if (!text) return
-    const newObjectives = [...objectivesDraft, text]
-    setObjectivesDraft(newObjectives)
-    setFormData({ ...formData, content: { ...(formData.content || {}), objectives: newObjectives } })
-    setNewObjective('')
-  }
-
-  const removeObjectiveAt = (index) => {
-    const newObjectives = objectivesDraft.filter((_, i) => i !== index)
-    setObjectivesDraft(newObjectives)
-    setFormData({ ...formData, content: { ...(formData.content || {}), objectives: newObjectives } })
-  }
-
-  const updateAssessment = (field, value) => {
-    const next = { ...assessmentDraft, [field]: value }
-    setAssessmentDraft(next)
-    setFormData({ ...formData, content: { ...(formData.content || {}), assessment: next } })
-  }
-
-  const updateCredits = (value) => {
-    setCreditsDraft(value)
-    setFormData({ ...formData, content: { ...(formData.content || {}), credits: value } })
-  }
-
-  // Simple inline ModuleBuilder component
-  const ModuleBuilder = ({ modules, onAdd, onRemove }) => {
-    const [title, setTitle] = useState('')
-    const [topicsText, setTopicsText] = useState('')
-
-    const handleAdd = () => {
-      const topics = topicsText.split(',').map(t => t.trim()).filter(Boolean)
-      if (!title) return
-      onAdd(title, topics)
-      setTitle('')
-      setTopicsText('')
-    }
-
-    return (
-      <div>
-        <div className="space-y-2">
-          <div>
-            <label className="text-sm font-medium">Tiêu đề module</label>
-            <input value={title} onChange={(e) => setTitle(e.target.value)} className="w-full px-2 py-1 border rounded" placeholder="Ví dụ: Giới thiệu" />
-          </div>
-          <div>
-            <label className="text-sm font-medium">Danh sách topics (ngăn cách bởi dấu ,)</label>
-            <input value={topicsText} onChange={(e) => setTopicsText(e.target.value)} className="w-full px-2 py-1 border rounded" placeholder="Tổng quan, Cài đặt môi trường" />
-          </div>
-          <div className="flex gap-2 mt-2">
-            <button onClick={handleAdd} className="px-3 py-1 bg-indigo-600 text-white rounded">Thêm module</button>
-          </div>
-        </div>
-
-        <div className="mt-4">
-          <h5 className="font-semibold">Modules hiện có</h5>
-          <ul className="mt-2 space-y-2">
-            {modules && modules.length === 0 && <li className="text-sm text-gray-500">Chưa có module nào</li>}
-            {modules && modules.map((m, i) => (
-              <li key={i} className="flex items-center justify-between bg-gray-50 p-2 rounded">
-                <div>
-                  <div className="font-medium">{m.title}</div>
-                  <div className="text-sm text-gray-600">{(m.topics || []).join(', ')}</div>
-                </div>
-                <button onClick={() => onRemove(i)} className="text-red-600"><Trash2 size={16} /></button>
-              </li>
-            ))}
-          </ul>
-        </div>
-      </div>
-    )
-  }
-
   const handleSubmit = async () => {
     if (!window.confirm('Bạn chắc chắn muốn gửi giáo trình này để xem xét?')) return
 
+    setSubmitting(true)
     try {
-      // Note: CLOs are already created from modal and are standalone.
-      // On submit, no additional CLO creation needed.
-      console.log('[SyllabusEditorPage] Submitting with', objectivesDraft?.length || 0, 'CLOs')
-
-      await syllabusServiceV2.submit(syllabusId, userId)
-      alert('Gửi thành công')
+      await syllabusApprovalService.submit(syllabusId, userId)
+      alert('Gửi thành công. Giáo trình đang chờ phòng Đào Tạo xem xét.')
       onBack?.()
     } catch (err) {
-      console.error('[SyllabusEditorPage] Submit failed:', err)
+      console.error('Submit failed:', err)
       alert('Gửi thất bại: ' + (err.response?.data?.message || err.message))
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const toggleNewCloPlo = (ploId) => {
+    setNewClo(prev => {
+      const exists = prev.selectedPloIds.includes(ploId)
+      return {
+        ...prev,
+        selectedPloIds: exists
+          ? prev.selectedPloIds.filter(id => id !== ploId)
+          : [...prev.selectedPloIds, ploId]
+      }
+    })
+  }
+
+  const handleCreateClo = async () => {
+    if (!formData.subjectId) {
+      alert('Vui lòng chọn môn học trước khi tạo CLO')
+      return
+    }
+    if (!newClo.cloCode.trim()) {
+      alert('Vui lòng nhập mã CLO')
+      return
+    }
+
+    setCreatingClo(true)
+    try {
+      const cloPayload = {
+        cloCode: newClo.cloCode.trim(),
+        cloName: newClo.cloCode.trim(),
+        description: newClo.description || '',
+        subjectId: Number(formData.subjectId)
+      }
+
+      const cloRes = await academicAPI.createClo(cloPayload)
+      const createdId = cloRes.data?.data?.id || cloRes.data?.id
+
+      if (!createdId) {
+        throw new Error('Không xác định được ID CLO vừa tạo')
+      }
+
+      if (newClo.selectedPloIds.length > 0) {
+        for (const ploId of newClo.selectedPloIds) {
+          await academicAPI.createCloMapping({ cloId: createdId, ploId })
+        }
+      }
+
+      await loadClos(formData.subjectId)
+      setShowAddCloModal(false)
+      setNewClo({ cloCode: '', description: '', selectedPloIds: [] })
+
+      // Tự động chọn CLO mới tạo
+      setFormData(prev => ({
+        ...prev,
+        cloPairIds: [...new Set([...(prev.cloPairIds || []), createdId])]
+      }))
+      alert('Tạo CLO thành công')
+    } catch (err) {
+      console.error('Create CLO failed:', err)
+      alert('Tạo CLO thất bại: ' + (err.response?.data?.message || err.message))
+    } finally {
+      setCreatingClo(false)
     }
   }
 
@@ -390,20 +386,14 @@ const SyllabusEditorPage = ({ syllabusId, rootId, user, onBack }) => {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-4xl mx-auto px-4 py-6">
-        {/* Header */}
         <div className="mb-6 flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <button
-              onClick={onBack}
-              className="p-2 hover:bg-gray-200 rounded-lg"
-            >
+            <button onClick={onBack} className="p-2 hover:bg-gray-200 rounded-lg">
               <ArrowLeft size={20} />
             </button>
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">
-                {mode === 'create' ? 'Tạo giáo trình' : 'Chỉnh sửa giáo trình'}
-              </h1>
-            </div>
+            <h1 className="text-2xl font-bold text-gray-900">
+              {mode === 'create' ? 'Tạo giáo trình mới' : 'Chỉnh sửa giáo trình'}
+            </h1>
           </div>
           <div className="flex gap-2">
             <button
@@ -412,370 +402,340 @@ const SyllabusEditorPage = ({ syllabusId, rootId, user, onBack }) => {
               className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 font-medium flex items-center gap-2"
             >
               <Save size={18} />
-              {saving ? 'Đang lưu...' : 'Lưu'}
-            </button>
-            <button
-              onClick={downloadJson}
-              className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 font-medium flex items-center gap-2"
-            >
-              <PlusCircle size={16} />
-              Tải JSON
+              {saving ? 'Đang lưu...' : 'Lưu bản nháp'}
             </button>
             {mode === 'edit' && (
               <button
                 onClick={handleSubmit}
-                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium flex items-center gap-2"
+                disabled={submitting}
+                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 font-medium flex items-center gap-2"
               >
                 <Send size={18} />
-                Gửi
+                {submitting ? 'Đang gửi...' : 'Gửi duyệt'}
               </button>
             )}
           </div>
         </div>
 
-        {/* Tabs */}
         <div className="bg-white rounded-lg shadow mb-6">
-          <div className="flex border-b border-gray-200">
-            {['basic', 'clos'].map(tab => (
+          <div className="flex border-b border-gray-200 overflow-x-auto">
+            {[
+              { id: 'basic', label: 'Thông tin cơ bản' },
+              { id: 'clos', label: 'Chuẩn đầu ra (CLO)' },
+              { id: 'files', label: 'Tệp bài giảng' }
+            ].map(tab => (
               <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                className={`px-6 py-3 font-medium border-b-2 ${
-                  activeTab === tab
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`px-6 py-3 font-medium border-b-2 whitespace-nowrap ${
+                  activeTab === tab.id
                     ? 'border-blue-600 text-blue-600'
                     : 'border-transparent text-gray-600 hover:text-gray-900'
                 }`}
               >
-                {tab === 'basic' && 'Thông tin cơ bản'}
-                {tab === 'clos' && 'CLOs'}
+                {tab.label}
               </button>
             ))}
           </div>
 
-          {/* Tab Content */}
           <div className="p-6">
             {activeTab === 'basic' && (
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Mã môn học *</label>
-                  <input
-                    type="text"
-                    value={formData.subjectCode}
-                    onChange={(e) => setFormData({ ...formData, subjectCode: e.target.value })}
-                    placeholder="VD: CS101"
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Môn học *</label>
+                  <select
+                    value={formData.subjectId}
+                    onChange={(e) => handleSubjectChange(e.target.value)}
+                    disabled={subjectsLoading}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
+                  >
+                    <option value="">-- Môn học --</option>
+                    {subjects.map(sub => (
+                      <option key={sub.id} value={sub.id}>
+                        {sub.subjectCode} - {sub.subjectName}
+                      </option>
+                    ))}
+                  </select>
+                  {subjectsLoading && <p className="text-xs text-gray-500 mt-1">Đang tải danh sách môn học...</p>}
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Tên môn học *</label>
-                  <input
-                    type="text"
-                    value={formData.subjectName}
-                    onChange={(e) => setFormData({ ...formData, subjectName: e.target.value })}
-                    placeholder="VD: Lập trình C++"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Mô tả</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Mô tả / Ghi chú</label>
                   <textarea
                     value={formData.description}
-                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                    placeholder="Mô tả tổng quát về môn học..."
+                    onChange={(e) => onChangeField('description', e.target.value)}
+                    placeholder="Mô tả ngắn gọn về giáo trình, mục tiêu học tập, yêu cầu tiên quyết..."
                     rows={4}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
+
+                {/* Program/PLO Info */}
+                {formData.subjectId && (programInfo || plos.length > 0) && (
+                  <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                    {programInfo && (
+                      <p className="text-sm font-medium text-gray-700 mb-2">
+                        Chương trình đào tạo: <span className="text-blue-600 font-semibold">{programInfo.programCode} - {programInfo.programName}</span>
+                      </p>
+                    )}
+                    {plosLoading && <p className="text-xs text-gray-500">Đang tải PLO...</p>}
+                    {plos.length > 0 && (
+                      <div>
+                        <p className="text-sm font-medium text-gray-700 mb-2">Chuẩn đầu ra chương trình (PLO):</p>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                          {plos.map(plo => (
+                            <div key={plo.id} className="text-xs bg-white p-2 rounded border border-blue-100">
+                              <p className="font-medium text-gray-700">{plo.ploCode || 'N/A'}</p>
+                              <p className="text-gray-600">{plo.description || 'N/A'}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
 
+            {/* CLO Tab */}
             {activeTab === 'clos' && (
               <div className="space-y-4">
-                <div className="flex gap-2 items-center">
-                  <button
-                    onClick={insertTemplate}
-                    className="px-3 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm"
-                  >
-                    Dùng template mẫu
-                  </button>
-                  <button
-                    onClick={() => {
-                      setFormData({ ...formData, content: {} })
-                      setModulesDraft([])
-                      setObjectivesDraft([])
-                      setAssessmentDraft({ midterm: '', final: '', assignments: '' })
-                      setCreditsDraft('')
-                    }}
-                    className="px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm"
-                  >
-                    Xóa nội dung
-                  </button>
-                </div>
-
-                <div className="grid md:grid-cols-2 gap-6">
-                  <div className="space-y-4">
-                    <div className="p-4 bg-white border rounded-lg space-y-3">
-                      <div className="flex items-center justify-between">
-                        <h4 className="font-semibold">CLOs (Course Learning Outcomes)</h4>
-                        <span className="text-xs text-gray-500">Thêm từng dòng</span>
-                      </div>
-
-                      {/* Action Buttons for CLO Management */}
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => setShowCLOModal(true)}
-                          className="flex-1 px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm flex items-center justify-center gap-2"
-                        >
-                          <PlusCircle size={16} />
-                          Tạo CLO mới
-                        </button>
-                        <button
-                          onClick={() => setShowSelectCLOModal(true)}
-                          className="flex-1 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm flex items-center justify-center gap-2"
-                        >
-                          <Search size={16} />
-                          Chọn CLO có sẵn
-                        </button>
-                      </div>
-
-                      <div className="flex gap-2">
-                        <input
-                          value={newObjective}
-                          onChange={(e) => setNewObjective(e.target.value)}
-                          className="flex-1 px-3 py-2 border rounded"
-                          placeholder="Hoặc nhập trực tiếp CLO"
-                        />
-                        <button onClick={() => addObjective(newObjective)} className="px-3 py-2 bg-blue-600 text-white rounded">Thêm</button>
-                      </div>
-                      <ul className="space-y-2">
-                        {objectivesDraft.length === 0 && (
-                          <li className="text-sm text-gray-500">Chưa có CLO</li>
-                        )}
-                        {objectivesDraft.map((obj, idx) => (
-                          <li key={idx} className="flex items-center justify-between bg-gray-50 px-3 py-2 rounded">
-                            <span className="text-sm">CLO{idx + 1}: {obj}</span>
-                            <button onClick={() => removeObjectiveAt(idx)} className="text-red-600"><Trash2 size={16} /></button>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-
-                    <div className="p-4 bg-white border rounded-lg space-y-3">
-                      <div className="flex items-center justify-between">
-                        <h4 className="font-semibold">Đánh giá</h4>
-                        <span className="text-xs text-gray-500">% điểm</span>
-                      </div>
-                      {['midterm', 'final', 'assignments'].map((field) => (
-                        <div key={field} className="space-y-1">
-                          <label className="text-sm text-gray-700 capitalize">
-                            {field === 'midterm' && 'Giữa kỳ'}
-                            {field === 'final' && 'Cuối kỳ'}
-                            {field === 'assignments' && 'Bài tập'}
-                          </label>
-                          <input
-                            type="number"
-                            min="0"
-                            max="100"
-                            value={assessmentDraft[field]}
-                            onChange={(e) => {
-                              const val = e.target.value
-                              updateAssessment(field, val === '' ? '' : Number(val))
-                            }}
-                            className="w-full px-3 py-2 border rounded"
-                            placeholder="0-100"
-                          />
-                        </div>
-                      ))}
-                    </div>
-
-                    <div className="p-4 bg-white border rounded-lg space-y-2">
-                      <label className="text-sm font-semibold text-gray-700">Số tín chỉ</label>
-                      <input
-                        type="number"
-                        min="0"
-                        value={creditsDraft}
-                        onChange={(e) => {
-                          const val = e.target.value
-                          updateCredits(val === '' ? '' : Number(val))
-                        }}
-                        className="w-full px-3 py-2 border rounded"
-                        placeholder="3"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="p-4 bg-white border rounded-lg space-y-3">
-                    <div className="flex items-center justify-between">
-                      <h4 className="font-semibold">Modules</h4>
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-sm font-medium text-gray-700">
+                    Chuẩn đầu ra học phần (CLO) - {formData.cloPairIds.length} / {clos.length} được chọn
+                  </h3>
+                  <div className="flex gap-2">
+                    {clos.length > 0 && (
                       <button
-                        onClick={() => setBuilderOpen(!builderOpen)}
-                        className="px-3 py-1 text-sm bg-gray-100 rounded hover:bg-gray-200"
+                        onClick={() => setShowCloModal(!showCloModal)}
+                        className="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 flex items-center gap-1"
                       >
-                        {builderOpen ? 'Ẩn builder' : 'Mở builder'}
+                        <ChevronDown size={14} />
+                        {showCloModal ? 'Ẩn danh sách' : 'Chọn CLO'}
                       </button>
-                    </div>
-                    {builderOpen && (
-                      <ModuleBuilder modules={modulesDraft} onAdd={addModule} onRemove={removeModuleAt} />
                     )}
-                    {!builderOpen && (
-                      <div className="text-sm text-gray-500">Nhấn "Mở builder" để thêm module và topics.</div>
-                    )}
+                    <button
+                      onClick={() => setShowAddCloModal(true)}
+                      className="px-3 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700 flex items-center gap-1"
+                    >
+                      <Plus size={14} />
+                      Thêm CLO
+                    </button>
                   </div>
                 </div>
 
-                <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg">
-                  <h4 className="font-semibold mb-2">Xem nhanh JSON</h4>
-                  <div className="bg-white p-3 rounded border border-gray-200 overflow-x-auto text-xs">
-                    {(() => {
-                      const compiled = compileContent()
-                      if (!compiled || Object.keys(compiled).length === 0) return <div className="text-gray-500">Chưa có nội dung. Mở Builder hoặc dùng template để bắt đầu.</div>
-                      return <pre className="whitespace-pre-wrap">{JSON.stringify(compiled, null, 2)}</pre>
-                    })()}
+                {!formData.subjectId && (
+                  <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg text-xs text-yellow-800 flex items-center gap-2">
+                    <AlertCircle size={14} />
+                    Vui lòng chọn môn học trước để xem danh sách CLO
                   </div>
-                </div>
-              </div>
-            )}
+                )}
 
-            {/* Preview removed per request - focus on CLOs and basic info */}
-          </div>
-        </div>
-      </div>
+                {closLoading && <p className="text-xs text-gray-500">Đang tải CLOs...</p>}
 
-      {/* Modal: Create New CLO */}
-      {showCLOModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4 space-y-4">
-            <h2 className="text-xl font-bold">Tạo CLO mới</h2>
-
-            <div>
-              <label className="block text-sm font-medium mb-1">Mã CLO (tuỳ chọn)</label>
-              <input
-                type="text"
-                value={newCLOForm.code}
-                onChange={(e) => setNewCLOForm({ ...newCLOForm, code: e.target.value })}
-                placeholder="VD: CLO1, CLO_001"
-                className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-1">Mô tả CLO *</label>
-              <textarea
-                value={newCLOForm.description}
-                onChange={(e) => setNewCLOForm({ ...newCLOForm, description: e.target.value })}
-                placeholder="Ví dụ: Hiểu các khái niệm cơ bản về Java..."
-                rows={4}
-                className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-1">Mức độ</label>
-              <select
-                value={newCLOForm.level}
-                onChange={(e) => setNewCLOForm({ ...newCLOForm, level: e.target.value })}
-                className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="KNOWLEDGE">Kiến thức (Knowledge)</option>
-                <option value="COMPREHENSION">Hiểu biết (Comprehension)</option>
-                <option value="APPLICATION">Ứng dụng (Application)</option>
-              </select>
-            </div>
-
-            <div className="flex gap-2">
-              <button
-                onClick={handleCreateNewCLO}
-                disabled={cloLoading}
-                className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400"
-              >
-                {cloLoading ? 'Đang tạo...' : 'Tạo CLO'}
-              </button>
-              <button
-                onClick={() => {
-                  setShowCLOModal(false)
-                  setNewCLOForm({ code: '', description: '', level: 'COMPREHENSION' })
-                }}
-                className="flex-1 px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400"
-              >
-                Hủy
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal: Select Existing CLO */}
-      {showSelectCLOModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-2xl w-full mx-4 space-y-4 max-h-96 overflow-y-auto">
-            <h2 className="text-xl font-bold">Chọn CLO có sẵn</h2>
-
-            {cloLoading && <p className="text-gray-500">Đang tải CLOs...</p>}
-
-            {!cloLoading && existingCLOs.length === 0 && (
-              <div className="space-y-3">
-                <p className="text-gray-500">Chưa có CLO nào hoặc không thể tải danh sách CLO.</p>
-                {cloError && (
-                  <div className="p-3 bg-red-50 border border-red-100 rounded text-sm space-y-2">
-                    <div className="text-red-700 font-medium">Lỗi: {cloError.message}</div>
-                    {cloError.errorCode && <div className="text-xs text-red-600">Mã lỗi: {cloError.errorCode}</div>}
-                    {cloError.correlationId && <div className="text-xs text-gray-500">ID tương quan: {cloError.correlationId}</div>}
-                    <div className="flex gap-2">
-                      <button onClick={copyCLOError} className="px-2 py-1 bg-gray-100 rounded text-xs">Sao chép thông tin lỗi</button>
-                      <button onClick={() => loadExistingCLOs()} disabled={cloLoading} className="px-2 py-1 bg-gray-100 rounded text-xs">Thử tải lại</button>
+                {showCloModal && formData.subjectId && clos.length > 0 && (
+                  <div className="border border-gray-300 rounded-lg p-4 bg-gray-50">
+                    <div className="space-y-3 max-h-96 overflow-y-auto">
+                      {clos.map(clo => (
+                        <label key={clo.id} className="flex items-start gap-3 p-3 bg-white rounded cursor-pointer hover:bg-gray-50">
+                          <input
+                            type="checkbox"
+                            checked={formData.cloPairIds.includes(clo.id)}
+                            onChange={() => toggleCloPair(clo.id)}
+                            className="mt-1"
+                          />
+                          <div className="flex-1">
+                            <p className="font-medium text-sm text-gray-700">{clo.cloCode || 'N/A'}</p>
+                            <p className="text-xs text-gray-600">{clo.description || 'Không có mô tả'}</p>
+                          </div>
+                        </label>
+                      ))}
                     </div>
                   </div>
                 )}
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => { setShowCLOModal(true); setShowSelectCLOModal(false) }}
-                    className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
-                  >
-                    Tạo CLO mới
-                  </button>
-                  <button
-                    onClick={() => loadExistingCLOs()}
-                    disabled={cloLoading}
-                    className={`px-3 py-2 rounded-lg ${cloLoading ? 'bg-gray-300 text-gray-600' : 'bg-gray-200 text-gray-800 hover:bg-gray-300'}`}
-                  >
-                    {cloLoading ? 'Đang tải...' : 'Thử lại'}
-                  </button>
+
+                {formData.cloPairIds.length > 0 && (
+                  <div className="mt-4">
+                    <p className="text-sm font-medium text-gray-700 mb-2">CLO được chọn:</p>
+                    <div className="space-y-2">
+                      {clos
+                        .filter(c => formData.cloPairIds.includes(c.id))
+                        .map(clo => (
+                          <div
+                            key={clo.id}
+                            className="flex items-start justify-between p-3 bg-green-50 border border-green-200 rounded"
+                          >
+                            <div className="flex-1">
+                              <p className="font-medium text-sm text-gray-700 flex items-center gap-2">
+                                <Check size={14} className="text-green-600" />
+                                {clo.cloCode}
+                              </p>
+                              <p className="text-xs text-gray-600 mt-1">{clo.description}</p>
+                            </div>
+                            <button
+                              onClick={() => toggleCloPair(clo.id)}
+                              className="text-red-600 hover:text-red-800 ml-2"
+                            >
+                              <X size={16} />
+                            </button>
+                          </div>
+                        ))}
+                    </div>
+                  </div>
+                )}
+
+                {clos.length === 0 && formData.subjectId && !closLoading && (
+                  <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg text-xs text-gray-600">
+                    Không có CLO nào cho môn học này. Vui lòng liên hệ với Phòng Đào Tạo để tạo CLO.
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Add CLO Modal */}
+            {showAddCloModal && (
+              <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
+                <div className="bg-white rounded-lg shadow-lg w-full max-w-lg p-6 space-y-4">
+                  <div className="flex justify-between items-center">
+                    <h3 className="text-base font-semibold text-gray-800">Tạo CLO mới</h3>
+                    <button onClick={() => setShowAddCloModal(false)} className="text-gray-500 hover:text-gray-700">
+                      <X size={18} />
+                    </button>
+                  </div>
+
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Mã CLO *</label>
+                      <input
+                        type="text"
+                        value={newClo.cloCode}
+                        onChange={(e) => setNewClo(prev => ({ ...prev, cloCode: e.target.value }))}
+                        placeholder="VD: CLO1"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Mô tả</label>
+                      <textarea
+                        value={newClo.description}
+                        onChange={(e) => setNewClo(prev => ({ ...prev, description: e.target.value }))}
+                        placeholder="Mô tả ngắn cho CLO"
+                        rows={3}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Chọn PLO liên kết (tùy chọn)</label>
+                      {plosLoading && <p className="text-xs text-gray-500">Đang tải PLO...</p>}
+                      {!plosLoading && plos.length === 0 && (
+                        <p className="text-xs text-gray-600">Chưa có PLO cho chương trình này.</p>
+                      )}
+                      {!plosLoading && plos.length > 0 && (
+                        <div className="space-y-2 max-h-48 overflow-y-auto border border-gray-200 rounded p-3 bg-gray-50">
+                          {plos.map(plo => (
+                            <label key={plo.id} className="flex items-start gap-2 text-sm cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={newClo.selectedPloIds.includes(plo.id)}
+                                onChange={() => toggleNewCloPlo(plo.id)}
+                                className="mt-1"
+                              />
+                              <div>
+                                <p className="font-medium text-gray-800">{plo.ploCode || 'PLO'}</p>
+                                <p className="text-xs text-gray-600">{plo.description || 'Không có mô tả'}</p>
+                              </div>
+                            </label>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end gap-2 pt-2">
+                    <button
+                      onClick={() => setShowAddCloModal(false)}
+                      className="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
+                      disabled={creatingClo}
+                    >
+                      Hủy
+                    </button>
+                    <button
+                      onClick={handleCreateClo}
+                      disabled={creatingClo}
+                      className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-60"
+                    >
+                      {creatingClo ? 'Đang tạo...' : 'Tạo CLO'}
+                    </button>
+                  </div>
                 </div>
               </div>
             )}
 
-            {!cloLoading && existingCLOs.length > 0 && (
-              <div className="space-y-2">
-                {existingCLOs.map((clo, idx) => (
-                  <div
-                    key={idx}
-                    className="p-3 border rounded-lg hover:bg-blue-50 cursor-pointer"
-                    onClick={() => {
-                      handleSelectExistingCLO(clo)
-                      setShowSelectCLOModal(false)
-                    }}
-                  >
-                    <div className="font-medium text-sm">{clo.cloCode || `CLO ${idx + 1}`}</div>
-                    <div className="text-sm text-gray-600">{clo.description}</div>
-                    {clo.level && <div className="text-xs text-gray-500">Mức: {clo.level}</div>}
+            {activeTab === 'files' && (
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Tải lên tệp bài giảng</label>
+                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:bg-gray-50">
+                    <input
+                      type="file"
+                      multiple
+                      onChange={handleFileUpload}
+                      disabled={uploading}
+                      className="hidden"
+                      id="file-upload"
+                      accept=".pdf,.doc,.docx,.ppt,.pptx,.xlsx,.jpg,.png,.zip"
+                    />
+                    <label htmlFor="file-upload" className="cursor-pointer block">
+                      <Upload size={32} className="mx-auto mb-2 text-gray-400" />
+                      <p className="text-sm font-medium text-gray-700">
+                        Kéo thả tệp hoặc <span className="text-blue-600">chọn tệp</span>
+                      </p>
+                      <p className="text-xs text-gray-500 mt-1">PDF, Word, PowerPoint, Excel, Hình ảnh, ZIP (Max 50MB)</p>
+                    </label>
                   </div>
-                ))}
+                </div>
+
+                {uploading && <p className="text-center text-gray-600">Đang tải lên...</p>}
+
+                {selectedFiles.length > 0 && (
+                  <div className="mt-4">
+                    <h4 className="font-semibold text-gray-700 mb-2">Tệp đã chọn</h4>
+                    <ul className="space-y-2">
+                      {selectedFiles.map((file, idx) => (
+                        <li key={idx} className="flex items-center justify-between bg-gray-50 p-3 rounded">
+                          <div className="flex items-center gap-2">
+                            <File size={16} className="text-gray-500" />
+                            <span className="text-sm text-gray-700">{file.name}</span>
+                          </div>
+                          <button onClick={() => removeFile(idx)} className="text-red-600 hover:text-red-800">
+                            <Trash2 size={16} />
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </div>
             )}
+          </div>
+        </div>
 
-            <div className="flex gap-2">
-              <button
-                onClick={() => setShowSelectCLOModal(false)}
-                className="w-full px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400"
-              >
-                Đóng
-              </button>
+        {/* Summary Card */}
+        <div className="bg-white rounded-lg shadow p-6">
+          <h3 className="text-sm font-medium text-gray-700 mb-3">Tóm tắt</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+            <div>
+              <p className="text-gray-600">Môn học:</p>
+              <p className="font-medium text-gray-900">{subjects.find(s => String(s.id) === String(formData.subjectId))?.subjectName || 'Chưa chọn'}</p>
+            </div>
+            <div>
+              <p className="text-gray-600">CLO được chọn:</p>
+              <p className="font-medium text-gray-900">{formData.cloPairIds.length}</p>
             </div>
           </div>
         </div>
-      )}
+      </div>
     </div>
   )
 }

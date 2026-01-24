@@ -22,6 +22,12 @@ spring:
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+  rabbitmq:
+    # Default dev values; docker-compose overrides via environment variables
+    host: smd-rabbitmq
+    port: 5672
+    username: guest
+    password: guest
   # Config Server Configuration (commented out - incompatible with Boot 3.4.0)
   # config:
   #   import: optional:configserver:http://config-server:8888

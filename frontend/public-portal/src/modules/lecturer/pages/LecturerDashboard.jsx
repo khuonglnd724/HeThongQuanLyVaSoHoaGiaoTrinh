@@ -4,6 +4,13 @@ import { Link } from 'react-router-dom'
 import apiClient from '../../../services/api/apiClient'
 import syllabusServiceV2 from '../services/syllabusServiceV2'
 import SyllabusEditorPage from './SyllabusEditorPage'
+import workflowApi from '../../workflow/api/workflowApi'
+
+// Minimal role constants here to avoid circular import with roleConfig (roleConfig imports LecturerDashboard)
+const ROLES = {
+  HOD: 'ROLE_HOD',
+  LECTURER: 'ROLE_LECTURER',
+}
 
 // Debounce utility
 const debounce = (func, delay) => {
@@ -38,7 +45,7 @@ const LecturerDashboard = ({ user, onLogout }) => {
   const [loading, setLoading] = useState(false)
   const [filterStatus, setFilterStatus] = useState('ALL')
   const [searchQuery, setSearchQuery] = useState('')
-  const [activeTab, setActiveTab] = useState('syllabi') // syllabi only
+  const [activeTab, setActiveTab] = useState('syllabi')
 
   // Documents upload state
   const [documentFile, setDocumentFile] = useState(null)
@@ -60,6 +67,14 @@ const LecturerDashboard = ({ user, onLogout }) => {
   const [showDocumentsModal, setShowDocumentsModal] = useState(false)
   const [selectedSyllabus, setSelectedSyllabus] = useState(null)
   const [showEditor, setShowEditor] = useState(false)
+  const [reviewItems, setReviewItems] = useState([])
+  const [reviewLoading, setReviewLoading] = useState(false)
+  const [reviewError, setReviewError] = useState('')
+  const reviewLastFetchRef = useRef(0)
+  const reviewInFlightRef = useRef(false)
+  const [showSyllabusDetailModal, setShowSyllabusDetailModal] = useState(false)
+  const [syllabusDetailData, setSyllabusDetailData] = useState(null)
+  const [syllabusDetailLoading, setSyllabusDetailLoading] = useState(false)
   
   // Create/Edit form (simplified - only basic fields, content will be added later)
   const [formData, setFormData] = useState({
@@ -72,6 +87,7 @@ const LecturerDashboard = ({ user, onLogout }) => {
   const debouncedLoad = useRef(null)
   const loadingRef = useRef(false)
   const lastFetchRef = useRef(0)
+  const isHod = currentUser?.role === ROLES.HOD
 
   const loadLecturerSyllabi = useCallback(async () => {
     const now = Date.now()
@@ -141,6 +157,53 @@ const LecturerDashboard = ({ user, onLogout }) => {
     }
   }, [currentUser])
 
+  const loadReviewQueue = useCallback(async (force = false) => {
+    if (!isHod) return
+    const now = Date.now()
+    // Throttle to avoid hammering the API unless explicitly forced
+    if (!force) {
+      if (reviewInFlightRef.current) return
+      if (now - reviewLastFetchRef.current < 8000) return
+    }
+    reviewInFlightRef.current = true
+    reviewLastFetchRef.current = now
+    try {
+      setReviewLoading(true)
+      setReviewError('')
+      const res = await workflowApi.getPending()
+      const workflows = res.data || []
+      
+      // Fetch syllabus details for each workflow
+      const enrichedItems = await Promise.all(
+        workflows.map(async (workflow) => {
+          try {
+            if (workflow.entityId) {
+              const syllabusRes = await apiClient.get(`/api/syllabuses/${workflow.entityId}`)
+              return {
+                ...workflow,
+                syllabusData: syllabusRes.data
+              }
+            }
+            return workflow
+          } catch (err) {
+            console.warn('Failed to fetch syllabus for workflow:', workflow.id, err)
+            return workflow
+          }
+        })
+      )
+      
+      setReviewItems(enrichedItems)
+    } catch (err) {
+      console.error('Failed to load HOD review queue:', err)
+      const msg = err?.response?.data?.message || err.message || 'Không tải được danh sách cần duyệt'
+      setReviewError(msg)
+      setReviewItems([])
+    } finally {
+      setReviewLoading(false)
+      reviewInFlightRef.current = false
+    }
+  }, [isHod])
+
   useEffect(() => {
     if (!debouncedLoad.current) {
       debouncedLoad.current = debounce(loadLecturerSyllabi, 1000)
@@ -149,7 +212,16 @@ const LecturerDashboard = ({ user, onLogout }) => {
     if (currentUser) {
       debouncedLoad.current()
     }
-  }, [currentUser, loadLecturerSyllabi])
+    if (isHod) {
+      loadReviewQueue()
+    }
+  }, [currentUser, loadLecturerSyllabi, isHod, loadReviewQueue])
+
+  useEffect(() => {
+    if (isHod && activeTab === 'review') {
+      loadReviewQueue()
+    }
+  }, [activeTab, isHod, loadReviewQueue])
 
   const handleCreateSyllabus = async () => {
     try {
@@ -176,6 +248,133 @@ const LecturerDashboard = ({ user, onLogout }) => {
     } catch (err) {
       console.error('Create error:', err)
       showToast(err?.response?.data?.message || 'Tạo giáo trình thất bại', 'error')
+    }
+  }
+
+  const resolveActionBy = () => {
+    // Try to get userId from localStorage user first
+    let userId = currentUser?.userId || currentUser?.id || currentUser?.lecturerId
+    
+    // If not found, decode from JWT token
+    if (!userId) {
+      try {
+        const token = localStorage.getItem('token')
+        if (token) {
+          const parts = token.split('.')
+          if (parts.length === 3) {
+            const decoded = JSON.parse(atob(parts[1]))
+            userId = decoded.userId || decoded.sub
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to decode JWT token for userId:', e)
+      }
+    }
+    
+    // Fallback to username or email
+    return userId || currentUser?.username || currentUser?.email || 'unknown'
+  }
+
+  const handleApproveWorkflow = async (workflowId) => {
+    try {
+      setReviewLoading(true)
+      const actionBy = resolveActionBy()
+      console.log('=== APPROVE WORKFLOW ===')
+      console.log('Workflow ID:', workflowId)
+      console.log('ActionBy:', actionBy)
+      console.log('CurrentUser:', currentUser)
+      console.log('Role:', ROLES.HOD)
+      console.log('=== END ===')
+      await workflowApi.approve(workflowId, { actionBy, role: ROLES.HOD })
+      await loadReviewQueue(true)
+      showToast('Đã duyệt giáo trình', 'success')
+    } catch (err) {
+      console.error('Approve failed:', err)
+      showToast(err?.response?.data?.message || 'Duyệt thất bại', 'error')
+      setReviewLoading(false)
+    }
+  }
+
+  const handleRejectWorkflow = async (workflowId) => {
+    const comment = window.prompt('Nhập lý do từ chối')
+    if (!comment) return
+    try {
+      setReviewLoading(true)
+      await workflowApi.reject(workflowId, { actionBy: resolveActionBy(), role: ROLES.HOD }, { comment })
+      await loadReviewQueue(true)
+      showToast('Đã từ chối giáo trình', 'success')
+    } catch (err) {
+      console.error('Reject failed:', err)
+      showToast(err?.response?.data?.message || 'Từ chối thất bại', 'error')
+      setReviewLoading(false)
+    }
+  }
+
+  const handleRequireEditWorkflow = async (workflowId) => {
+    const comment = window.prompt('Nhập yêu cầu chỉnh sửa')
+    if (!comment) return
+    try {
+      setReviewLoading(true)
+      await workflowApi.requireEdit(workflowId, { actionBy: resolveActionBy(), role: ROLES.HOD }, { comment })
+      await loadReviewQueue(true)
+      showToast('Đã yêu cầu chỉnh sửa', 'success')
+    } catch (err) {
+      console.error('Require edit failed:', err)
+      showToast(err?.response?.data?.message || 'Yêu cầu chỉnh sửa thất bại', 'error')
+      setReviewLoading(false)
+    }
+  }
+
+  const handleViewSyllabusDetail = async (workflowItem) => {
+    try {
+      setSyllabusDetailLoading(true)
+      setShowSyllabusDetailModal(true)
+      setSyllabusDetailData(null)
+
+      // Extract syllabusId from workflow entityId
+      const syllabusId = workflowItem.entityId
+      if (!syllabusId) {
+        showToast('Không tìm thấy ID giáo trình', 'error')
+        return
+      }
+
+      // Fetch syllabus details from syllabus-service
+      const res = await apiClient.get(`/api/syllabuses/${syllabusId}`)
+      const syllabusData = res.data
+      
+      // Fetch subject and program info from academic-service
+      let subjectInfo = null
+      let programInfo = null
+      if (syllabusData.subjectCode) {
+        try {
+          const subjectRes = await apiClient.get(`/api/academic/subjects/code/${syllabusData.subjectCode}`)
+          subjectInfo = subjectRes.data
+          
+          // Fetch program if we have programId
+          if (subjectInfo?.programId) {
+            try {
+              const programRes = await apiClient.get(`/api/academic/programs/${subjectInfo.programId}`)
+              programInfo = programRes.data
+            } catch (progErr) {
+              console.warn('Failed to fetch program info:', progErr)
+            }
+          }
+        } catch (subjErr) {
+          console.warn('Failed to fetch subject info:', subjErr)
+        }
+      }
+      
+      setSyllabusDetailData({
+        ...syllabusData,
+        subjectInfo,
+        programInfo
+      })
+    } catch (err) {
+      console.error('Failed to load syllabus detail:', err)
+      showToast('Không thể tải chi tiết giáo trình', 'error')
+      setShowSyllabusDetailModal(false)
+    } finally {
+      setSyllabusDetailLoading(false)
     }
   }
 
@@ -221,7 +420,10 @@ const LecturerDashboard = ({ user, onLogout }) => {
   const handleSubmitForReview = async (syllabusId) => {
     if (!window.confirm('Gửi giáo trình này để phê duyệt?')) return
     try {
-      await apiClient.post(`/api/syllabuses/${syllabusId}/submit`)
+      const userId = currentUser?.userId || currentUser?.username || currentUser?.email || 'unknown'
+      await apiClient.post(`/api/syllabuses/${syllabusId}/submit`, null, {
+        headers: { 'X-User-Id': userId }
+      })
       loadLecturerSyllabi()
       showToast('Đã gửi giáo trình để phê duyệt', 'success')
     } catch (err) {
@@ -454,6 +656,14 @@ const LecturerDashboard = ({ user, onLogout }) => {
             >
               Giáo trình của tôi
             </button>
+            {isHod && (
+              <button
+                onClick={() => setActiveTab('review')}
+                className={`px-6 py-4 font-semibold ${activeTab === 'review' ? 'border-b-2 border-indigo-600 text-indigo-600' : 'text-gray-600'}`}
+              >
+                Duyệt giáo trình
+              </button>
+            )}
           </div>
 
           {activeTab === 'syllabi' && (
@@ -586,6 +796,107 @@ const LecturerDashboard = ({ user, onLogout }) => {
                   )}
                 </div>
               </div>
+            </div>
+          )}
+
+          {activeTab === 'review' && isHod && (
+            <div className="p-8">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h3 className="text-lg font-semibold">Danh sách cần duyệt (HoD)</h3>
+                  <p className="text-sm text-gray-600">Nhấn duyệt / từ chối / yêu cầu chỉnh sửa.</p>
+                </div>
+                <button
+                  onClick={() => loadReviewQueue(true)}
+                  className="px-4 py-2 text-sm rounded bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-60"
+                  disabled={reviewLoading}
+                >
+                  Làm mới
+                </button>
+              </div>
+
+              {reviewError && (
+                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-2 rounded mb-4">
+                  {reviewError}
+                </div>
+              )}
+
+              {reviewLoading ? (
+                <div className="text-gray-600">Đang tải danh sách cần duyệt...</div>
+              ) : reviewItems.length === 0 ? (
+                <div className="text-gray-500">Không có giáo trình nào đang chờ HoD duyệt.</div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full table-fixed">
+                    <thead className="bg-gray-50 border-b border-gray-200">
+                      <tr>
+                        <th className="w-1/4 px-6 py-3 text-left text-sm font-semibold text-gray-900">Môn học</th>
+                        <th className="w-1/4 px-6 py-3 text-left text-sm font-semibold text-gray-900">Người tạo</th>
+                        <th className="w-1/6 px-6 py-3 text-center text-sm font-semibold text-gray-900">Chi tiết</th>
+                        <th className="w-1/3 px-6 py-3 text-left text-sm font-semibold text-gray-900">Hành động</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200">
+                      {reviewItems.map((item) => (
+                        <tr key={item.id} className="hover:bg-gray-50">
+                          <td className="px-6 py-4 text-sm text-gray-700">
+                            {item.syllabusData ? (
+                              <div>
+                                <div className="font-medium text-gray-900">{item.syllabusData.subjectCode}</div>
+                                <div className="text-xs text-gray-500">{item.syllabusData.subjectName}</div>
+                              </div>
+                            ) : (
+                              <span className="text-gray-400">N/A</span>
+                            )}
+                          </td>
+                          <td className="px-6 py-4 text-sm text-gray-700">
+                            {item.syllabusData ? (
+                              <div>
+                                <div className="font-medium text-gray-900">{item.syllabusData.createdBy}</div>
+                              </div>
+                            ) : (
+                              <span className="text-gray-400">-</span>
+                            )}
+                          </td>
+                          <td className="px-6 py-4 text-center">
+                            <button
+                              onClick={() => handleViewSyllabusDetail(item)}
+                              className="px-3 py-1 rounded bg-blue-600 text-white text-sm hover:bg-blue-700"
+                            >
+                              Xem
+                            </button>
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="flex gap-2 flex-wrap">
+                              <button
+                                onClick={() => handleApproveWorkflow(item.id)}
+                                className="px-3 py-1 rounded bg-green-600 text-white text-sm hover:bg-green-700 disabled:opacity-60"
+                                disabled={reviewLoading}
+                              >
+                                Duyệt
+                              </button>
+                              <button
+                                onClick={() => handleRejectWorkflow(item.id)}
+                                className="px-3 py-1 rounded bg-red-600 text-white text-sm hover:bg-red-700 disabled:opacity-60"
+                                disabled={reviewLoading}
+                              >
+                                Từ chối
+                              </button>
+                              <button
+                                onClick={() => handleRequireEditWorkflow(item.id)}
+                                className="px-3 py-1 rounded bg-yellow-500 text-white text-sm hover:bg-yellow-600 disabled:opacity-60"
+                                disabled={reviewLoading}
+                              >
+                                Yêu cầu sửa
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -849,6 +1160,224 @@ const LecturerDashboard = ({ user, onLogout }) => {
             <div className="sticky bottom-0 bg-gray-50 px-8 py-4 flex justify-end gap-4 border-t">
               <button onClick={() => {setShowDocumentsModal(false); setSelectedSyllabus(null); resetDocumentsForm()}} className="px-6 py-2 border rounded-lg hover:bg-gray-100">Hủy</button>
               <button onClick={handleAddDocument} className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">Thêm tài liệu</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Syllabus Detail Modal */}
+      {showSyllabusDetailModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-white border-b px-8 py-6 flex justify-between items-center">
+              <h2 className="text-2xl font-bold text-gray-900">Chi tiết giáo trình</h2>
+              <button 
+                onClick={() => {
+                  setShowSyllabusDetailModal(false)
+                  setSyllabusDetailData(null)
+                }} 
+                className="text-gray-500 hover:text-gray-700 text-2xl"
+              >
+                ✕
+              </button>
+            </div>
+            
+            <div className="p-8 space-y-6">
+              {syllabusDetailLoading ? (
+                <div className="text-center py-8 text-gray-600">
+                  Đang tải thông tin giáo trình...
+                </div>
+              ) : syllabusDetailData ? (
+                <div className="space-y-6">
+                  {/* Basic Info */}
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Thông tin cơ bản</h3>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <span className="text-sm text-gray-600">Mã môn học:</span>
+                        <div className="font-semibold text-gray-900">{syllabusDetailData.subjectCode}</div>
+                      </div>
+                      <div>
+                        <span className="text-sm text-gray-600">Tên môn học:</span>
+                        <div className="font-semibold text-gray-900">{syllabusDetailData.subjectName}</div>
+                      </div>
+                      {syllabusDetailData.programInfo && (
+                        <div className="col-span-2">
+                          <span className="text-sm text-gray-600">Chương trình đào tạo:</span>
+                          <div className="font-semibold text-gray-900">
+                            {syllabusDetailData.programInfo.programCode} - {syllabusDetailData.programInfo.programName}
+                          </div>
+                        </div>
+                      )}
+                      {syllabusDetailData.subjectInfo && (
+                        <>
+                          <div>
+                            <span className="text-sm text-gray-600">Số tín chỉ:</span>
+                            <div className="font-semibold text-gray-900">{syllabusDetailData.subjectInfo.credits || '-'}</div>
+                          </div>
+                          <div>
+                            <span className="text-sm text-gray-600">Học kỳ:</span>
+                            <div className="font-semibold text-gray-900">{syllabusDetailData.subjectInfo.semester || '-'}</div>
+                          </div>
+                        </>
+                      )}
+                      <div>
+                        <span className="text-sm text-gray-600">Trạng thái:</span>
+                        <div className="font-semibold">
+                          <span className={`px-2 py-1 rounded text-xs ${
+                            syllabusDetailData.status === 'APPROVED' ? 'bg-green-100 text-green-800' :
+                            syllabusDetailData.status === 'PENDING_REVIEW' ? 'bg-yellow-100 text-yellow-800' :
+                            syllabusDetailData.status === 'PENDING_APPROVAL' ? 'bg-blue-100 text-blue-800' :
+                            syllabusDetailData.status === 'DRAFT' ? 'bg-gray-100 text-gray-800' :
+                            syllabusDetailData.status === 'REJECTED' ? 'bg-red-100 text-red-800' :
+                            'bg-purple-100 text-purple-800'
+                          }`}>
+                            {syllabusDetailData.status}
+                          </span>
+                        </div>
+                      </div>
+                      <div>
+                        <span className="text-sm text-gray-600">Phiên bản:</span>
+                        <div className="font-semibold text-gray-900">v{syllabusDetailData.versionNo || 1}</div>
+                      </div>
+                      <div>
+                        <span className="text-sm text-gray-600">Người tạo:</span>
+                        <div className="font-semibold text-gray-900">{syllabusDetailData.createdBy}</div>
+                      </div>
+                      <div>
+                        <span className="text-sm text-gray-600">Ngày tạo:</span>
+                        <div className="font-semibold text-gray-900">
+                          {syllabusDetailData.createdAt ? new Date(syllabusDetailData.createdAt).toLocaleString('vi-VN') : '-'}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Workflow Timeline */}
+                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-6">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Lịch sử workflow</h3>
+                    <div className="space-y-3">
+                      {syllabusDetailData.submittedAt && (
+                        <div className="flex items-center gap-3">
+                          <div className="w-3 h-3 rounded-full bg-blue-500"></div>
+                          <div>
+                            <span className="text-sm font-medium text-gray-900">Đã nộp:</span>
+                            <span className="text-sm text-gray-600 ml-2">
+                              {new Date(syllabusDetailData.submittedAt).toLocaleString('vi-VN')}
+                            </span>
+                          </div>
+                        </div>
+                      )}
+                      {syllabusDetailData.reviewedAt && (
+                        <div className="flex items-center gap-3">
+                          <div className="w-3 h-3 rounded-full bg-indigo-500"></div>
+                          <div>
+                            <span className="text-sm font-medium text-gray-900">Đã duyệt bởi HoD:</span>
+                            <span className="text-sm text-gray-600 ml-2">
+                              {new Date(syllabusDetailData.reviewedAt).toLocaleString('vi-VN')}
+                            </span>
+                          </div>
+                        </div>
+                      )}
+                      {syllabusDetailData.approvedAt && (
+                        <div className="flex items-center gap-3">
+                          <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                          <div>
+                            <span className="text-sm font-medium text-gray-900">Đã phê duyệt:</span>
+                            <span className="text-sm text-gray-600 ml-2">
+                              {new Date(syllabusDetailData.approvedAt).toLocaleString('vi-VN')}
+                            </span>
+                          </div>
+                        </div>
+                      )}
+                      {syllabusDetailData.rejectedAt && (
+                        <div className="flex items-center gap-3">
+                          <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                          <div>
+                            <span className="text-sm font-medium text-gray-900">Bị từ chối:</span>
+                            <span className="text-sm text-gray-600 ml-2">
+                              {new Date(syllabusDetailData.rejectedAt).toLocaleString('vi-VN')}
+                            </span>
+                            {syllabusDetailData.rejectionReason && (
+                              <div className="text-sm text-red-600 mt-1">Lý do: {syllabusDetailData.rejectionReason}</div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                      {syllabusDetailData.publishedAt && (
+                        <div className="flex items-center gap-3">
+                          <div className="w-3 h-3 rounded-full bg-purple-500"></div>
+                          <div>
+                            <span className="text-sm font-medium text-gray-900">Đã công bố:</span>
+                            <span className="text-sm text-gray-600 ml-2">
+                              {new Date(syllabusDetailData.publishedAt).toLocaleString('vi-VN')}
+                            </span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Summary */}
+                  {syllabusDetailData.summary && (
+                    <div className="bg-gray-50 border border-gray-200 rounded-lg p-6">
+                      <h3 className="text-lg font-semibold text-gray-900 mb-3">Tóm tắt</h3>
+                      <p className="text-gray-700">{syllabusDetailData.summary}</p>
+                    </div>
+                  )}
+
+                  {/* Content Preview */}
+                  {syllabusDetailData.content && syllabusDetailData.content !== '{}' && (
+                    <div className="bg-gray-50 border border-gray-200 rounded-lg p-6">
+                      <h3 className="text-lg font-semibold text-gray-900 mb-3">Nội dung giáo trình</h3>
+                      <div className="text-sm text-gray-700 max-h-60 overflow-y-auto">
+                        <pre className="whitespace-pre-wrap">{syllabusDetailData.content}</pre>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Additional Info */}
+                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-6">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Thông tin khác</h3>
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <span className="text-gray-600">Workflow ID:</span>
+                        <div className="font-mono text-xs text-gray-900 mt-1">{syllabusDetailData.workflowId || '-'}</div>
+                      </div>
+                      <div>
+                        <span className="text-gray-600">Người cập nhật gần nhất:</span>
+                        <div className="text-gray-900 mt-1">{syllabusDetailData.lastActionBy || syllabusDetailData.updatedBy || '-'}</div>
+                      </div>
+                      <div>
+                        <span className="text-gray-600">Root ID:</span>
+                        <div className="font-mono text-xs text-gray-900 mt-1">{syllabusDetailData.rootId || '-'}</div>
+                      </div>
+                      <div>
+                        <span className="text-gray-600">Cập nhật lần cuối:</span>
+                        <div className="text-gray-900 mt-1">
+                          {syllabusDetailData.updatedAt ? new Date(syllabusDetailData.updatedAt).toLocaleString('vi-VN') : '-'}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-8 text-red-600">
+                  Không tải được thông tin giáo trình
+                </div>
+              )}
+            </div>
+
+            <div className="sticky bottom-0 bg-gray-50 px-8 py-4 flex justify-end border-t">
+              <button 
+                onClick={() => {
+                  setShowSyllabusDetailModal(false)
+                  setSyllabusDetailData(null)
+                }} 
+                className="px-6 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
+              >
+                Đóng
+              </button>
             </div>
           </div>
         </div>

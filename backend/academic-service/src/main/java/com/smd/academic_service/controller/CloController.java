@@ -12,8 +12,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-// Note: servlet context-path is already /api/v1 (see application.yml). Keep controller path relative.
-@RequestMapping("/clo")
+@RequestMapping("/api/v1/clo")
 @RequiredArgsConstructor
 @Slf4j
 public class CloController {
@@ -76,6 +75,17 @@ public class CloController {
         List<CloDto> clos = cloService.getAllClos();
         return ResponseEntity.ok(ApiResponse.success(clos, "All CLOs fetched successfully"));
     }
+
+    /**
+     * Get CLOs not yet assigned to any subject
+     * GET /api/v1/clo/unassigned
+     */
+    @GetMapping("/unassigned")
+    public ResponseEntity<ApiResponse<List<CloDto>>> getUnassignedClos() {
+        log.info("Fetching unassigned CLOs");
+        List<CloDto> clos = cloService.getUnassignedClos();
+        return ResponseEntity.ok(ApiResponse.success(clos, "Unassigned CLOs fetched successfully"));
+    }
     
     /**
      * Search CLOs by code
@@ -110,5 +120,17 @@ public class CloController {
         String deletedBy = "SYSTEM";
         cloService.deleteClo(id, deletedBy);
         return ResponseEntity.ok(ApiResponse.success(null, "CLO deleted successfully"));
+    }
+
+    /**
+     * Assign or detach a CLO to/from a subject
+     * POST /api/v1/clo/{id}/assign-subject?subjectId=123 (subjectId null to detach)
+     */
+    @PostMapping("/{id}/assign-subject")
+    public ResponseEntity<ApiResponse<CloDto>> assignCloToSubject(@PathVariable Long id, @RequestParam(required = false) Long subjectId) {
+        log.info("Assigning CLO {} to subject {}", id, subjectId);
+        String updatedBy = "SYSTEM";
+        CloDto updated = cloService.assignCloToSubject(id, subjectId, updatedBy);
+        return ResponseEntity.ok(ApiResponse.success(updated, "CLO assignment updated successfully"));
     }
 }
