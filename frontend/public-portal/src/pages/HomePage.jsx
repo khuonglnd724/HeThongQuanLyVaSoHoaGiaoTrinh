@@ -6,7 +6,7 @@ export const HomePage = () => {
   const navigate = useNavigate()
 
   const handleSearchClick = () => {
-    navigate('/search')
+    navigate('/public/search')
   }
 
   return (

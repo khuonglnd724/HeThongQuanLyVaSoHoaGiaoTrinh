@@ -450,7 +450,7 @@ services:
     image: grafana/promtail:latest
     container_name: smd-promtail
     ports:
-      - "19080:9080"
+      - "9080:9080"
     volumes:
       - ./observability/promtail-config.yml:/etc/promtail/config.yml:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
