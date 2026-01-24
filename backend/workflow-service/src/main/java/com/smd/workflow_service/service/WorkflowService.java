@@ -142,6 +142,8 @@ public class WorkflowService {
             try {
                 WorkflowApprovalEvent approvalEvent = new WorkflowApprovalEvent();
                 approvalEvent.setWorkflowId(workflowId);
+                approvalEvent.setEntityId(workflow.getEntityId());
+                approvalEvent.setEntityType(workflow.getEntityType());
                 approvalEvent.setFromState(fromState);
                 approvalEvent.setToState(toState);
                 approvalEvent.setActionBy(actionBy);
@@ -162,18 +164,38 @@ public class WorkflowService {
     private void validateRole(WorkflowState state,
                               WorkflowEvent event,
                               UserRole role) {
+        
+        Logger log = LoggerFactory.getLogger(WorkflowService.class);
+        log.info("=== VALIDATE ROLE === Event: {}, State: {}, Role: {}", event, state, role);
 
         switch (event) {
             case SUBMIT -> {
-                if (role != UserRole.ROLE_LECTURER || state != WorkflowState.DRAFT) {
-                    throw new RuntimeException("Only Lecturer can submit from DRAFT");
+                if ((role != UserRole.ROLE_LECTURER && role != UserRole.ROLE_HOD)
+                        || state != WorkflowState.DRAFT) {
+                    throw new RuntimeException("Only Lecturer or HoD can submit from DRAFT");
                 }
             }
             case APPROVE, REJECT -> {
+                log.info("APPROVE/REJECT check - Role is HOD: {}, RECTOR: {}, State is REVIEW: {}", 
+                    role == UserRole.ROLE_HOD, 
+                    role == UserRole.ROLE_RECTOR, 
+                    state == WorkflowState.REVIEW);
+                
+                if (state == WorkflowState.APPROVED) {
+                    throw new IllegalStateException(
+                        "Workflow đã được duyệt rồi. Không thể duyệt lại!"
+                    );
+                }
+                if (state == WorkflowState.REJECTED) {
+                    throw new IllegalStateException(
+                        "Workflow đã bị từ chối. Không thể duyệt!"
+                    );
+                }
                 if ((role != UserRole.ROLE_HOD && role != UserRole.ROLE_RECTOR)
                     || state != WorkflowState.REVIEW) {
-                    throw new RuntimeException(
-                            "Only HoD or Principal can approve/reject from REVIEW"
+                    throw new IllegalStateException(
+                            "Chỉ Trưởng khoa hoặc Hiệu trưởng mới có thể duyệt/từ chối khi workflow ở trạng thái REVIEW. " +
+                            "Hiện tại: role=" + role + ", state=" + state
                     );
                 }
             }

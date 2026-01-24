@@ -122,9 +122,9 @@ const Login = () => {
       console.log('[Login] Login successful, navigating...')
       // Navigate based on primary role (small delay to ensure state updates)
       const roleToPath = {
-        'ROLE_RECTOR': '/academic/dashboard',          // Rector → Academic Dashboard (publish)
+        'ROLE_RECTOR': '/academic/dashboard',           // Rector → Academic Dashboard (publish)
         'ROLE_ACADEMIC_AFFAIRS': '/academic/dashboard', // AA → Academic Dashboard (approve)
-        'ROLE_HOD': '/hod/dashboard',                   // HOD → HOD Dashboard (review)
+        'ROLE_HOD': '/lecturer/dashboard',              // HoD acts as lecturer by default (can still access /hod/dashboard for approvals)
         'ROLE_ADMIN': '/admin/dashboard',
         'ROLE_LECTURER': '/lecturer/dashboard',
         'ROLE_STUDENT': '/student/dashboard'

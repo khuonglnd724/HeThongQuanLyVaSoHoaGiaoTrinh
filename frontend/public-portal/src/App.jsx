@@ -16,6 +16,28 @@ import SyllabusEditorPage from './modules/lecturer/pages/SyllabusEditorPage'
 import SyllabusComparePage from './modules/lecturer/pages/SyllabusComparePage'
 import LecturerPortalGuide from './modules/lecturer/pages/LecturerPortalGuide'
 
+const RequireRole = ({ allowedRoles, children }) => {
+  const storedUser = (() => {
+    try {
+      return JSON.parse(localStorage.getItem('user'))
+    } catch (e) {
+      return null
+    }
+  })()
+
+  const role = storedUser?.role || localStorage.getItem('role')
+
+  if (!role) {
+    return <Navigate to="/login" replace />
+  }
+
+  if (!allowedRoles.includes(role)) {
+    return <Navigate to="/" replace />
+  }
+
+  return children
+}
+
 function App() {
   const location = useLocation()
   const isLoginPage = location.pathname === '/login'
@@ -35,9 +57,30 @@ function App() {
           <Route path="/student/dashboard" element={<StudentDashboard />} />
           <Route path="/lecturer/dashboard" element={<LecturerDashboard />} />
           <Route path="/admin/dashboard" element={<AdminDashboard />} />
-          <Route path="/hod/dashboard" element={<HODDashboard />} />
-          <Route path="/academic/dashboard" element={<AcademicDashboard />} />
-          <Route path="/academic/programs" element={<ProgramManagement />} />
+          <Route
+            path="/hod/dashboard"
+            element={
+              <RequireRole allowedRoles={['ROLE_HOD', 'ROLE_ADMIN', 'ROLE_RECTOR']}>
+                <HODDashboard />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/academic/dashboard"
+            element={
+              <RequireRole allowedRoles={['ROLE_ACADEMIC_AFFAIRS', 'ROLE_RECTOR']}>
+                <AcademicDashboard />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/academic/programs"
+            element={
+              <RequireRole allowedRoles={['ROLE_ACADEMIC_AFFAIRS', 'ROLE_ADMIN']}>
+                <ProgramManagement />
+              </RequireRole>
+            }
+          />
           
           {/* Lecturer Portal Routes */}
           <Route path="/lecturer/portal" element={<LecturerPortalGuide />} />

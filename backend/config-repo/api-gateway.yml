@@ -8,7 +8,7 @@ spring:
       globalcors:
         cors-configurations:
           '[/**]':
-            allowedOrigins: "*"
+            allowedOriginPatterns: "*"
             allowedMethods:
               - GET
               - POST
@@ -17,7 +17,11 @@ spring:
               - OPTIONS
               - PATCH
             allowedHeaders: "*"
-            allowCredentials: false
+            exposedHeaders:
+              - Authorization
+              - Content-Type
+            allowCredentials: true
+            maxAge: 3600
       routes:
         - id: auth-service
           uri: lb://auth-service
@@ -86,6 +90,7 @@ security:
     whitelist:
       - /api/auth/**
       - /api/ai/**
+      - /api/workflows/**
       - /actuator/prometheus
       - /actuator/health
       - /

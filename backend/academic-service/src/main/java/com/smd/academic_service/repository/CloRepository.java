@@ -28,4 +28,6 @@ public interface CloRepository extends JpaRepository<Clo, Long> {
     Long countBySubjectIdAndIsActiveTrue(Long subjectId);
     
     List<Clo> findByCloCodeContainingIgnoreCase(String cloCode);
+
+    List<Clo> findBySubjectIsNullAndIsActiveTrue();
 }

@@ -73,6 +73,9 @@ public class Syllabus {
     @Column(name = "last_action_by", length = 100)
     private String lastActionBy;
 
+    @Column(name = "workflow_id")
+    private UUID workflowId;
+
     // ---------- audit fields ----------
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
@@ -240,6 +243,14 @@ public class Syllabus {
 
     public void setLastActionBy(String lastActionBy) {
         this.lastActionBy = lastActionBy;
+    }
+
+    public UUID getWorkflowId() {
+        return workflowId;
+    }
+
+    public void setWorkflowId(UUID workflowId) {
+        this.workflowId = workflowId;
     }
 
     public Instant getCreatedAt() {

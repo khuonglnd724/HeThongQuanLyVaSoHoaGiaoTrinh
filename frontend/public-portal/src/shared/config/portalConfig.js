@@ -15,7 +15,7 @@ export const PORTALS = {
     name: 'Lecturer Portal - Syllabus Builder',
     url: 'http://localhost:3002',
     port: 3002,
-    roles: ['ROLE_LECTURER'],
+    roles: ['ROLE_LECTURER', 'ROLE_HOD'],
     description: 'Xây dựng & quản lý giáo trình'
   },
   ADMIN: {
@@ -49,8 +49,8 @@ export const getPortalByRole = (role) => {
     case 'ROLE_STUDENT':
       return PORTALS.PUBLIC
     case 'ROLE_LECTURER':
-      return PORTALS.LECTURER
     case 'ROLE_HOD':
+      return PORTALS.LECTURER
     case 'ROLE_RECTOR':
       return PORTALS.ADMIN
     case 'ROLE_ACADEMIC_AFFAIRS':

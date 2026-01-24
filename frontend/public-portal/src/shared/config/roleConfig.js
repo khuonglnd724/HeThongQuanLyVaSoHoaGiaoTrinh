@@ -90,7 +90,7 @@ export const isAdmin = (role) => {
  * @returns {boolean}
  */
 export const isLecturer = (role) => {
-  return role === ROLES.LECTURER
+  return [ROLES.LECTURER, ROLES.HOD].includes(role)
 }
 
 /**

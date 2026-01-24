@@ -36,6 +36,8 @@ public final class SyllabusMapper {
         r.setRejectionReason(s.getRejectionReason());
         r.setLastActionBy(s.getLastActionBy());
 
+        r.setWorkflowId(s.getWorkflowId());
+
         return r;
     }
 }

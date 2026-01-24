@@ -44,12 +44,12 @@ public class CloService {
         
         Clo clo = Clo.builder()
             .cloCode(cloDto.getCloCode())
-            .cloName(cloDto.getCloName())
+            .cloName(cloDto.getCloName() != null ? cloDto.getCloName() : cloDto.getCloCode())
             .description(cloDto.getDescription())
             .subject(subject)
             .syllabus(syllabus)
             .bloomLevel(cloDto.getBloomLevel())
-            .displayOrder(cloDto.getDisplayOrder())
+            .displayOrder(cloDto.getDisplayOrder() != null ? cloDto.getDisplayOrder() : 0)
             .teachingMethod(cloDto.getTeachingMethod())
             .evaluationMethod(cloDto.getEvaluationMethod())
             .isActive(true)
@@ -92,6 +92,33 @@ public class CloService {
             .filter(Clo::getIsActive)
             .map(this::mapToDto)
             .collect(Collectors.toList());
+    }
+
+    public List<CloDto> getUnassignedClos() {
+        log.debug("Fetching CLOs without subject");
+        return cloRepository.findBySubjectIsNullAndIsActiveTrue()
+            .stream()
+            .map(this::mapToDto)
+            .collect(Collectors.toList());
+    }
+
+    public CloDto assignCloToSubject(Long cloId, Long subjectId, String updatedBy) {
+        log.info("Assigning CLO {} to subject {}", cloId, subjectId);
+
+        Clo clo = cloRepository.findByIdAndIsActiveTrue(cloId)
+            .orElseThrow(() -> new RuntimeException("CLO not found with id: " + cloId));
+
+        Subject subject = null;
+        if (subjectId != null) {
+            subject = subjectRepository.findById(subjectId)
+                .orElseThrow(() -> new RuntimeException("Subject not found with id: " + subjectId));
+        }
+
+        clo.setSubject(subject);
+        clo.setUpdatedBy(updatedBy);
+        Clo saved = cloRepository.save(clo);
+        log.info("CLO {} assigned to subject {}", cloId, subjectId);
+        return mapToDto(saved);
     }
     
     public List<CloDto> searchClosByCode(String code) {
@@ -160,7 +187,7 @@ public class CloService {
             .cloCode(clo.getCloCode())
             .cloName(clo.getCloName())
             .description(clo.getDescription())
-            .subjectId(clo.getSubject().getId())
+            .subjectId(clo.getSubject() != null ? clo.getSubject().getId() : null)
             .syllabusId(clo.getSyllabus() != null ? clo.getSyllabus().getId() : null)
             .bloomLevel(clo.getBloomLevel())
             .displayOrder(clo.getDisplayOrder())

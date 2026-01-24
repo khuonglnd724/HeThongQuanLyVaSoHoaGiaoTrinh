@@ -103,8 +103,9 @@ public class SyllabusController {
     @PostMapping("/{id}/submit")
     public ResponseEntity<SyllabusResponse> submit(
             @RequestHeader("X-User-Id") String userId,
+            @RequestHeader(value = "X-User-Roles", required = false, defaultValue = "ROLE_LECTURER") String userRoles,
             @PathVariable UUID id) {
-        return ResponseEntity.ok(syllabusService.submit(id, userId));
+        return ResponseEntity.ok(syllabusService.submit(id, userId, userRoles));
     }
 
     /**

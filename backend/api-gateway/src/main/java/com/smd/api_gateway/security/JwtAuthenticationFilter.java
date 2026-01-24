@@ -2,6 +2,8 @@ package com.smd.api_gateway.security;
 
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 import javax.crypto.SecretKey;
 
@@ -62,18 +64,42 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
 
             // propagate basic claims
             String subject = claims.getSubject();
-            Object roles = claims.get("roles");
+            Object rolesObj = claims.get("roles");
+
+            final String rolesHeader = extractRolesHeader(rolesObj);
+            final String subjectHeader = subject != null ? subject : "";
 
             ServerWebExchange mutated = exchange.mutate()
                     .request(builder -> builder
-                            .header("X-User-Id", subject != null ? subject : "")
-                            .header("X-User-Roles", roles != null ? String.valueOf(roles) : "")
+                            .header("X-User-Id", subjectHeader)
+                            .header("X-User-Roles", rolesHeader)
                     )
                     .build();
             return chain.filter(mutated);
         } catch (Exception ex) {
             return unauthorized(exchange, "Invalid or expired token");
         }
+    }
+
+    private String extractRolesHeader(Object rolesObj) {
+        if (rolesObj instanceof List<?>) {
+            List<?> rolesList = (List<?>) rolesObj;
+            return rolesList.stream()
+                    .map(role -> {
+                        if (role instanceof Map) {
+                            return ((Map<?, ?>) role).get("authority");
+                        } else if (role instanceof String) {
+                            return role;
+                        }
+                        return null;
+                    })
+                    .filter(r -> r != null)
+                    .map(String::valueOf)
+                    .collect(Collectors.joining(","));
+        } else if (rolesObj != null) {
+            return String.valueOf(rolesObj);
+        }
+        return "";
     }
 
     private boolean isWhitelisted(String path, List<String> whitelist) {
@@ -90,7 +116,8 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
         exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
         exchange.getResponse().getHeaders().setContentType(MediaType.APPLICATION_JSON);
         byte[] bytes = ("{\"error\":\"" + message + "\"}").getBytes(StandardCharsets.UTF_8);
-        return exchange.getResponse().writeWith(Mono.just(exchange.getResponse().bufferFactory().wrap(bytes)));
+        var buffer = exchange.getResponse().bufferFactory().wrap(bytes);
+        return exchange.getResponse().writeWith(Mono.just(buffer));
     }
 
     @Override
