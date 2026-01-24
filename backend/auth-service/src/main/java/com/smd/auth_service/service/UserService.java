@@ -8,6 +8,7 @@ import com.smd.auth_service.dto.LoginHistoryDTO;
 import com.smd.auth_service.dto.LoginRequest;
 import com.smd.auth_service.dto.RegisterRequest;
 import com.smd.auth_service.dto.ResetPasswordRequest;
+import com.smd.auth_service.dto.UpdateUserRequest;
 import com.smd.auth_service.dto.UserDTO;
 
 public interface UserService {
@@ -45,7 +46,7 @@ public interface UserService {
     /**
      * Update user
      */
-    UserDTO updateUser(Long userId, RegisterRequest request);
+    UserDTO updateUser(Long userId, UpdateUserRequest request);
     
     /**
      * Delete user

@@ -28,11 +28,22 @@ export const Header = () => {
     navigate('/')
   }
 
-  const navLinks = [
-    { icon: Home, label: 'Home', path: '/' },
-    { icon: Search, label: 'Search', path: '/search' },
-    { icon: HelpCircle, label: 'Help', path: '#help' }
-  ]
+  const getNavLinks = () => {
+    const baseLinks = [
+      { icon: Home, label: 'Home', path: '/' },
+      { icon: Search, label: 'Search', path: '/public/search' },
+      { icon: HelpCircle, label: 'Help', path: '#help' }
+    ];
+    
+    if (user) {
+      // Add dashboard link for logged-in users
+      baseLinks.splice(1, 0, { icon: User, label: 'My Dashboard', path: '/student/dashboard' });
+    }
+    
+    return baseLinks;
+  };
+
+  const navLinks = getNavLinks();
 
   return (
     <header className="bg-white border-b border-gray-200 sticky top-0 z-50">
@@ -70,7 +81,11 @@ export const Header = () => {
                 <Link 
                   key={idx}
                   to={link.path}
-                  className="flex items-center gap-2 px-4 py-2 text-gray-700 hover:bg-blue-50 rounded-lg transition"
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg transition ${
+                    link.label === 'My Dashboard' 
+                      ? 'text-white bg-blue-600 hover:bg-blue-700 font-medium' 
+                      : 'text-gray-700 hover:bg-blue-50'
+                  }`}
                 >
                   <link.icon size={18} />
                   <span className="text-sm font-medium">{link.label}</span>

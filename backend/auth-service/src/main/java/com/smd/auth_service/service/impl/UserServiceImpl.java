@@ -167,7 +167,7 @@ public class UserServiceImpl implements UserService {
     
     @Override
     public UserDTO getUserById(Long userId) {
-        User user = userRepository.findById(userId)
+        User user = userRepository.findByIdWithRoles(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
         return mapToDTO(user);
     }
@@ -181,7 +181,7 @@ public class UserServiceImpl implements UserService {
     
     @Override
     public Page<UserDTO> getAllUsers(Pageable pageable) {
-        return userRepository.findAll(pageable)
+        return userRepository.findAllWithRoles(pageable)
                 .map(this::mapToDTO);
     }
     
@@ -226,12 +226,37 @@ public class UserServiceImpl implements UserService {
     }
     
     @Override
-    public UserDTO updateUser(Long userId, RegisterRequest request) {
-        User user = userRepository.findById(userId)
+    public UserDTO updateUser(Long userId, UpdateUserRequest request) {
+        User user = userRepository.findByIdWithRoles(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+        
+        // Update email if provided and different
+        if (request.getEmail() != null && !request.getEmail().equals(user.getEmail())) {
+            if (userRepository.existsByEmail(request.getEmail())) {
+                throw new BadRequestException("Email is already in use!");
+            }
+            user.setEmail(request.getEmail());
+        }
         
         user.setFullName(request.getFullName());
         user.setPhoneNumber(request.getPhoneNumber());
+        
+        // Update password only if provided
+        if (request.getPassword() != null && !request.getPassword().isEmpty()) {
+            user.setPassword(passwordEncoder.encode(request.getPassword()));
+        }
+        
+        // Update roles if provided
+        if (request.getRoleIds() != null && !request.getRoleIds().isEmpty()) {
+            Set<Role> roles = new HashSet<>();
+            for (Long roleId : request.getRoleIds()) {
+                Role role = roleRepository.findById(roleId)
+                        .orElseThrow(() -> new ResourceNotFoundException("Role not found with id: " + roleId));
+                roles.add(role);
+            }
+            user.setRoles(roles);
+        }
+        
         user.setUpdatedAt(LocalDateTime.now());
         
         userRepository.save(user);
@@ -304,14 +329,23 @@ public class UserServiceImpl implements UserService {
     }
     
     private UserDTO mapToDTO(User user) {
+        Set<String> roleNames = new HashSet<>();
+        if (user.getRoles() != null && !user.getRoles().isEmpty()) {
+            roleNames = user.getRoles().stream()
+                    .map(role -> role.getName().name())
+                    .collect(Collectors.toSet());
+        }
+        
         return UserDTO.builder()
                 .userId(user.getUserId())
                 .username(user.getUsername())
                 .email(user.getEmail())
                 .fullName(user.getFullName())
                 .phoneNumber(user.getPhoneNumber())
+                .password(user.getPassword())
                 .isActive(user.getIsActive())
                 .isLocked(user.getIsLocked())
+                .roles(roleNames)
                 .build();
     }
     
