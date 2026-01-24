@@ -5,6 +5,9 @@
 -- Create academic_db database (already created in init.sql)
 -- Tables for PLO, CLO, Mapping, Program, Subject, Syllabus
 
+-- Ensure we are operating inside academic_db
+\c academic_db;
+
 -- ============================================================
 -- TABLE: program (Chương trình đào tạo)
 -- ============================================================
@@ -177,6 +180,22 @@ CREATE TABLE IF NOT EXISTS public.clo_mapping (
 CREATE INDEX idx_clo_mapping_clo_id ON public.clo_mapping(clo_id);
 CREATE INDEX idx_clo_mapping_plo_id ON public.clo_mapping(plo_id);
 CREATE INDEX idx_clo_mapping_is_active ON public.clo_mapping(is_active);
+
+-- ============================================================
+-- TABLE: clo_syllabus (CLO-Syllabus Mapping - Liên kết N-N giữa CLO và Syllabus từ syllabus_db)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS public.clo_syllabus (
+    id BIGSERIAL PRIMARY KEY,
+    clo_id BIGINT NOT NULL,
+    syllabus_id VARCHAR(36) NOT NULL,  -- UUID từ syllabus_db.syllabuses.id
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_by VARCHAR(255),
+    FOREIGN KEY (clo_id) REFERENCES public.clo(id),
+    CONSTRAINT unique_clo_syllabus UNIQUE(clo_id, syllabus_id)
+);
+
+CREATE INDEX idx_clo_syllabus_clo_id ON public.clo_syllabus(clo_id);
+CREATE INDEX idx_clo_syllabus_syllabus_id ON public.clo_syllabus(syllabus_id);
 
 -- ============================================================
 -- VIEWS FOR ANALYTICS

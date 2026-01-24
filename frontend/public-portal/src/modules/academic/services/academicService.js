@@ -58,15 +58,12 @@ const academicAPI = {
   updateSubject: (id, data) => apiClient.put(`/api/academic/subject/${id}`, data),
   deleteSubject: (id) => apiClient.delete(`/api/academic/subject/${id}`),
 
-  // ============ CLO ============
+  // ============ CLO (read-only for academic UI; creation moved to lecturer) ============
   getCloById: (id) => apiClient.get(`/api/academic/clo/${id}`),
   getClosBySubject: (subjectId) => apiClient.get(`/api/academic/clo/subject/${subjectId}`),
   getClosBySyllabus: (syllabusId) => apiClient.get(`/api/academic/clo/syllabus/${syllabusId}`),
   getAllClos: () => apiClient.get('/api/academic/clo'),
   searchClos: (code) => apiClient.get('/api/academic/clo/search', { params: { code } }),
-  createClo: (data) => apiClient.post('/api/academic/clo', data),
-  updateClo: (id, data) => apiClient.put(`/api/academic/clo/${id}`, data),
-  deleteClo: (id) => apiClient.delete(`/api/academic/clo/${id}`),
 
   // ============ PLO ============
   getPlos: () => apiClient.get('/api/academic/plo'),

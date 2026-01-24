@@ -31,9 +31,9 @@ public class Clo extends BaseEntity {
     @Column(name = "description", columnDefinition = "TEXT")
     private String description;  // Mô tả chi tiết
     
-    @ManyToOne(fetch = jakarta.persistence.FetchType.LAZY)
-    @JoinColumn(name = "subject_id", nullable = false)
-    private Subject subject;  // Môn học
+    @ManyToOne(fetch = jakarta.persistence.FetchType.LAZY, optional = true)
+    @JoinColumn(name = "subject_id")
+    private Subject subject;  // Môn học (có thể null để CLO tái sử dụng)
     
     @ManyToOne(fetch = jakarta.persistence.FetchType.LAZY)
     @JoinColumn(name = "syllabus_id")

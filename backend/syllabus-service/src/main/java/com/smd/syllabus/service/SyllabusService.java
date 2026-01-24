@@ -20,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.*;
+import com.smd.syllabus.client.WorkflowClient;
 
 @Service
 public class SyllabusService {
@@ -27,14 +28,17 @@ public class SyllabusService {
     private final SyllabusRepository syllabusRepository;
     private final NotificationService notificationService;
     private final SyllabusDocumentRepository documentRepository;
+    private final WorkflowClient workflowClient;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public SyllabusService(SyllabusRepository syllabusRepository,
             NotificationService notificationService,
-            SyllabusDocumentRepository documentRepository) {
+            SyllabusDocumentRepository documentRepository,
+            WorkflowClient workflowClient) {
         this.syllabusRepository = syllabusRepository;
         this.notificationService = notificationService;
         this.documentRepository = documentRepository;
+        this.workflowClient = workflowClient;
     }
 
     // helper
@@ -200,9 +204,13 @@ public class SyllabusService {
     // =========================
 
     @Transactional
-    public SyllabusResponse submit(UUID id, String userId) {
+    public SyllabusResponse submit(UUID id, String userId, String userRoles) {
         String actor = requireUser(userId);
         Syllabus s = getOrThrow(id);
+        // Extract first role from comma-separated list or default to ROLE_LECTURER
+        String roleToUse = (userRoles != null && !userRoles.isEmpty()) 
+            ? userRoles.split(",\\s*")[0].trim()
+            : "ROLE_LECTURER";
 
         if (s.getStatus() != SyllabusStatus.DRAFT) {
             throw new IllegalStateException("Only DRAFT syllabus can be submitted");
@@ -217,6 +225,24 @@ public class SyllabusService {
         s.setRejectedAt(null);
 
         Syllabus saved = syllabusRepository.save(s);
+
+        // Create workflow instance if missing and submit event to workflow-service
+        try {
+            if (saved.getWorkflowId() == null) {
+                UUID workflowId = workflowClient.create(saved.getId());
+                saved.setWorkflowId(workflowId);
+                if (workflowId != null) {
+                    saved = syllabusRepository.save(saved);
+                }
+            }
+            if (saved.getWorkflowId() != null) {
+                workflowClient.submit(saved.getWorkflowId(), actor, roleToUse);
+            }
+        } catch (Exception ex) {
+            // Do not fail submit if workflow service is unavailable; log and continue
+            System.err.println("Workflow submit failed: " + ex.getMessage());
+            ex.printStackTrace();
+        }
 
         notificationService.notifyFollowers(
                 saved.getRootId(),
@@ -244,6 +270,14 @@ public class SyllabusService {
 
         Syllabus saved = syllabusRepository.save(s);
 
+        try {
+            if (saved.getWorkflowId() != null) {
+                workflowClient.approve(saved.getWorkflowId(), actor, "ROLE_HOD");
+            }
+        } catch (Exception ex) {
+            System.err.println("Workflow approve (HoD) failed: " + ex.getMessage());
+        }
+
         // (tuỳ bạn) có thể bỏ notify bước trung gian này nếu không cần
         notificationService.notifyFollowers(
                 saved.getRootId(),
@@ -270,6 +304,14 @@ public class SyllabusService {
         s.setLastActionBy(actor);
 
         Syllabus saved = syllabusRepository.save(s);
+
+        try {
+            if (saved.getWorkflowId() != null) {
+                workflowClient.approve(saved.getWorkflowId(), actor, "ROLE_RECTOR");
+            }
+        } catch (Exception ex) {
+            System.err.println("Workflow approve (final) failed: " + ex.getMessage());
+        }
 
         notificationService.notifyFollowers(
                 saved.getRootId(),
@@ -312,6 +354,8 @@ public class SyllabusService {
         String actor = requireUser(userId);
         Syllabus s = getOrThrow(id);
 
+        SyllabusStatus previousStatus = s.getStatus();
+
         if (s.getStatus() != SyllabusStatus.PENDING_REVIEW && s.getStatus() != SyllabusStatus.PENDING_APPROVAL) {
             throw new IllegalStateException("Syllabus not in a rejectable status");
         }
@@ -327,6 +371,15 @@ public class SyllabusService {
         String msg = "Syllabus " + safeCode(saved) + " rejected";
         if (reason != null && !reason.isBlank())
             msg += ": " + reason.trim();
+
+        try {
+            if (saved.getWorkflowId() != null) {
+                String role = (previousStatus == SyllabusStatus.PENDING_REVIEW) ? "ROLE_HOD" : "ROLE_RECTOR";
+                workflowClient.reject(saved.getWorkflowId(), actor, role, reason);
+            }
+        } catch (Exception ex) {
+            System.err.println("Workflow reject failed: " + ex.getMessage());
+        }
 
         notificationService.notifyFollowers(
                 saved.getRootId(),

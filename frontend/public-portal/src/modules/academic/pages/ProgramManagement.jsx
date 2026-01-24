@@ -34,6 +34,27 @@ export const ProgramManagement = () => {
     isActive: true,
   })
 
+
+  const [ploForm, setPloForm] = useState({
+    ploCode: '',
+    ploName: '',
+    description: '',
+    programId: '',
+    displayOrder: '',
+    ploLevel: '',
+    assessmentMethod: '',
+    isActive: true,
+  })
+
+  const [detailModal, setDetailModal] = useState({
+    open: false,
+    program: null,
+    subjects: [],
+    plos: [],
+    closBySubject: {},
+    loading: false,
+  })
+
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
@@ -75,6 +96,16 @@ export const ProgramManagement = () => {
     loadPrograms()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  const normalize = (resp) => {
+    const data = resp?.data
+    if (!data) return []
+    if (Array.isArray(data)) return data
+    if (Array.isArray(data.data)) return data.data
+    if (data.data && Array.isArray(data.data.content)) return data.data.content
+    if (Array.isArray(data.content)) return data.content
+    return []
+  }
 
   const resetProgramForm = () => {
     setProgramForm({
@@ -125,6 +156,14 @@ export const ProgramManagement = () => {
   const handleSubjectChange = (e) => {
     const { name, value, type, checked } = e.target
     setSubjectForm((prev) => ({
+      ...prev,
+      [name]: type === 'checkbox' ? checked : value,
+    }))
+  }
+
+  const handlePloChange = (e) => {
+    const { name, value, type, checked } = e.target
+    setPloForm((prev) => ({
       ...prev,
       [name]: type === 'checkbox' ? checked : value,
     }))
@@ -276,6 +315,87 @@ export const ProgramManagement = () => {
     }
   }
 
+  const openProgramDetail = async (program) => {
+    setDetailModal((prev) => ({ ...prev, open: true, loading: true, program }))
+    try {
+      const [progDetailResp, subjResp, ploResp] = await Promise.all([
+        academicAPI.getProgramById(program.id),
+        academicAPI.getSubjectsByProgram(program.id),
+        academicAPI.getPlosByProgram(program.id)
+      ])
+      const subjList = normalize(subjResp)
+      const ploList = normalize(ploResp)
+
+      const closPromises = subjList.map(async (s) => {
+        try {
+          const res = await academicAPI.getClosBySubject(s.id)
+          return [s.id, normalize(res)]
+        } catch (err) {
+          console.error('Load CLO error', err)
+          return [s.id, []]
+        }
+      })
+      const closPairs = await Promise.all(closPromises)
+      const closMap = closPairs.reduce((acc, [sid, clos]) => {
+        acc[sid] = clos
+        return acc
+      }, {})
+
+      setDetailModal({
+        open: true,
+        loading: false,
+        program: progDetailResp?.data?.data || program,
+        subjects: subjList,
+        plos: ploList,
+        closBySubject: closMap,
+      })
+    } catch (err) {
+      console.error(err)
+      setDetailModal((prev) => ({ ...prev, loading: false }))
+      setError('Không tải được chi tiết CTĐT')
+    }
+  }
+
+
+  const handleSubmitPlo = async (e) => {
+    e.preventDefault()
+    const programId = ploForm.programId || selectedProgram?.id
+    if (!programId) {
+      setError('Chọn chương trình trước khi tạo PLO')
+      return
+    }
+    try {
+      setLoading(true)
+      setError('')
+      const payload = {
+        ploCode: ploForm.ploCode,
+        ploName: ploForm.ploName,
+        description: ploForm.description,
+        programId: Number(programId),
+        displayOrder: ploForm.displayOrder ? Number(ploForm.displayOrder) : null,
+        ploLevel: ploForm.ploLevel,
+        assessmentMethod: ploForm.assessmentMethod,
+        isActive: ploForm.isActive,
+      }
+      await academicAPI.createPlo(payload)
+      setPloForm({
+        ploCode: '',
+        ploName: '',
+        description: '',
+        programId: '',
+        displayOrder: '',
+        ploLevel: '',
+        assessmentMethod: '',
+        isActive: true,
+      })
+    } catch (err) {
+      console.error(err)
+      setError('Tạo PLO thất bại')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   return (
     <div className="p-6 space-y-6">
       <h1 className="text-3xl font-bold">Quản lý Chương trình & Học phần</h1>
@@ -337,6 +457,16 @@ export const ProgramManagement = () => {
                         )}
                       </td>
                       <td className="px-3 py-2 text-right space-x-2">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            openProgramDetail(p)
+                          }}
+                          className="text-xs px-2 py-1 rounded border border-blue-300 text-blue-700 hover:bg-blue-50"
+                        >
+                          Xem
+                        </button>
                         <button
                           type="button"
                           onClick={(e) => {
@@ -748,10 +878,233 @@ export const ProgramManagement = () => {
         </div>
       </div>
 
+      {/* CLO/PLO quick create */}
+      <div className="grid grid-cols-1 gap-6">
+        <div className="bg-white rounded-lg shadow p-4">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-xl font-semibold">Tạo PLO cho chương trình</h2>
+          </div>
+          <form onSubmit={handleSubmitPlo} className="space-y-3 text-sm">
+            <div>
+              <label className="block text-gray-700 mb-1">Chọn chương trình</label>
+              <select
+                name="programId"
+                value={ploForm.programId || selectedProgram?.id || ''}
+                onChange={handlePloChange}
+                className="w-full border rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              >
+                <option value="">-- Chọn chương trình --</option>
+                {programs.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    [{p.programCode}] {p.programName}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-gray-700 mb-1">Mã PLO</label>
+                <input
+                  type="text"
+                  name="ploCode"
+                  value={ploForm.ploCode}
+                  onChange={handlePloChange}
+                  className="w-full border rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-gray-700 mb-1">Tên PLO</label>
+                <input
+                  type="text"
+                  name="ploName"
+                  value={ploForm.ploName}
+                  onChange={handlePloChange}
+                  className="w-full border rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  required
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-gray-700 mb-1">Mô tả</label>
+              <textarea
+                name="description"
+                value={ploForm.description}
+                onChange={handlePloChange}
+                rows={2}
+                className="w-full border rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-gray-700 mb-1">Thứ tự hiển thị</label>
+                <input
+                  type="number"
+                  name="displayOrder"
+                  value={ploForm.displayOrder}
+                  onChange={handlePloChange}
+                  className="w-full border rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                />
+              </div>
+              <div>
+                <label className="block text-gray-700 mb-1">Mức độ</label>
+                <input
+                  type="text"
+                  name="ploLevel"
+                  value={ploForm.ploLevel}
+                  onChange={handlePloChange}
+                  className="w-full border rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  placeholder="Foundational / Advanced"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-gray-700 mb-1">Phương pháp đánh giá</label>
+              <input
+                type="text"
+                name="assessmentMethod"
+                value={ploForm.assessmentMethod}
+                onChange={handlePloChange}
+                className="w-full border rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              />
+            </div>
+
+            <div className="flex items-center justify-between mt-2">
+              <label className="inline-flex items-center gap-2 text-gray-700">
+                <input
+                  type="checkbox"
+                  name="isActive"
+                  checked={ploForm.isActive}
+                  onChange={handlePloChange}
+                  className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                />
+                Kích hoạt
+              </label>
+              <button
+                type="submit"
+                disabled={loading}
+                className="px-4 py-1.5 text-sm rounded bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-60"
+              >
+                Lưu PLO
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+
       {loading && (
         <div className="fixed inset-0 bg-black/10 flex items-center justify-center pointer-events-none">
           <div className="bg-white shadow px-4 py-2 rounded text-sm text-gray-700">
             Đang xử lý...
+          </div>
+        </div>
+      )}
+
+      {detailModal.open && (
+        <div className="fixed inset-0 bg-black/50 z-40 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg shadow-2xl w-full max-w-5xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b px-6 py-4">
+              <div>
+                <h2 className="text-xl font-semibold">Chi tiết chương trình đào tạo</h2>
+                <p className="text-sm text-gray-600">
+                  [{detailModal.program?.programCode}] {detailModal.program?.programName}
+                </p>
+              </div>
+              <button
+                onClick={() => setDetailModal({ open: false, program: null, subjects: [], plos: [], closBySubject: {}, loading: false })}
+                className="text-gray-500 hover:text-gray-700 text-2xl"
+              >
+                ×
+              </button>
+            </div>
+
+            {detailModal.loading ? (
+              <div className="p-6 text-center text-gray-600">Đang tải chi tiết...</div>
+            ) : (
+              <div className="p-6 space-y-6 text-sm">
+                <div className="grid grid-cols-2 gap-4 bg-gray-50 p-4 rounded">
+                  <div>
+                    <p className="text-xs text-gray-500 uppercase">Mô tả</p>
+                    <p className="text-gray-800">{detailModal.program?.description || '-'}</p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <p className="text-xs text-gray-500 uppercase">Tín chỉ</p>
+                      <p className="text-gray-800">{detailModal.program?.creditsRequired ?? '--'}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500 uppercase">Thời gian (năm)</p>
+                      <p className="text-gray-800">{detailModal.program?.durationYears ?? '--'}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500 uppercase">Bằng cấp</p>
+                      <p className="text-gray-800">{detailModal.program?.degreeType || '--'}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500 uppercase">Kiểm định</p>
+                      <p className="text-gray-800">{detailModal.program?.accreditationStatus || '--'}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <h3 className="text-base font-semibold">PLO của chương trình</h3>
+                  {detailModal.plos.length ? (
+                    <div className="border rounded divide-y">
+                      {detailModal.plos.map((p) => (
+                        <div key={p.id} className="p-3">
+                          <div className="font-semibold text-gray-900">{p.ploCode} - {p.ploName}</div>
+                          <p className="text-gray-700 text-sm">{p.description}</p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-gray-500">Chưa có PLO</p>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <h3 className="text-base font-semibold">Học phần & CLO</h3>
+                  {detailModal.subjects.length ? (
+                    <div className="space-y-3">
+                      {detailModal.subjects.map((s) => (
+                        <div key={s.id} className="border rounded p-3">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <div className="font-semibold text-gray-900">{s.subjectCode} - {s.subjectName}</div>
+                              <p className="text-gray-600 text-xs">TC: {s.credits ?? '--'} | Kỳ: {s.semester ?? '--'}</p>
+                            </div>
+                            <span className={`px-2 py-0.5 rounded-full text-xs ${s.isActive ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
+                              {s.isActive ? 'Đang mở' : 'Ngừng'}
+                            </span>
+                          </div>
+                          <div className="mt-2">
+                            <p className="text-xs text-gray-500 mb-1">CLO:</p>
+                            {detailModal.closBySubject[s.id]?.length ? (
+                              <ul className="list-disc list-inside text-gray-800 text-sm space-y-1">
+                                {detailModal.closBySubject[s.id].map((c) => (
+                                  <li key={c.id}>
+                                    <span className="font-semibold">{c.cloCode}</span> - {c.cloName || c.description}
+                                  </li>
+                                ))}
+                              </ul>
+                            ) : (
+                              <p className="text-gray-500 text-sm">Chưa có CLO</p>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-gray-500">Chưa có học phần</p>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

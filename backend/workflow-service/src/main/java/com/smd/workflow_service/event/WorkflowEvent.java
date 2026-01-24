@@ -6,7 +6,7 @@ import com.smd.workflow_service.domain.WorkflowState;
 
 import java.util.UUID;
 
-public class WorkflowApprovalEvent {
+public class WorkflowEvent {
 
     private UUID workflowId;
     private String entityId;
@@ -15,11 +15,11 @@ public class WorkflowApprovalEvent {
     private WorkflowState toState;
     private String actionBy;
 
-    public WorkflowApprovalEvent() {
+    public WorkflowEvent() {
     }
 
     @JsonCreator
-    public WorkflowApprovalEvent(
+    public WorkflowEvent(
             @JsonProperty("workflowId") UUID workflowId,
             @JsonProperty("entityId") String entityId,
             @JsonProperty("entityType") String entityType,
@@ -84,7 +84,7 @@ public class WorkflowApprovalEvent {
 
     @Override
     public String toString() {
-        return "WorkflowApprovalEvent{" +
+        return "WorkflowEvent{" +
                 "workflowId=" + workflowId +
                 ", entityId='" + entityId + '\'' +
                 ", entityType='" + entityType + '\'' +

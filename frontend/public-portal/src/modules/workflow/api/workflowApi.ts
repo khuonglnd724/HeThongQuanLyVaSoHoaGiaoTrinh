@@ -13,35 +13,35 @@ interface CommentBody {
 
 const workflowApi = {
   getPending: () =>
-    apiClient.get<WorkflowItem[]>('/api/workflow/instances', {
+    apiClient.get<WorkflowItem[]>('/api/workflows', {
       params: { state: 'REVIEW' }
     }),
 
   getAll: () =>
-    apiClient.get<WorkflowItem[]>('/api/workflow/instances'),
+    apiClient.get<WorkflowItem[]>('/api/workflows'),
 
   getReview: (workflowId: string) =>
-    apiClient.get<WorkflowReviewDTO>(`/api/workflow/instances/${workflowId}/review`),
+    apiClient.get<WorkflowReviewDTO>(`/api/workflows/${workflowId}/review`),
 
   approve: (workflowId: string, params: ActionParams) =>
-    apiClient.post(`/api/workflow/instances/${workflowId}/approve`, null, { params }),
+    apiClient.post(`/api/workflows/${workflowId}/approve`, null, { params }),
 
   reject: (
     workflowId: string,
     params: ActionParams,
     body: CommentBody
   ) =>
-    apiClient.post(`/api/workflow/instances/${workflowId}/reject`, body, { params }),
+    apiClient.post(`/api/workflows/${workflowId}/reject`, body, { params }),
 
   requireEdit: (
     workflowId: string,
     params: ActionParams,
     body: CommentBody
   ) =>
-    apiClient.post(`/api/workflow/instances/${workflowId}/require-edit`, body, { params }),
+    apiClient.post(`/api/workflows/${workflowId}/require-edit`, body, { params }),
 
   getHistory: (workflowId: string) =>
-    apiClient.get(`/api/workflow/instances/${workflowId}/history`)
+    apiClient.get(`/api/workflows/${workflowId}/history`)
 }
 
 export default workflowApi

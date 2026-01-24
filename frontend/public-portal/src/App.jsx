@@ -19,6 +19,28 @@ import AdminPortalLayout from './modules/admin/layout/AdminPortalLayout'
 import PublicSyllabusSearchPage from './modules/public/pages/PublicSyllabusSearchPage'
 import PublicSyllabusDetailPage from './modules/public/pages/PublicSyllabusDetailPage'
 
+const RequireRole = ({ allowedRoles, children }) => {
+  const storedUser = (() => {
+    try {
+      return JSON.parse(localStorage.getItem('user'))
+    } catch (e) {
+      return null
+    }
+  })()
+
+  const role = storedUser?.role || localStorage.getItem('role')
+
+  if (!role) {
+    return <Navigate to="/login" replace />
+  }
+
+  if (!allowedRoles.includes(role)) {
+    return <Navigate to="/" replace />
+  }
+
+  return children
+}
+
 function App() {
   const location = useLocation()
   const isLoginPage = location.pathname === '/login'
@@ -38,9 +60,32 @@ function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/student/dashboard" element={<StudentDashboard />} />
           <Route path="/lecturer/dashboard" element={<LecturerDashboard />} />
-          <Route path="/hod/dashboard" element={<HODDashboard />} />
-          <Route path="/academic/dashboard" element={<AcademicDashboard />} />
-          <Route path="/academic/programs" element={<ProgramManagement />} />
+
+          <Route path="/admin/dashboard" element={<AdminDashboard />} />
+          <Route
+            path="/hod/dashboard"
+            element={
+              <RequireRole allowedRoles={['ROLE_HOD', 'ROLE_ADMIN', 'ROLE_RECTOR']}>
+                <HODDashboard />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/academic/dashboard"
+            element={
+              <RequireRole allowedRoles={['ROLE_ACADEMIC_AFFAIRS', 'ROLE_RECTOR']}>
+                <AcademicDashboard />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/academic/programs"
+            element={
+              <RequireRole allowedRoles={['ROLE_ACADEMIC_AFFAIRS', 'ROLE_ADMIN']}>
+                <ProgramManagement />
+              </RequireRole>
+            }
+          />
           
           {/* Public Portal Routes */}
           <Route path="/public/search" element={<PublicSyllabusSearchPage />} />

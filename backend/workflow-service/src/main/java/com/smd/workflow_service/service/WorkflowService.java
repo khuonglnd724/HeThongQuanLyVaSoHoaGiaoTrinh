@@ -1,8 +1,8 @@
 package com.smd.workflow_service.service;
 
 import com.smd.workflow_service.domain.*;
-import com.smd.workflow_service.event.WorkflowApprovalEvent;
-import com.smd.workflow_service.messaging.WorkflowApprovalProducer;
+import com.smd.workflow_service.event.WorkflowSyncEvent;
+import com.smd.workflow_service.messaging.WorkflowProducer;
 import com.smd.workflow_service.repository.WorkflowHistoryRepository;
 import com.smd.workflow_service.repository.WorkflowRepository;
 
@@ -27,7 +27,7 @@ public class WorkflowService {
     private final WorkflowRepository repository;
     private final WorkflowHistoryRepository historyRepository;
     private final WorkflowAuditProducer auditProducer;
-    private final WorkflowApprovalProducer approvalProducer;
+    private final WorkflowProducer workflowProducer;
     private static final Logger log =
         LoggerFactory.getLogger(WorkflowService.class);
 
@@ -35,12 +35,12 @@ public class WorkflowService {
                            WorkflowRepository repository,
                            WorkflowHistoryRepository historyRepository,
                            WorkflowAuditProducer auditProducer,
-                           WorkflowApprovalProducer approvalProducer) {
+                           WorkflowProducer workflowProducer) {
         this.factory = factory;
         this.repository = repository;
         this.historyRepository = historyRepository;
         this.auditProducer = auditProducer;
-        this.approvalProducer = approvalProducer;
+        this.workflowProducer = workflowProducer;
     }
 
     public Workflow createWorkflow(String entityId, String entityType) {
@@ -140,15 +140,17 @@ public class WorkflowService {
             }
 
             try {
-                WorkflowApprovalEvent approvalEvent = new WorkflowApprovalEvent();
-                approvalEvent.setWorkflowId(workflowId);
-                approvalEvent.setFromState(fromState);
-                approvalEvent.setToState(toState);
-                approvalEvent.setActionBy(actionBy);
+                WorkflowSyncEvent syncEvent = new WorkflowSyncEvent();
+                syncEvent.setWorkflowId(workflowId);
+                syncEvent.setEntityId(workflow.getEntityId());
+                syncEvent.setEntityType(workflow.getEntityType());
+                syncEvent.setFromState(fromState);
+                syncEvent.setToState(toState);
+                syncEvent.setActionBy(actionBy);
 
-                approvalProducer.send(approvalEvent);
+                workflowProducer.send(syncEvent);
             } catch (Exception e) {
-                log.error("Failed to send approval event for workflow {}", workflowId, e);
+                log.error("Failed to send workflow sync event for workflow {}", workflowId, e);
             }
         }
 
@@ -162,18 +164,38 @@ public class WorkflowService {
     private void validateRole(WorkflowState state,
                               WorkflowEvent event,
                               UserRole role) {
+        
+        Logger log = LoggerFactory.getLogger(WorkflowService.class);
+        log.info("=== VALIDATE ROLE === Event: {}, State: {}, Role: {}", event, state, role);
 
         switch (event) {
             case SUBMIT -> {
-                if (role != UserRole.ROLE_LECTURER || state != WorkflowState.DRAFT) {
-                    throw new RuntimeException("Only Lecturer can submit from DRAFT");
+                if ((role != UserRole.ROLE_LECTURER && role != UserRole.ROLE_HOD)
+                        || state != WorkflowState.DRAFT) {
+                    throw new RuntimeException("Only Lecturer or HoD can submit from DRAFT");
                 }
             }
             case APPROVE, REJECT -> {
+                log.info("APPROVE/REJECT check - Role is HOD: {}, RECTOR: {}, State is REVIEW: {}", 
+                    role == UserRole.ROLE_HOD, 
+                    role == UserRole.ROLE_RECTOR, 
+                    state == WorkflowState.REVIEW);
+                
+                if (state == WorkflowState.APPROVED) {
+                    throw new IllegalStateException(
+                        "Workflow đã được duyệt rồi. Không thể duyệt lại!"
+                    );
+                }
+                if (state == WorkflowState.REJECTED) {
+                    throw new IllegalStateException(
+                        "Workflow đã bị từ chối. Không thể duyệt!"
+                    );
+                }
                 if ((role != UserRole.ROLE_HOD && role != UserRole.ROLE_RECTOR)
                     || state != WorkflowState.REVIEW) {
-                    throw new RuntimeException(
-                            "Only HoD or Principal can approve/reject from REVIEW"
+                    throw new IllegalStateException(
+                            "Chỉ Trưởng khoa hoặc Hiệu trưởng mới có thể duyệt/từ chối khi workflow ở trạng thái REVIEW. " +
+                            "Hiện tại: role=" + role + ", state=" + state
                     );
                 }
             }
