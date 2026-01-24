@@ -37,14 +37,14 @@ public class RabbitMqConfig {
     }
 
     @Bean
-    public Queue workflowApprovalQueue(@Value("${smd.workflow.approval-queue:workflow.approval.syllabus}") String queueName) {
+    public Queue workflowSyncQueue(@Value("${smd.workflow.sync-queue:workflow.sync.syllabus}") String queueName) {
         return QueueBuilder.durable(queueName).build();
     }
 
     @Bean
-    public Binding workflowApprovalBinding(Queue workflowApprovalQueue, TopicExchange workflowExchange,
-                                           @Value("${smd.workflow.approval-routing-key:workflow.approval}") String routingKey) {
-        return BindingBuilder.bind(workflowApprovalQueue)
+    public Binding workflowSyncBinding(Queue workflowSyncQueue, TopicExchange workflowExchange,
+                                       @Value("${smd.workflow.sync-routing-key:workflow.sync}") String routingKey) {
+        return BindingBuilder.bind(workflowSyncQueue)
                 .to(workflowExchange)
                 .with(routingKey);
     }

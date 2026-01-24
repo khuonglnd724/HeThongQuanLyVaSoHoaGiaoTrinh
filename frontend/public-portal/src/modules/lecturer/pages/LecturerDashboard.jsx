@@ -5,6 +5,7 @@ import apiClient from '../../../services/api/apiClient'
 import syllabusServiceV2 from '../services/syllabusServiceV2'
 import SyllabusEditorPage from './SyllabusEditorPage'
 import workflowApi from '../../workflow/api/workflowApi'
+import academicAPI from '../services/academicAPI'
 
 // Minimal role constants here to avoid circular import with roleConfig (roleConfig imports LecturerDashboard)
 const ROLES = {
@@ -19,6 +20,96 @@ const debounce = (func, delay) => {
     clearTimeout(timeoutId)
     timeoutId = setTimeout(() => func(...args), delay)
   }
+}
+
+// CLO Details Display Component
+const CLODetailsDisplay = ({ cloIds }) => {
+  const [cloDetails, setCloDetails] = useState({})
+  const [loading, setLoading] = useState(true)
+  const [loadedIds, setLoadedIds] = useState([])
+
+  useEffect(() => {
+    // Check if we've already loaded these CLO IDs
+    const idsString = cloIds ? cloIds.sort().join(',') : ''
+    const loadedString = loadedIds.sort().join(',')
+    
+    if (idsString === loadedString && Object.keys(cloDetails).length > 0) {
+      setLoading(false)
+      return // Already loaded, skip
+    }
+
+    const fetchCLODetails = async () => {
+      setLoading(true)
+      const details = {}
+      
+      for (const id of (cloIds || [])) {
+        try {
+          const response = await syllabusServiceV2.getCLOById(id)
+          // API returns { success, message, data: {...}, timestamp }
+          const cloData = response.data?.data || response.data || response
+          console.log(`CLO ${id} fetched:`, cloData)
+          details[id] = cloData
+        } catch (err) {
+          console.error(`Failed to fetch CLO ${id}:`, err)
+          details[id] = { id, cloCode: `CLO-${id}`, description: 'Không thể tải' }
+        }
+      }
+      
+      setCloDetails(details)
+      setLoadedIds(cloIds || [])
+      setLoading(false)
+    }
+
+    if (cloIds && cloIds.length > 0) {
+      fetchCLODetails()
+    } else {
+      setLoading(false)
+    }
+  }, [cloIds, loadedIds, cloDetails])
+
+  return (
+    <div>
+      <h4 className="font-semibold text-gray-900 mb-3">🎓 CLO liên kết ({cloIds?.length || 0})</h4>
+      {loading ? (
+        <div className="text-gray-600 text-sm py-2">
+          Đang tải thông tin CLO...
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {(cloIds || []).map((id) => {
+            const clo = cloDetails[id]
+            const cloCode = clo?.cloCode || clo?.name || `CLO-${id}`
+            const description = clo?.description || ''
+            
+            return (
+              <div key={id} className="bg-white border border-indigo-200 rounded-lg p-3 hover:shadow-md transition">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="font-semibold text-indigo-900">
+                      {cloCode}
+                    </div>
+                    {description && (
+                      <div className="text-sm text-gray-600 mt-1 line-clamp-2">
+                        {description}
+                      </div>
+                    )}
+                    {clo?.level && (
+                      <div className="text-xs text-gray-500 mt-1">
+                        Level: {clo.level}
+                      </div>
+                    )}
+                  </div>
+                  <span className="ml-2 bg-indigo-100 text-indigo-800 px-3 py-1 rounded text-xs font-medium whitespace-nowrap flex-shrink-0">
+                    #{id}
+                  </span>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
 }
 
 const LecturerDashboard = ({ user, onLogout }) => {
@@ -230,6 +321,14 @@ const LecturerDashboard = ({ user, onLogout }) => {
         return
       }
 
+      // Check for duplicate subject code
+      const normalizedCode = formData.subjectCode.trim().toUpperCase()
+      const isDuplicate = syllabi.some(s => s.subjectCode?.toUpperCase() === normalizedCode)
+      if (isDuplicate) {
+        showToast(`Mã môn '${formData.subjectCode}' đã tồn tại. Vui lòng sử dụng mã khác.`, 'warning')
+        return
+      }
+
       const payload = {
         subjectCode: formData.subjectCode,
         subjectName: formData.subjectName,
@@ -279,13 +378,26 @@ const LecturerDashboard = ({ user, onLogout }) => {
     try {
       setReviewLoading(true)
       const actionBy = resolveActionBy()
-      console.log('=== APPROVE WORKFLOW ===')
-      console.log('Workflow ID:', workflowId)
-      console.log('ActionBy:', actionBy)
-      console.log('CurrentUser:', currentUser)
-      console.log('Role:', ROLES.HOD)
-      console.log('=== END ===')
+      
+      // Approve workflow
       await workflowApi.approve(workflowId, { actionBy, role: ROLES.HOD })
+      
+      // Find the corresponding syllabus from reviewItems
+      const reviewItem = reviewItems.find(item => item.id === workflowId)
+      if (reviewItem && reviewItem.syllabusData) {
+        // Update syllabus status to APPROVED
+        try {
+          // Make direct API call to update syllabus
+          await apiClient.patch(`/api/syllabi/${reviewItem.syllabusData.id}`, {
+            status: 'APPROVED'
+          })
+          console.log('Syllabus status updated to APPROVED')
+        } catch (updateErr) {
+          console.warn('Failed to update syllabus status:', updateErr)
+          // Don't throw error - workflow was already approved
+        }
+      }
+      
       await loadReviewQueue(true)
       showToast('Đã duyệt giáo trình', 'success')
     } catch (err) {
@@ -300,7 +412,27 @@ const LecturerDashboard = ({ user, onLogout }) => {
     if (!comment) return
     try {
       setReviewLoading(true)
+      
+      // Reject workflow
       await workflowApi.reject(workflowId, { actionBy: resolveActionBy(), role: ROLES.HOD }, { comment })
+      
+      // Find the corresponding syllabus from reviewItems
+      const reviewItem = reviewItems.find(item => item.id === workflowId)
+      if (reviewItem && reviewItem.syllabusData) {
+        // Update syllabus status to REJECTED
+        try {
+          // Make direct API call to update syllabus
+          await apiClient.patch(`/api/syllabi/${reviewItem.syllabusData.id}`, {
+            status: 'REJECTED',
+            rejectionReason: comment
+          })
+          console.log('Syllabus status updated to REJECTED with reason:', comment)
+        } catch (updateErr) {
+          console.warn('Failed to update syllabus status:', updateErr)
+          // Don't throw error - workflow was already rejected
+        }
+      }
+      
       await loadReviewQueue(true)
       showToast('Đã từ chối giáo trình', 'success')
     } catch (err) {
@@ -310,20 +442,6 @@ const LecturerDashboard = ({ user, onLogout }) => {
     }
   }
 
-  const handleRequireEditWorkflow = async (workflowId) => {
-    const comment = window.prompt('Nhập yêu cầu chỉnh sửa')
-    if (!comment) return
-    try {
-      setReviewLoading(true)
-      await workflowApi.requireEdit(workflowId, { actionBy: resolveActionBy(), role: ROLES.HOD }, { comment })
-      await loadReviewQueue(true)
-      showToast('Đã yêu cầu chỉnh sửa', 'success')
-    } catch (err) {
-      console.error('Require edit failed:', err)
-      showToast(err?.response?.data?.message || 'Yêu cầu chỉnh sửa thất bại', 'error')
-      setReviewLoading(false)
-    }
-  }
 
   const handleViewSyllabusDetail = async (workflowItem) => {
     try {
@@ -882,13 +1000,6 @@ const LecturerDashboard = ({ user, onLogout }) => {
                               >
                                 Từ chối
                               </button>
-                              <button
-                                onClick={() => handleRequireEditWorkflow(item.id)}
-                                className="px-3 py-1 rounded bg-yellow-500 text-white text-sm hover:bg-yellow-600 disabled:opacity-60"
-                                disabled={reviewLoading}
-                              >
-                                Yêu cầu sửa
-                              </button>
                             </div>
                           </td>
                         </tr>
@@ -1330,8 +1441,102 @@ const LecturerDashboard = ({ user, onLogout }) => {
                   {syllabusDetailData.content && syllabusDetailData.content !== '{}' && (
                     <div className="bg-gray-50 border border-gray-200 rounded-lg p-6">
                       <h3 className="text-lg font-semibold text-gray-900 mb-3">Nội dung giáo trình</h3>
-                      <div className="text-sm text-gray-700 max-h-60 overflow-y-auto">
-                        <pre className="whitespace-pre-wrap">{syllabusDetailData.content}</pre>
+                      <div className="text-sm text-gray-700">
+                        {(() => {
+                          try {
+                            const content = typeof syllabusDetailData.content === 'string' 
+                              ? JSON.parse(syllabusDetailData.content) 
+                              : syllabusDetailData.content
+                            
+                            // Nếu là object, render từng field
+                            if (typeof content === 'object') {
+                              return (
+                                <div className="space-y-4">
+                                  {/* Metadata Section */}
+                                  {(content.subjectCode || content.academicYear || content.semester) && (
+                                    <div className="bg-white p-3 rounded border border-gray-200">
+                                      <h4 className="font-semibold text-gray-900 mb-2">📋 Thông tin</h4>
+                                      <div className="grid grid-cols-2 gap-2 text-sm">
+                                        {content.subjectCode && <div><span className="text-gray-600">Mã môn:</span> <span className="font-medium">{content.subjectCode}</span></div>}
+                                        {content.syllabusCode && <div><span className="text-gray-600">Mã giáo trình:</span> <span className="font-medium">{content.syllabusCode}</span></div>}
+                                        {content.academicYear && <div><span className="text-gray-600">Năm học:</span> <span className="font-medium">{content.academicYear}</span></div>}
+                                        {content.semester && <div><span className="text-gray-600">Học kỳ:</span> <span className="font-medium">{content.semester}</span></div>}
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {/* Modules */}
+                                  {content.modules && content.modules.length > 0 && (
+                                    <div>
+                                      <h4 className="font-semibold text-gray-900 mb-2">📚 Các module ({content.modules.length})</h4>
+                                      <ul className="space-y-1 ml-4">
+                                        {content.modules.map((mod, idx) => (
+                                          <li key={idx} className="text-gray-700">
+                                            • {mod.title || mod.name || `Module ${idx + 1}`}
+                                            {mod.description && ` - ${mod.description}`}
+                                          </li>
+                                        ))}
+                                      </ul>
+                                    </div>
+                                  )}
+
+                                  {/* Learning Objectives */}
+                                  {content.learningObjectives && content.learningObjectives.trim() && (
+                                    <div>
+                                      <h4 className="font-semibold text-gray-900 mb-2">🎯 Mục tiêu học tập</h4>
+                                      <p className="text-gray-700 whitespace-pre-wrap">{content.learningObjectives}</p>
+                                    </div>
+                                  )}
+
+                                  {/* Teaching Methods */}
+                                  {content.teachingMethods && content.teachingMethods.trim() && (
+                                    <div>
+                                      <h4 className="font-semibold text-gray-900 mb-2">👨‍🏫 Phương pháp giảng dạy</h4>
+                                      <p className="text-gray-700 whitespace-pre-wrap">{content.teachingMethods}</p>
+                                    </div>
+                                  )}
+
+                                  {/* Assessment Methods */}
+                                  {content.assessmentMethods && content.assessmentMethods.trim() && (
+                                    <div>
+                                      <h4 className="font-semibold text-gray-900 mb-2">📝 Phương pháp đánh giá</h4>
+                                      <p className="text-gray-700 whitespace-pre-wrap">{content.assessmentMethods}</p>
+                                    </div>
+                                  )}
+
+                                  {/* CLO Pair IDs */}
+                                  {content.cloPairIds && content.cloPairIds.length > 0 && (
+                                    <CLODetailsDisplay cloIds={content.cloPairIds} />
+                                  )}
+
+                                  {/* Empty state */}
+                                  {(!content.modules || content.modules.length === 0) &&
+                                   (!content.learningObjectives || !content.learningObjectives.trim()) &&
+                                   (!content.teachingMethods || !content.teachingMethods.trim()) &&
+                                   (!content.assessmentMethods || !content.assessmentMethods.trim()) &&
+                                   (!content.cloPairIds || content.cloPairIds.length === 0) && (
+                                    <div className="text-gray-500 italic">
+                                      ℹ️ Chưa có nội dung chi tiết. Hãy thêm modules, mục tiêu, phương pháp giảng dạy và đánh giá.
+                                    </div>
+                                  )}
+                                </div>
+                              )
+                            } else {
+                              // Nếu là string, hiển thị thô
+                              return <pre className="whitespace-pre-wrap overflow-x-auto">{content}</pre>
+                            }
+                          } catch (err) {
+                            // Nếu parse lỗi, hiển thị thô
+                            return (
+                              <div>
+                                <p className="text-red-600 text-xs mb-2">⚠️ Không thể parse JSON, hiển thị thô:</p>
+                                <pre className="bg-white p-3 rounded border border-gray-300 text-xs overflow-x-auto max-h-48">
+                                  {syllabusDetailData.content}
+                                </pre>
+                              </div>
+                            )
+                          }
+                        })()}
                       </div>
                     </div>
                   )}

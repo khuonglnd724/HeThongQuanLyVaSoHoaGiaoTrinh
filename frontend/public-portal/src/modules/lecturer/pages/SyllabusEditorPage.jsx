@@ -13,10 +13,13 @@ import {
   AlertCircle
 } from 'lucide-react'
 import syllabusServiceV2 from '../services/syllabusServiceV2'
+import dualSyllabusOrchestrator from '../services/dualSyllabusOrchestrator'
 import { academicAPI } from '../services/academicAPI'
 import { syllabusApprovalService } from '../services/syllabusApprovalService'
 
-const SyllabusEditorPage = ({ syllabusId, rootId, user, onBack }) => {
+const SyllabusEditorPage = ({ syllabusId: initialSyllabusId, rootId, user, onBack }) => {
+  const [syllabusId, setSyllabusId] = useState(initialSyllabusId)
+  const [isEditMode, setIsEditMode] = useState(false)
   const mode = syllabusId ? 'edit' : 'create'
   const userId = user?.userId || user?.id
 
@@ -33,6 +36,7 @@ const SyllabusEditorPage = ({ syllabusId, rootId, user, onBack }) => {
   const [plos, setPlos] = useState([])
   const [plosLoading, setPlosLoading] = useState(false)
   const [programInfo, setProgramInfo] = useState(null)
+  const [academicSyllabusId, setAcademicSyllabusId] = useState(null)  // ID từ academic-service
   const [formData, setFormData] = useState({
     subjectId: '',
     description: '',
@@ -257,45 +261,74 @@ const SyllabusEditorPage = ({ syllabusId, rootId, user, onBack }) => {
     const subjectName = (subject.subjectName || subject.name || '').trim()
 
     const payload = {
+      syllabusCode: formData.syllabusCode || `${subjectCode}-${new Date().getFullYear()}`,
       subjectCode,
       subjectName,
       subjectId: Number(formData.subjectId),
+      academicYear: formData.academicYear || new Date().getFullYear().toString(),
+      semester: formData.semester || 1,
       content: formData.description || '',
       summary: formData.description || '',
+      learningObjectives: formData.learningObjectives || '',
+      teachingMethods: formData.teachingMethods || '',
+      assessmentMethods: formData.assessmentMethods || '',
       cloPairIds: formData.cloPairIds,
-      modules: formData.modules
+      modules: formData.modules,
+      version: formData.version || 1
     }
 
     setSaving(true)
     try {
       let savedId = syllabusId
+      let newAcademicId = academicSyllabusId
+
       if (mode === 'create') {
-        const res = await syllabusServiceV2.create(payload, userId)
-        savedId = res.data?.data?.id || res.data?.id || res.data?.syllabusId
-        console.log('[SyllabusEditorPage] Created syllabus', savedId)
+        // ===== Create dùng dual orchestrator =====
+        console.log('[SyllabusEditorPage] Creating with dual orchestrator')
+        const res = await dualSyllabusOrchestrator.createDualSyllabus(payload, userId)
+        
+        savedId = res.id  // syllabusServiceId
+        newAcademicId = res.academicId
+        
+        console.log('[SyllabusEditorPage] Dual creation successful', {
+          syllabusServiceId: savedId,
+          academicId: newAcademicId,
+          cloPairIds: res.cloPairIds
+        })
+
+        setAcademicSyllabusId(newAcademicId)
+        setSyllabusId(savedId)
+        setIsEditMode(true)
+
         await uploadDocuments(savedId)
-        alert('Tạo giáo trình thành công')
+        alert('Tạo giáo trình thành công (lưu ở cả academic_db và syllabus_db)')
       } else {
-        const res = await syllabusServiceV2.createNewVersion(
+        // ===== Update dùng dual orchestrator =====
+        console.log('[SyllabusEditorPage] Updating with dual orchestrator')
+        const res = await dualSyllabusOrchestrator.updateDualSyllabusVersion(
           rootId || syllabusId,
-          {
-            content: formData.description || '',
-            changes: 'Cập nhật thông tin cơ bản',
-            subjectCode,
-            subjectName,
-            cloPairIds: formData.cloPairIds,
-            modules: formData.modules
-          },
+          academicSyllabusId,
+          syllabusId,
+          { ...payload, changes: 'Cập nhật thông tin cơ bản' },
           userId
         )
-        savedId = res.data?.data?.id || res.data?.id || savedId
+
+        savedId = res.id
+        newAcademicId = res.academicId
+
+        console.log('[SyllabusEditorPage] Dual update successful', {
+          syllabusServiceId: savedId,
+          academicId: newAcademicId
+        })
+
         await uploadDocuments(savedId)
-        alert('Cập nhật giáo trình thành công')
+        alert('Cập nhật giáo trình thành công (cập nhật cả 2 database)')
       }
+
       onBack?.()
     } catch (err) {
-      console.error('Save failed:', err)
-      alert('Lưu thất bại: ' + (err.response?.data?.message || err.message))
+      console.error('[SyllabusEditorPage] Save failed:', err)
+      alert('Lưu thất bại: ' + (err.message || err.response?.data?.message || 'Unknown error'))
     } finally {
       setSaving(false)
     }
