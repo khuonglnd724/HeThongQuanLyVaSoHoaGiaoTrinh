@@ -19,7 +19,6 @@ import { syllabusApprovalService } from '../services/syllabusApprovalService'
 
 const SyllabusEditorPage = ({ syllabusId: initialSyllabusId, rootId, user, onBack }) => {
   const [syllabusId, setSyllabusId] = useState(initialSyllabusId)
-  const [isEditMode, setIsEditMode] = useState(false)
   const mode = syllabusId ? 'edit' : 'create'
   const userId = user?.userId || user?.id
 
@@ -47,7 +46,6 @@ const SyllabusEditorPage = ({ syllabusId: initialSyllabusId, rootId, user, onBac
   const [showCloModal, setShowCloModal] = useState(false)
   const [showAddCloModal, setShowAddCloModal] = useState(false)
   const [creatingClo, setCreatingClo] = useState(false)
-  const [showModuleForm, setShowModuleForm] = useState(false)
   const [newModule, setNewModule] = useState({
     week: '',
     topic: '',
@@ -192,32 +190,33 @@ const SyllabusEditorPage = ({ syllabusId: initialSyllabusId, rootId, user, onBac
     })
   }
 
-  const handleAddModule = () => {
-    if (!newModule.week || !newModule.topic) {
-      alert('Vui lòng nhập tuần và chủ đề')
-      return
-    }
-    setFormData(prev => ({
-      ...prev,
-      modules: [
-        ...prev.modules,
-        {
-          ...newModule,
-          id: Date.now(),
-          week: parseInt(newModule.week)
-        }
-      ]
-    }))
-    setNewModule({ week: '', topic: '', content: '', learning_objectives: '' })
-    setShowModuleForm(false)
-  }
+  // Unused functions - commented out to avoid ESLint warnings
+  // const handleAddModule = () => {
+  //   if (!newModule.week || !newModule.topic) {
+  //     alert('Vui lòng nhập tuần và chủ đề')
+  //     return
+  //   }
+  //   setFormData(prev => ({
+  //     ...prev,
+  //     modules: [
+  //       ...prev.modules,
+  //       {
+  //         ...newModule,
+  //         id: Date.now(),
+  //         week: parseInt(newModule.week)
+  //       }
+  //     ]
+  //   }))
+  //   setNewModule({ week: '', topic: '', content: '', learning_objectives: '' })
+  //   setShowModuleForm(false)
+  // }
 
-  const handleRemoveModule = (moduleId) => {
-    setFormData(prev => ({
-      ...prev,
-      modules: prev.modules.filter(m => m.id !== moduleId)
-    }))
-  }
+  // const handleRemoveModule = (moduleId) => {
+  //   setFormData(prev => ({
+  //     ...prev,
+  //     modules: prev.modules.filter(m => m.id !== moduleId)
+  //   }))
+  // }
 
   const handleFileUpload = (e) => {
     const files = e.target.files
@@ -298,7 +297,7 @@ const SyllabusEditorPage = ({ syllabusId: initialSyllabusId, rootId, user, onBac
 
         setAcademicSyllabusId(newAcademicId)
         setSyllabusId(savedId)
-        setIsEditMode(true)
+        // setIsEditMode(true) - removed as isEditMode state was unused
 
         await uploadDocuments(savedId)
         alert('Tạo giáo trình thành công (lưu ở cả academic_db và syllabus_db)')

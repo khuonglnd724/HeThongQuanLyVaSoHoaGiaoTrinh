@@ -8,8 +8,7 @@ import {
   Settings,
   LogOut,
   BarChart3,
-  Eye,
-  XCircle
+  Eye
 } from 'lucide-react'
 import syllabusApprovalService from '../services/syllabusApprovalService'
 import syllabusServiceV2 from '../../../modules/lecturer/services/syllabusServiceV2'
