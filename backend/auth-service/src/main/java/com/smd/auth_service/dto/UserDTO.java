@@ -16,6 +16,8 @@ public class UserDTO {
     private String email;
     private String fullName;
     private String phoneNumber;
+    private String password;
     private Boolean isActive;
     private Boolean isLocked;
+    private java.util.Set<String> roles;
 }

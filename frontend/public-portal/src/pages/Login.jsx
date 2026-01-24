@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { User, LogOut } from 'lucide-react'
+import { User, LogOut, Eye, EyeOff } from 'lucide-react'
 import authService from '../services/auth/authService'
 
 const Login = () => {
   const navigate = useNavigate()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [rememberMe, setRememberMe] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -71,9 +72,18 @@ const Login = () => {
       }
 
       // Normalize roles to array
-      const userRoles = Array.isArray(response.roles)
+      let userRoles = Array.isArray(response.roles)
         ? response.roles
         : (response.roles ? Array.from(response.roles) : [])
+      
+      console.log('[Login] ========== ROLES DEBUG ==========')
+      console.log('[Login] Raw roles from API:', response.roles)
+      console.log('[Login] Type of response.roles:', typeof response.roles)
+      console.log('[Login] Is Array?', Array.isArray(response.roles))
+      console.log('[Login] Parsed userRoles array:', userRoles)
+      console.log('[Login] userRoles[0]:', userRoles[0])
+      console.log('[Login] userRoles includes ROLE_ADMIN?', userRoles.includes('ROLE_ADMIN'))
+      console.log('[Login] ======================================')
 
       // Determine primary role by priority (HOD, RECTOR, AA highest priority)
       const rolePriority = [
@@ -86,12 +96,18 @@ const Login = () => {
       ]
       
       // Use roles array (not singular role field) for routing
-      let primaryRole = userRoles.length > 0 ? userRoles[0] : 'ROLE_STUDENT'
-      for (const r of rolePriority) {
-        if (userRoles.includes(r)) {
-          primaryRole = r
-          break
+      let primaryRole = 'ROLE_STUDENT' // Default fallback
+      if (userRoles && userRoles.length > 0) {
+        // Try to find highest priority role
+        for (const r of rolePriority) {
+          if (userRoles.includes(r)) {
+            primaryRole = r
+            console.log('[Login] Primary role selected:', primaryRole)
+            break
+          }
         }
+      } else {
+        console.warn('[Login] No roles found, using default ROLE_STUDENT')
       }
 
       // Save user data
@@ -109,9 +125,18 @@ const Login = () => {
       // also store role separately for older modules/hooks that read `role`
       try {
         localStorage.setItem('role', primaryRole)
+        console.log('[Login] ✅ Saved to localStorage - role:', primaryRole)
+        console.log('[Login] ✅ Saved to localStorage - user:', JSON.stringify(userData))
       } catch (e) {
         console.warn('Failed to set localStorage role', e)
       }
+      
+      // Verify what was saved
+      const savedUser = JSON.parse(localStorage.getItem('user'))
+      const savedRole = localStorage.getItem('role')
+      console.log('[Login] 🔍 Verify localStorage - savedUser:', savedUser)
+      console.log('[Login] 🔍 Verify localStorage - savedRole:', savedRole)
+      
       setCurrentUser(userData)
       console.log('[Login] User data saved, navigating to dashboard')
 
@@ -119,19 +144,30 @@ const Login = () => {
         localStorage.setItem('rememberEmail', email)
       }
 
-      console.log('[Login] Login successful, navigating...')
+      console.log('[Login] Login successful, primaryRole =', primaryRole)
       // Navigate based on primary role (small delay to ensure state updates)
       const roleToPath = {
         'ROLE_RECTOR': '/academic/dashboard',           // Rector → Academic Dashboard (publish)
         'ROLE_ACADEMIC_AFFAIRS': '/academic/dashboard', // AA → Academic Dashboard (approve)
         'ROLE_HOD': '/lecturer/dashboard',              // HoD acts as lecturer by default (can still access /hod/dashboard for approvals)
-        'ROLE_ADMIN': '/admin/dashboard',
+        'ROLE_ADMIN': '/admin/portal',                  // Admin → Admin Portal
         'ROLE_LECTURER': '/lecturer/dashboard',
         'ROLE_STUDENT': '/student/dashboard'
       }
       const targetPath = roleToPath[primaryRole] || '/student/dashboard'
-      console.log(`[Login] Routing ${primaryRole} → ${targetPath}`)
-      setTimeout(() => navigate(targetPath), 100)
+      console.log(`[Login] Will navigate ${primaryRole} → ${targetPath}`)
+      console.log('[Login] Current userData.role:', userData.role)
+      console.log('[Login] Current userData.roles:', userData.roles)
+      console.log('[Login] Checking condition: primaryRole === ROLE_ADMIN?', primaryRole === 'ROLE_ADMIN')
+      
+      // Force redirect to admin portal immediately for ROLE_ADMIN
+      if (primaryRole === 'ROLE_ADMIN') {
+        console.log('[Login] ✅ ROLE_ADMIN detected - navigate to /admin/portal immediately')
+        navigate('/admin/portal', { replace: true })
+      } else {
+        console.log(`[Login] ⚠️ NOT ADMIN - Routing ${primaryRole} → ${targetPath}`)
+        setTimeout(() => navigate(targetPath, { replace: true }), 100)
+      }
     } catch (err) {
       console.error('[Login] Error caught:', err)
       const errorMsg = err.message || err.error || 'Login failed. Please check your credentials.'
@@ -153,7 +189,7 @@ const Login = () => {
         localStorage.setItem('user', JSON.stringify(demoUser))
         setCurrentUser(demoUser)
         // Demo fallback: respect admin role and route accordingly
-        setTimeout(() => navigate('/admin/dashboard'), 100)
+        setTimeout(() => navigate('/admin/portal'), 100)
       }
     } finally {
       setLoading(false)
@@ -221,13 +257,23 @@ const Login = () => {
             {/* Password */}
             <div className="space-y-1">
               <label className="block text-sm font-semibold text-slate-700">Password</label>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                className="w-full rounded-md border border-slate-300 px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-              />
+              <div className="relative flex items-center">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  className="w-full rounded-md border border-slate-300 px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 text-slate-500 hover:text-slate-700 transition-colors"
+                  title={showPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
             </div>
 
             {/* Checkbox & Link */}
