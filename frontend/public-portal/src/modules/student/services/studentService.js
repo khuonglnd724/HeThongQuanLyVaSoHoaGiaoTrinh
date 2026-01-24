@@ -1,8 +1,22 @@
-import apiClient from '@/services/api/apiClient';
+import apiClient from '../../../services/api/apiClient';
 
 const studentAPI = {
-  // Dashboard
-  getDashboard: () => apiClient.get('/api/student/dashboard'),
+  // Dashboard - mock data until backend implements student-service
+  getDashboard: async () => {
+    try {
+      return await apiClient.get('/api/student/dashboard');
+    } catch (err) {
+      // Fallback to mock data if endpoint not available
+      console.warn('[studentAPI] Dashboard endpoint not available, using mock data');
+      return {
+        data: {
+          syllabiCount: 8,
+          averageGrade: 7.8,
+          progressPercent: 72
+        }
+      };
+    }
+  },
   
   // Enrolled Classes
   getEnrolledClasses: () => apiClient.get('/api/student/classes'),
