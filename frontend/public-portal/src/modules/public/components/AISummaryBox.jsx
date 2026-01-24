@@ -1,5 +1,5 @@
 import React from 'react'
-import { BookOpen, Zap } from 'lucide-react'
+import { Zap } from 'lucide-react'
 
 export default function AISummaryBox({ summary, loading = false }) {
   if (loading) {

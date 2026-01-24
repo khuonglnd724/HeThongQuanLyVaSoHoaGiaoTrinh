@@ -1,11 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { BookOpen, LogOut, FileText, Plus, Edit, Eye, Trash2, Upload, CheckCircle, Clock, XCircle } from 'lucide-react'
-import { Link } from 'react-router-dom'
 import apiClient from '../../../services/api/apiClient'
 import syllabusServiceV2 from '../services/syllabusServiceV2'
 import SyllabusEditorPage from './SyllabusEditorPage'
 import workflowApi from '../../workflow/api/workflowApi'
-import academicAPI from '../services/academicAPI'
 
 // Minimal role constants here to avoid circular import with roleConfig (roleConfig imports LecturerDashboard)
 const ROLES = {
