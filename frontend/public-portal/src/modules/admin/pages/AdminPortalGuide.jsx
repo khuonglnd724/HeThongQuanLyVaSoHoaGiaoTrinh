@@ -26,7 +26,7 @@ export default function AdminPortalGuide() {
       console.error('[AdminPortalGuide] Invalid user data:', e)
       navigate('/login')
     }
-  }, [])
+  }, [navigate])
 
   const sections = [
     {
