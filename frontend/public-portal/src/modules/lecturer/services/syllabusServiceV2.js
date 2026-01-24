@@ -7,6 +7,7 @@ import apiClient from '../../../services/api/apiClient'
 
 const SYLLABUS_API_BASE = '/api/syllabuses'
 const SYLLABUS_DOCUMENT_BASE = '/api/syllabus/documents'
+const SUBJECT_API_BASE = '/api/v1/subject'
 
 const syllabusServiceV2 = {
   // ========== Syllabus List & Search ==========
@@ -39,9 +40,16 @@ const syllabusServiceV2 = {
   create: async (data, userId) => {
     const payload = {
       syllabusCode: data.syllabusCode,
+      subjectCode: data.subjectCode || '',
+      subjectName: data.subjectName || '',
       subjectId: data.subjectId,
-      content: data.content, // JSON content
-      description: data.description
+      academicYear: data.academicYear,
+      semester: data.semester,
+      content: data.content, // JSON content or text
+      description: data.description,
+      learningObjectives: data.learningObjectives,
+      cloPairIds: data.cloPairIds,
+      modules: data.modules
     }
     return apiClient.post(SYLLABUS_API_BASE, payload, {
       headers: { 'X-User-Id': userId }
@@ -51,7 +59,14 @@ const syllabusServiceV2 = {
   createNewVersion: async (rootId, data, userId) => {
     const payload = {
       content: data.content,
-      changes: data.changes
+      changes: data.changes,
+      subjectCode: data.subjectCode || '',
+      subjectName: data.subjectName || '',
+      academicYear: data.academicYear,
+      semester: data.semester,
+      learningObjectives: data.learningObjectives,
+      cloPairIds: data.cloPairIds,
+      modules: data.modules
     }
     return apiClient.post(`${SYLLABUS_API_BASE}/${rootId}/versions`, payload, {
       headers: { 'X-User-Id': userId }
@@ -218,6 +233,10 @@ const syllabusServiceV2 = {
   },
 
   // ========== CLOs (Course Learning Outcomes) ==========
+  getSubjects: async () => {
+    return apiClient.get(SUBJECT_API_BASE)
+  },
+
   createCLO: async (cloData) => {
     // POST /api/v1/clo
     // cloData: { cloCode, syllabusId, description, level }
@@ -252,6 +271,14 @@ const syllabusServiceV2 = {
   searchCLOs: async (code) => {
     // GET /api/v1/clo/search?code={code}
     return apiClient.get('/api/v1/clo/search', { params: { code } })
+  },
+
+  getUnassignedCLOs: async () => {
+    return apiClient.get('/api/v1/clo/unassigned')
+  },
+
+  assignCLOToSubject: async (cloId, subjectId) => {
+    return apiClient.post(`/api/v1/clo/${cloId}/assign-subject`, null, { params: { subjectId } })
   }
 }
 

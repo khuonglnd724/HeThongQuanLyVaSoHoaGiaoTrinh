@@ -43,11 +43,12 @@ public class WorkflowController {
 
     @PostMapping("/{id}/submit")
     public WorkflowState submit(@PathVariable UUID id,
-                                @RequestParam String actionBy) {
+                                @RequestParam String actionBy,
+                                @RequestParam(defaultValue = "ROLE_LECTURER") UserRole role) {
         return service.sendEvent(
             id,
             WorkflowEvent.SUBMIT,
-            UserRole.ROLE_LECTURER,
+            role,
             actionBy,
             null
         );

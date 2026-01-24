@@ -1,13 +1,16 @@
 import React, { useState, useEffect } from 'react'
-import { Plus, Edit2, Eye, Send } from 'lucide-react'
+import { Plus, Edit2, Eye, Send, AlertCircle } from 'lucide-react'
 import syllabusServiceV2 from '../services/syllabusServiceV2'
+import { syllabusApprovalService } from '../services/syllabusApprovalService'
 import SyllabusEditorPage from './SyllabusEditorPage'
+import SyllabusCommentSection from '../components/SyllabusCommentSection'
 import DocumentUploadForm from '../components/DocumentUploadForm'
 import DocumentList from '../components/DocumentList'
 
 const SyllabusListPage = ({ user }) => {
   const [syllabi, setSyllabi] = useState([])
   const [loading, setLoading] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState('ALL')
   const [page, setPage] = useState(0)
@@ -79,14 +82,17 @@ const SyllabusListPage = ({ user }) => {
 
   const handleSubmit = async (id) => {
     if (!window.confirm('Bạn chắc chắn muốn gửi giáo trình này để xem xét?')) return
+    setSubmitting(true)
     try {
-      await syllabusServiceV2.submit(id, user?.userId || user?.id)
-      alert('Gửi thành công')
+      await syllabusApprovalService.submit(id, user?.userId || user?.id)
+      alert('Gửi thành công. Giáo trình đang chờ phòng Đào Tạo xem xét.')
       loadSyllabi()
       setShowDetailModal(false)
     } catch (err) {
       console.error('Submit failed:', err)
       alert('Gửi thất bại: ' + (err.response?.data?.message || err.message))
+    } finally {
+      setSubmitting(false)
     }
   }
 
@@ -213,15 +219,45 @@ const SyllabusListPage = ({ user }) => {
                         {new Date(syllabus.updatedAt).toLocaleDateString('vi-VN')}
                       </td>
                       <td className="px-6 py-4 text-center">
-                        <button
-                          onClick={() => {
-                            setSelectedSyllabus(syllabus)
-                            setShowDetailModal(true)
-                          }}
-                          className="text-blue-600 hover:text-blue-900 font-medium"
-                        >
-                          Xem chi tiết
-                        </button>
+                        <div className="flex gap-2 justify-center">
+                          {selectedSyllabus.status === 'DRAFT' && (
+                            <>
+                              <button
+                                onClick={() => {
+                                  setShowDetailModal(false)
+                                  setShowEditor(true)
+                                }}
+                                className="text-blue-600 hover:text-blue-900 font-medium text-sm"
+                              >
+                                Sửa
+                              </button>
+                              <span className="text-gray-300">|</span>
+                            </>
+                          )}
+                          {selectedSyllabus.status === 'REJECTED' && (
+                            <>
+                              <button
+                                onClick={() => {
+                                  setShowDetailModal(false)
+                                  setShowEditor(true)
+                                }}
+                                className="text-orange-600 hover:text-orange-900 font-medium text-sm"
+                              >
+                                Sửa lại
+                              </button>
+                              <span className="text-gray-300">|</span>
+                            </>
+                          )}
+                          <button
+                            onClick={() => {
+                              setSelectedSyllabus(syllabus)
+                              setShowDetailModal(true)
+                            }}
+                            className="text-blue-600 hover:text-blue-900 font-medium text-sm"
+                          >
+                            Chi tiết
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -279,7 +315,7 @@ const SyllabusListPage = ({ user }) => {
             <div className="p-6">
               {/* Status Info */}
               <div className="mb-6 p-4 bg-gray-50 rounded-lg">
-                <div className="flex justify-between items-center">
+                <div className="flex justify-between items-center mb-3">
                   <div>
                     <p className="text-sm text-gray-600 mb-1">Trạng thái</p>
                     <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${statusColors[selectedSyllabus.status]}`}>
@@ -291,45 +327,79 @@ const SyllabusListPage = ({ user }) => {
                     <p className="font-medium">{new Date(selectedSyllabus.updatedAt).toLocaleString('vi-VN')}</p>
                   </div>
                 </div>
+
+                {/* Rejection Reason */}
+                {selectedSyllabus.status === 'REJECTED' && selectedSyllabus.rejectionReason && (
+                  <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded">
+                    <div className="flex gap-2 text-red-800 text-sm">
+                      <AlertCircle size={16} className="flex-shrink-0 mt-0.5" />
+                      <div>
+                        <p className="font-medium">Lý do từ chối:</p>
+                        <p className="mt-1">{selectedSyllabus.rejectionReason}</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Action Buttons */}
-              <div className="mb-6 flex gap-3">
-                    {selectedSyllabus.status === 'DRAFT' && (
+              <div className="mb-6 flex gap-3 flex-wrap">
+                {selectedSyllabus.status === 'DRAFT' && (
                   <>
                     <button
                       onClick={() => handleSubmit(selectedSyllabus.id)}
-                      className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium flex items-center justify-center gap-2"
+                      disabled={submitting}
+                      className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 font-medium flex items-center justify-center gap-2"
                     >
                       <Send size={18} />
-                      Gửi để xem xét
+                      {submitting ? 'Đang gửi...' : 'Gửi để xem xét'}
                     </button>
-                        <button
-                          onClick={() => {
-                            setShowDetailModal(false)
-                            setShowEditor(true)
-                            // selectedSyllabus remains set to pass to editor
-                          }}
-                          className="flex-1 px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 font-medium flex items-center justify-center gap-2"
-                        >
-                          <Edit2 size={18} />
-                          Chỉnh sửa
-                        </button>
+                    <button
+                      onClick={() => {
+                        setShowDetailModal(false)
+                        setShowEditor(true)
+                      }}
+                      className="flex-1 px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 font-medium flex items-center justify-center gap-2"
+                    >
+                      <Edit2 size={18} />
+                      Chỉnh sửa
+                    </button>
                   </>
                 )}
                 {selectedSyllabus.status === 'REJECTED' && (
+                  <>
+                    <button
+                      onClick={() => {
+                        setShowDetailModal(false)
+                        setShowEditor(true)
+                      }}
+                      className="flex-1 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 font-medium flex items-center justify-center gap-2"
+                    >
+                      <Edit2 size={18} />
+                      Sửa và gửi lại
+                    </button>
+                    <button
+                      onClick={() => handleSubmit(selectedSyllabus.id)}
+                      disabled={submitting}
+                      className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 font-medium flex items-center justify-center gap-2"
+                    >
+                      <Send size={18} />
+                      {submitting ? 'Đang gửi...' : 'Gửi lại'}
+                    </button>
+                  </>
+                )}
+                {(selectedSyllabus.status === 'PENDING_REVIEW' || 
+                  selectedSyllabus.status === 'PENDING_APPROVAL' || 
+                  selectedSyllabus.status === 'APPROVED' || 
+                  selectedSyllabus.status === 'PUBLISHED') && (
                   <button
-                    className="flex-1 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 font-medium"
+                    disabled
+                    className="flex-1 px-4 py-2 bg-gray-100 text-gray-600 rounded-lg font-medium flex items-center justify-center gap-2"
                   >
-                    Sửa và gửi lại
+                    <Eye size={18} />
+                    Đang trong quy trình duyệt
                   </button>
                 )}
-                <button
-                  className="flex-1 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-medium flex items-center justify-center gap-2"
-                >
-                  <Eye size={18} />
-                  Xem chi tiết
-                </button>
               </div>
 
               {/* Documents Section */}
@@ -342,6 +412,14 @@ const SyllabusListPage = ({ user }) => {
               <DocumentUploadForm 
                 syllabusId={selectedSyllabus.id}
                 userId={user?.userId || user?.id}
+              />
+
+              {/* Comment Section */}
+              <SyllabusCommentSection
+                syllabusId={selectedSyllabus.id}
+                syllabusStatus={selectedSyllabus.status}
+                userId={user?.userId || user?.id}
+                onCommentAdded={() => loadSyllabi()}
               />
             </div>
 

@@ -61,4 +61,6 @@ public interface SyllabusRepository extends JpaRepository<Syllabus, UUID> {
                         """)
         List<Syllabus> findPendingSince(@Param("statuses") List<SyllabusStatus> statuses,
                         @Param("since") Instant since);
+
+        Optional<Syllabus> findByWorkflowId(UUID workflowId);
 }

@@ -103,7 +103,7 @@ ON CONFLICT (user_id) DO NOTHING;
 
 INSERT INTO user_roles (user_id, role_id) VALUES 
 	(2, 5),
-	(3, 5)
+	(3, 4)
 ON CONFLICT DO NOTHING;
 
 INSERT INTO users (user_id, username, email, password, full_name, phone_number, is_active, is_locked, created_at, updated_at, failed_attempts)

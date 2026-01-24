@@ -38,6 +38,8 @@ public class SyllabusResponse {
     private String rejectionReason;
     private String lastActionBy;
 
+    private UUID workflowId;
+
     public SyllabusResponse() {
     }
 
@@ -191,5 +193,13 @@ public class SyllabusResponse {
 
     public void setLastActionBy(String lastActionBy) {
         this.lastActionBy = lastActionBy;
+    }
+
+    public UUID getWorkflowId() {
+        return workflowId;
+    }
+
+    public void setWorkflowId(UUID workflowId) {
+        this.workflowId = workflowId;
     }
 }

@@ -12,8 +12,8 @@ import org.springframework.context.annotation.Configuration;
 public class RabbitMQConfig {
 
     public static final String WORKFLOW_EXCHANGE = "workflow.exchange";
-    public static final String APPROVAL_QUEUE = "workflow.approval.queue";
-    public static final String APPROVAL_ROUTING_KEY = "workflow.approval";
+    public static final String SYNC_QUEUE = "workflow.sync.queue";
+    public static final String SYNC_ROUTING_KEY = "workflow.sync";
 
     @Bean
     public TopicExchange workflowExchange() {
@@ -21,16 +21,16 @@ public class RabbitMQConfig {
     }
 
     @Bean
-    public Queue approvalQueue() {
-        return QueueBuilder.durable(APPROVAL_QUEUE).build();
+    public Queue syncQueue() {
+        return QueueBuilder.durable(SYNC_QUEUE).build();
     }
 
     @Bean
-    public Binding approvalBinding() {
+    public Binding syncBinding() {
         return BindingBuilder
-                .bind(approvalQueue())
+                .bind(syncQueue())
                 .to(workflowExchange())
-                .with(APPROVAL_ROUTING_KEY);
+                .with(SYNC_ROUTING_KEY);
     }
 
     @Bean

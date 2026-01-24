@@ -5,7 +5,7 @@ spring:
   application:
     name: syllabus-service
   rabbitmq:
-    host: ${SPRING_RABBITMQ_HOST:localhost}
+    host: ${SPRING_RABBITMQ_HOST:smd-rabbitmq}
     port: 5672
     username: guest
     password: guest
@@ -37,6 +37,10 @@ smd:
   mq:
     exchange: smd.syllabus.exchange
     routingKey: syllabus.event
+  workflow:
+    base-url: http://workflow-service:8084
+    sync-queue: workflow.sync.syllabus
+    sync-routing-key: workflow.sync
   file:
     upload:
       directory: ./uploads/syllabus-documents
