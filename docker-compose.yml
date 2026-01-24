@@ -89,9 +89,9 @@ services:
       dockerfile: Dockerfile
     container_name: smd-auth-service
     ports:
-      - "8001:8001"
+      - "8081:8081"
     environment:
-      - SERVER_PORT=8001
+      - SERVER_PORT=8081
       - EUREKA_SERVER_URL=http://discovery-server:8761/eureka
       - CONFIG_SERVER_URL=http://config-server:8888
     depends_on:
