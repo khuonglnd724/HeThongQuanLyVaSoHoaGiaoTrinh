@@ -2,15 +2,18 @@ const { createProxyMiddleware } = require('http-proxy-middleware');
 
 module.exports = function(app) {
   // Proxy all /api/* requests to API Gateway (port 8080)
-  // IMPORTANT: Do NOT strip /api prefix - keep full path when forwarding
   app.use(
     '/api',
     createProxyMiddleware({
       target: 'http://localhost:8080', // API Gateway
       changeOrigin: true,
-      // Express strips the mount path when using app.use('/api', ...).
-      // Re-add the `/api` prefix so the gateway receives the full path.
-      pathRewrite: (path) => '/api' + path,
+      // The API Gateway expects /api/* paths
+      // When app.use('/api', ...) is used, the /api prefix is stripped before reaching this middleware
+      // So we need to re-add it for the backend
+      pathRewrite: (path) => {
+        // path is just '/users', '/auth/login', etc (without /api prefix)
+        return `/api${path}`
+      },
       logLevel: 'debug',
       ws: true, // Enable WebSocket support
       onProxyReq: (proxyReq, req, res) => {
@@ -31,6 +34,20 @@ module.exports = function(app) {
           message: 'Backend service is not responding',
           details: err.message
         });
+      }
+    })
+  );
+
+  // Proxy WebSocket connections to API Gateway
+  app.use(
+    '/ws',
+    createProxyMiddleware({
+      target: 'ws://localhost:8080',
+      changeOrigin: true,
+      ws: true,
+      logLevel: 'debug',
+      onError: (err, req, res) => {
+        console.error(`[WS PROXY ERROR]:`, err.message);
       }
     })
   );

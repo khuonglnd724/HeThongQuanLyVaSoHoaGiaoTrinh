@@ -12,7 +12,7 @@ spring:
         - id: auth-service
           uri: lb://auth-service
           predicates:
-            - Path=/api/auth/**,/api/users/**,/api/roles/**,/api/system/**,/api/services/**
+            - Path=/api/auth/**,/api/users/**,/api/admin/**,/api/roles/**,/api/system/**,/api/services/**
         
         - id: academic-service
           uri: lb://academic-service
@@ -35,6 +35,13 @@ spring:
           uri: lb://public-service
           predicates:
             - Path=/api/public/**
+        
+        - id: student-service-fallback
+          uri: lb://academic-service
+          predicates:
+            - Path=/api/student/**
+          filters:
+            - RewritePath=/api/student(?<segment>/?.*), /api/v1/student${segment}
         
         - id: ai-service
           uri: http://ai-service:8000
@@ -76,6 +83,7 @@ security:
     whitelist:
       - /api/auth/**
       - /api/ai/**
+      - /api/public/**
       - /actuator/prometheus
       - /actuator/health
       - /
