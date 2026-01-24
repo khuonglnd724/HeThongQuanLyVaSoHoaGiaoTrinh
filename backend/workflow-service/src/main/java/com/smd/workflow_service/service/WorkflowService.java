@@ -1,8 +1,8 @@
 package com.smd.workflow_service.service;
 
 import com.smd.workflow_service.domain.*;
-import com.smd.workflow_service.event.WorkflowApprovalEvent;
-import com.smd.workflow_service.messaging.WorkflowApprovalProducer;
+import com.smd.workflow_service.event.WorkflowSyncEvent;
+import com.smd.workflow_service.messaging.WorkflowProducer;
 import com.smd.workflow_service.repository.WorkflowHistoryRepository;
 import com.smd.workflow_service.repository.WorkflowRepository;
 
@@ -27,7 +27,7 @@ public class WorkflowService {
     private final WorkflowRepository repository;
     private final WorkflowHistoryRepository historyRepository;
     private final WorkflowAuditProducer auditProducer;
-    private final WorkflowApprovalProducer approvalProducer;
+    private final WorkflowProducer workflowProducer;
     private static final Logger log =
         LoggerFactory.getLogger(WorkflowService.class);
 
@@ -35,12 +35,12 @@ public class WorkflowService {
                            WorkflowRepository repository,
                            WorkflowHistoryRepository historyRepository,
                            WorkflowAuditProducer auditProducer,
-                           WorkflowApprovalProducer approvalProducer) {
+                           WorkflowProducer workflowProducer) {
         this.factory = factory;
         this.repository = repository;
         this.historyRepository = historyRepository;
         this.auditProducer = auditProducer;
-        this.approvalProducer = approvalProducer;
+        this.workflowProducer = workflowProducer;
     }
 
     public Workflow createWorkflow(String entityId, String entityType) {
@@ -140,17 +140,17 @@ public class WorkflowService {
             }
 
             try {
-                WorkflowApprovalEvent approvalEvent = new WorkflowApprovalEvent();
-                approvalEvent.setWorkflowId(workflowId);
-                approvalEvent.setEntityId(workflow.getEntityId());
-                approvalEvent.setEntityType(workflow.getEntityType());
-                approvalEvent.setFromState(fromState);
-                approvalEvent.setToState(toState);
-                approvalEvent.setActionBy(actionBy);
+                WorkflowSyncEvent syncEvent = new WorkflowSyncEvent();
+                syncEvent.setWorkflowId(workflowId);
+                syncEvent.setEntityId(workflow.getEntityId());
+                syncEvent.setEntityType(workflow.getEntityType());
+                syncEvent.setFromState(fromState);
+                syncEvent.setToState(toState);
+                syncEvent.setActionBy(actionBy);
 
-                approvalProducer.send(approvalEvent);
+                workflowProducer.send(syncEvent);
             } catch (Exception e) {
-                log.error("Failed to send approval event for workflow {}", workflowId, e);
+                log.error("Failed to send workflow sync event for workflow {}", workflowId, e);
             }
         }
 

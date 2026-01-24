@@ -2,9 +2,11 @@ package com.smd.academic_service.service;
 
 import com.smd.academic_service.model.dto.CloDto;
 import com.smd.academic_service.model.entity.Clo;
+import com.smd.academic_service.model.entity.CloSyllabus;
 import com.smd.academic_service.model.entity.Subject;
 import com.smd.academic_service.model.entity.Syllabus;
 import com.smd.academic_service.repository.CloRepository;
+import com.smd.academic_service.repository.CloSyllabusRepository;
 import com.smd.academic_service.repository.SubjectRepository;
 import com.smd.academic_service.repository.SyllabusRepository;
 import lombok.RequiredArgsConstructor;
@@ -12,6 +14,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -24,6 +27,7 @@ public class CloService {
     private final CloRepository cloRepository;
     private final SubjectRepository subjectRepository;
     private final SyllabusRepository syllabusRepository;
+    private final CloSyllabusRepository cloSyllabusRepository;
     
     // Create
     public CloDto createClo(CloDto cloDto, String createdBy) {
@@ -42,6 +46,7 @@ public class CloService {
                 .orElseThrow(() -> new RuntimeException("Syllabus not found with id: " + cloDto.getSyllabusId()));
         }
         
+        @SuppressWarnings("null")
         Clo clo = Clo.builder()
             .cloCode(cloDto.getCloCode())
             .cloName(cloDto.getCloName() != null ? cloDto.getCloName() : cloDto.getCloCode())
@@ -56,6 +61,7 @@ public class CloService {
             .createdBy(createdBy)
             .build();
         
+        @SuppressWarnings("null")
         Clo savedClo = cloRepository.save(clo);
         log.info("CLO created successfully with id: {}", savedClo.getId());
         return mapToDto(savedClo);
@@ -197,5 +203,65 @@ public class CloService {
             .createdAt(clo.getCreatedAt())
             .updatedAt(clo.getUpdatedAt())
             .build();
+    }
+    
+    // ========== Link CLO to Syllabus from syllabus_db ==========
+    /**
+     * Link một danh sách CLO vào một Syllabus (từ syllabus_db)
+     * Tạo các bản ghi trong bảng clo_syllabus
+     */
+    public void linkClosToSyllabus(String syllabusId, List<Long> cloIds, String createdBy) {
+        log.info("Linking {} CLOs to syllabus {}", cloIds.size(), syllabusId);
+        
+        if (cloIds == null || cloIds.isEmpty()) {
+            log.warn("No CLOs to link for syllabus {}", syllabusId);
+            return;
+        }
+        
+        // Validate tất cả CLO tồn tại
+        @SuppressWarnings("null")
+        List<Clo> clos = cloRepository.findByIdIn(cloIds);
+        if (clos.size() != cloIds.size()) {
+            throw new RuntimeException("Some CLOs not found. Expected: " + cloIds.size() + ", Found: " + clos.size());
+        }
+        
+        // Insert các link vào clo_syllabus
+        for (Long cloId : cloIds) {
+            // Kiểm tra xem link đã tồn tại chưa
+            if (cloSyllabusRepository.findByCloIdAndSyllabusId(cloId, syllabusId).isEmpty()) {
+                CloSyllabus cloSyllabus = CloSyllabus.builder()
+                    .cloId(cloId)
+                    .syllabusId(syllabusId)
+                    .createdBy(createdBy)
+                    .build();
+                cloSyllabusRepository.save(cloSyllabus);
+            }
+        }
+        
+        log.info("Successfully linked CLOs to syllabus {}", syllabusId);
+    }
+    
+    /**
+     * Lấy tất cả CLO liên kết với một Syllabus
+     */
+    public List<CloDto> getClosBySyllabusUuid(String syllabusId) {
+        log.debug("Fetching CLOs for syllabus UUID: {}", syllabusId);
+        List<CloSyllabus> links = cloSyllabusRepository.findBySyllabusId(syllabusId);
+        
+        return links.stream()
+            .map(link -> {
+                Clo clo = cloRepository.findById(link.getCloId()).orElse(null);
+                return clo != null ? mapToDto(clo) : null;
+            })
+            .filter(dto -> dto != null)
+            .collect(Collectors.toList());
+    }
+    
+    /**
+     * Xóa tất cả link của một Syllabus
+     */
+    public void unlinkAllClosFromSyllabus(String syllabusId) {
+        log.info("Unlinking all CLOs from syllabus {}", syllabusId);
+        cloSyllabusRepository.deleteBySyllabusId(syllabusId);
     }
 }

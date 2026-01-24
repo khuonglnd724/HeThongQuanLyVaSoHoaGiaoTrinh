@@ -12,6 +12,7 @@ import {
   XCircle
 } from 'lucide-react'
 import syllabusApprovalService from '../services/syllabusApprovalService'
+import syllabusServiceV2 from '../../../modules/lecturer/services/syllabusServiceV2'
 import academicAPI from '../services/academicService'
 
 const AcademicDashboard = () => {
@@ -23,6 +24,8 @@ const AcademicDashboard = () => {
   const [actionId, setActionId] = useState(null)
   const [selected, setSelected] = useState(null)
   const [statsData, setStatsData] = useState({ departments: '--', programs: '--' })
+  const [cloDetails, setCloDetails] = useState({})
+  const [cloLoading, setCloLoading] = useState(false)
 
   useEffect(() => {
     const storedUser = (() => {
@@ -114,6 +117,83 @@ const AcademicDashboard = () => {
       setActionId(null)
     }
   }
+
+  const fetchCLODetails = async (cloIds) => {
+    if (!cloIds || cloIds.length === 0) {
+      setCloDetails({})
+      return
+    }
+
+    setCloLoading(true)
+    try {
+      const details = {}
+      console.log('[AcademicDashboard] Fetching CLO details for IDs:', cloIds)
+      
+      for (const id of cloIds) {
+        try {
+          console.log(`[AcademicDashboard] Fetching CLO with ID: ${id}`)
+          const response = await syllabusServiceV2.getCLOById(id)
+          console.log(`[AcademicDashboard] CLO ${id} response:`, response)
+          
+          const cloData = response.data?.data || response.data || response
+          details[id] = cloData
+          console.log(`[AcademicDashboard] CLO ${id} data:`, cloData)
+        } catch (err) {
+          console.error(`Failed to fetch CLO ${id}:`, err)
+          details[id] = { id, cloCode: `CLO-${id}`, description: 'Không thể tải' }
+        }
+      }
+      setCloDetails(details)
+      console.log('[AcademicDashboard] Final CLO details:', details)
+    } catch (err) {
+      console.error('Error fetching CLO details:', err)
+    } finally {
+      setCloLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    if (selected) {
+      console.log('[AcademicDashboard] Selected item:', selected)
+      
+      let cloIds = []
+      
+      // First try to get cloIds from content (which is usually a JSON string)
+      if (selected.content) {
+        try {
+          const content = typeof selected.content === 'string' 
+            ? JSON.parse(selected.content) 
+            : selected.content
+          
+          if (content?.cloPairIds && Array.isArray(content.cloPairIds)) {
+            cloIds = content.cloPairIds
+            console.log('[AcademicDashboard] Found cloPairIds in content:', cloIds)
+          } else if (content?.cloIds && Array.isArray(content.cloIds)) {
+            cloIds = content.cloIds
+            console.log('[AcademicDashboard] Found cloIds in content:', cloIds)
+          } else if (content?.clIds && Array.isArray(content.clIds)) {
+            cloIds = content.clIds
+            console.log('[AcademicDashboard] Found clIds in content:', cloIds)
+          }
+        } catch (e) {
+          console.error('[AcademicDashboard] Error parsing content:', e)
+        }
+      }
+      
+      // Fallback to top-level fields
+      if (cloIds.length === 0) {
+        cloIds = selected.cloPairIds || selected.clIds || selected.cloIds || []
+      }
+      
+      console.log('[AcademicDashboard] Final extracted CLO IDs:', cloIds)
+      
+      if (cloIds.length > 0) {
+        fetchCLODetails(cloIds)
+      } else {
+        setCloDetails({})
+      }
+    }
+  }, [selected])
 
   const handleLogout = () => {
     localStorage.clear()
@@ -209,7 +289,6 @@ const AcademicDashboard = () => {
           <div className="flex items-center justify-between mb-6">
             <div>
               <h2 className="text-2xl font-bold">Giáo trình chờ phê duyệt</h2>
-              <p className="text-sm text-gray-500">PENDING_APPROVAL → APPROVED / REJECTED</p>
             </div>
             <button
               onClick={loadPending}
@@ -283,7 +362,10 @@ const AcademicDashboard = () => {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
             <div className="sticky top-0 bg-white border-b border-gray-200 px-8 py-6 flex justify-between items-center">
-              <h2 className="text-xl font-semibold text-gray-900">Chi tiết giáo trình</h2>
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900">Chi tiết giáo trình</h2>
+                <p className="text-sm text-gray-600 mt-1">{selected.subjectCode}</p>
+              </div>
               <button
                 onClick={() => setSelected(null)}
                 className="text-gray-400 hover:text-gray-600 text-2xl font-light"
@@ -291,85 +373,213 @@ const AcademicDashboard = () => {
                 ×
               </button>
             </div>
-            <div className="px-8 py-6 space-y-4">
-              <div className="grid grid-cols-2 gap-4 bg-gray-50 p-4 rounded-lg">
-                <div>
-                  <p className="text-xs text-gray-600 uppercase">Mã môn</p>
-                  <p className="font-medium text-gray-900">{selected.subjectCode || '-'}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-600 uppercase">Tên môn</p>
-                  <p className="font-medium text-gray-900">{selected.subjectName || '-'}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-600 uppercase">Giảng viên</p>
-                  <p className="font-medium text-gray-900">{selected.lecturerName || selected.createdBy || '-'}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-600 uppercase">Ngày gửi</p>
-                  <p className="font-medium text-gray-900">{selected.submittedAt ? new Date(selected.submittedAt).toLocaleDateString('vi-VN') : '-'}</p>
+            
+            <div className="px-8 py-6 space-y-6">
+              {/* Thông tin cơ bản */}
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Thông tin cơ bản</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <span className="text-sm text-gray-600">Mã môn</span>
+                    <div className="font-semibold text-gray-900 mt-1">{selected.subjectCode || '-'}</div>
+                  </div>
+                  <div>
+                    <span className="text-sm text-gray-600">Tên môn</span>
+                    <div className="font-semibold text-gray-900 mt-1">{selected.subjectName || '-'}</div>
+                  </div>
+                  <div>
+                    <span className="text-sm text-gray-600">Giảng viên</span>
+                    <div className="font-semibold text-gray-900 mt-1">{selected.lecturerName || selected.createdBy || '-'}</div>
+                  </div>
+                  <div>
+                    <span className="text-sm text-gray-600">Ngày gửi</span>
+                    <div className="font-semibold text-gray-900 mt-1">
+                      {selected.submittedAt ? new Date(selected.submittedAt).toLocaleDateString('vi-VN') : '-'}
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              <div>
-                <h3 className="text-base font-semibold text-gray-900 mb-3">CLOs</h3>
-                {selected.content?.objectives && Array.isArray(selected.content.objectives) && selected.content.objectives.length > 0 ? (
-                  <ul className="space-y-2 bg-gray-50 p-4 rounded-lg">
-                    {selected.content.objectives.map((clo, idx) => (
-                      <li key={idx} className="text-sm text-gray-700 flex gap-3">
-                        <span className="font-semibold text-gray-900 flex-shrink-0">CLO{idx + 1}:</span>
-                        <span>{clo}</span>
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="text-sm text-gray-500">Chưa có CLO được định nghĩa</p>
-                )}
-              </div>
-
-              <div>
-                <h3 className="text-base font-semibold text-gray-900 mb-3">Chương trình giảng dạy</h3>
-                {selected.content?.modules && Array.isArray(selected.content.modules) && selected.content.modules.length > 0 ? (
-                  <div className="space-y-3 bg-gray-50 p-4 rounded-lg">
-                    {selected.content.modules.map((module, idx) => (
-                      <div key={idx} className="border-l-2 border-blue-400 pl-4">
-                        <p className="font-medium text-gray-900">{module.title || `Module ${idx + 1}`}</p>
-                        {module.topics && Array.isArray(module.topics) && module.topics.length > 0 && (
-                          <ul className="text-sm text-gray-700 mt-1 space-y-1">
-                            {module.topics.map((topic, tidx) => (
-                              <li key={tidx} className="flex gap-2">
-                                <span className="text-gray-400">•</span>
-                                <span>{topic}</span>
-                              </li>
-                            ))}
-                          </ul>
-                        )}
-                      </div>
-                    ))}
+              {/* CLOs */}
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">🎓 CLO liên kết</h3>
+                {cloLoading ? (
+                  <div className="text-gray-600 text-sm py-2">
+                    Đang tải thông tin CLO...
+                  </div>
+                ) : Object.keys(cloDetails).length > 0 ? (
+                  <div className="space-y-2">
+                    {Object.entries(cloDetails).map(([id, clo]) => {
+                      const cloCode = clo?.cloCode || clo?.name || `CLO-${id}`
+                      const description = clo?.description || ''
+                      
+                      return (
+                        <div key={id} className="bg-white border border-indigo-200 rounded-lg p-3 hover:shadow-md transition">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex-1 min-w-0">
+                              <div className="font-semibold text-indigo-900">
+                                {cloCode}
+                              </div>
+                              {description && (
+                                <div className="text-sm text-gray-600 mt-1 line-clamp-2">
+                                  {description}
+                                </div>
+                              )}
+                              {clo?.level && (
+                                <div className="text-xs text-gray-500 mt-1">
+                                  Level: {clo.level}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })}
                   </div>
                 ) : (
-                  <p className="text-sm text-gray-500">Chưa có chương trình chi tiết</p>
+                  <p className="text-sm text-gray-500">Chưa có CLO được liên kết</p>
                 )}
               </div>
 
-              <div className="flex justify-end gap-3 pt-2">
-                <button
-                  onClick={() => handleReject(selected.id)}
-                  disabled={actionId === selected.id}
-                  className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition flex items-center gap-2 disabled:opacity-50"
-                >
-                  <XCircle size={16} />
-                  Từ chối
-                </button>
-                <button
-                  onClick={() => handleApprove(selected.id)}
-                  disabled={actionId === selected.id}
-                  className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition flex items-center gap-2 disabled:opacity-50"
-                >
-                  <CheckCircle size={16} />
-                  Phê duyệt
-                </button>
+              {/* Chương trình giảng dạy */}
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">📚 Chương trình giảng dạy</h3>
+                {selected.content ? (
+                  (() => {
+                    try {
+                      const content = typeof selected.content === 'string' 
+                        ? JSON.parse(selected.content) 
+                        : selected.content
+
+                      if (typeof content === 'object') {
+                        return (
+                          <div className="space-y-4">
+                            {/* Metadata Section */}
+                            {(content.subjectCode || content.academicYear || content.semester) && (
+                              <div className="bg-white p-3 rounded border border-gray-200">
+                                <h4 className="font-semibold text-gray-900 mb-2">📋 Thông tin</h4>
+                                <div className="grid grid-cols-2 gap-2 text-sm">
+                                  {content.subjectCode && <div><span className="text-gray-600">Mã môn:</span> <span className="font-medium">{content.subjectCode}</span></div>}
+                                  {content.syllabusCode && <div><span className="text-gray-600">Mã giáo trình:</span> <span className="font-medium">{content.syllabusCode}</span></div>}
+                                  {content.academicYear && <div><span className="text-gray-600">Năm học:</span> <span className="font-medium">{content.academicYear}</span></div>}
+                                  {content.semester && <div><span className="text-gray-600">Học kỳ:</span> <span className="font-medium">{content.semester}</span></div>}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Modules */}
+                            {content.modules && content.modules.length > 0 && (
+                              <div>
+                                <h4 className="font-semibold text-gray-900 mb-2">📚 Các module ({content.modules.length})</h4>
+                                <ul className="space-y-1 ml-4">
+                                  {content.modules.map((mod, idx) => (
+                                    <li key={idx} className="text-gray-700">
+                                      • {mod.title || mod.name || `Module ${idx + 1}`}
+                                      {mod.description && ` - ${mod.description}`}
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+
+                            {/* Learning Objectives */}
+                            {content.learningObjectives && content.learningObjectives.trim() && (
+                              <div>
+                                <h4 className="font-semibold text-gray-900 mb-2">🎯 Mục tiêu học tập</h4>
+                                <p className="text-gray-700 whitespace-pre-wrap">{content.learningObjectives}</p>
+                              </div>
+                            )}
+
+                            {/* Teaching Methods */}
+                            {content.teachingMethods && content.teachingMethods.trim() && (
+                              <div>
+                                <h4 className="font-semibold text-gray-900 mb-2">👨‍🏫 Phương pháp giảng dạy</h4>
+                                <p className="text-gray-700 whitespace-pre-wrap">{content.teachingMethods}</p>
+                              </div>
+                            )}
+
+                            {/* Assessment Methods */}
+                            {content.assessmentMethods && content.assessmentMethods.trim() && (
+                              <div>
+                                <h4 className="font-semibold text-gray-900 mb-2">📝 Phương pháp đánh giá</h4>
+                                <p className="text-gray-700 whitespace-pre-wrap">{content.assessmentMethods}</p>
+                              </div>
+                            )}
+
+                            {/* Empty state */}
+                            {(!content.modules || content.modules.length === 0) &&
+                             (!content.learningObjectives || !content.learningObjectives.trim()) &&
+                             (!content.teachingMethods || !content.teachingMethods.trim()) &&
+                             (!content.assessmentMethods || !content.assessmentMethods.trim()) && (
+                              <div className="text-gray-500 italic">
+                                ℹ️ Chưa có nội dung chi tiết. Hãy thêm modules, mục tiêu, phương pháp giảng dạy và đánh giá.
+                              </div>
+                            )}
+                          </div>
+                        )
+                      } else {
+                        return <pre className="whitespace-pre-wrap overflow-x-auto">{content}</pre>
+                      }
+                    } catch (e) {
+                      console.error('Error parsing content:', e)
+                      return (
+                        <div className="bg-red-50 p-4 rounded border border-red-200 text-sm text-red-700">
+                          <p className="mb-2">⚠️ Không thể parse JSON:</p>
+                          <pre className="text-xs bg-white p-2 rounded overflow-x-auto max-h-32">
+                            {String(selected.content).substring(0, 500)}
+                          </pre>
+                        </div>
+                      )
+                    }
+                  })()
+                ) : (
+                  <p className="text-sm text-gray-500">Chưa có nội dung giảng dạy</p>
+                )}
               </div>
+
+              {/* Thông tin khác */}
+              {(selected.summary || selected.credits) && (
+                <div className="bg-gray-50 border border-gray-200 rounded-lg p-6">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Thông tin khác</h3>
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    {selected.credits && (
+                      <div>
+                        <span className="text-gray-600">Số tín chỉ</span>
+                        <div className="font-semibold text-gray-900 mt-1">{selected.credits}</div>
+                      </div>
+                    )}
+                    {selected.summary && (
+                      <div className="col-span-2">
+                        <span className="text-gray-600">Tóm tắt</span>
+                        <div className="text-gray-700 mt-1">{selected.summary}</div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="sticky bottom-0 bg-gray-50 px-8 py-4 flex justify-end gap-3 border-t">
+              <button
+                onClick={() => setSelected(null)}
+                className="px-6 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition font-medium"
+              >
+                Đóng
+              </button>
+              <button
+                onClick={() => handleReject(selected.id)}
+                disabled={actionId === selected.id}
+                className="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition font-medium disabled:opacity-50"
+              >
+                {actionId === selected.id ? 'Đang xử lý...' : 'Từ chối'}
+              </button>
+              <button
+                onClick={() => handleApprove(selected.id)}
+                disabled={actionId === selected.id}
+                className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition font-medium disabled:opacity-50"
+              >
+                {actionId === selected.id ? 'Đang xử lý...' : 'Phê duyệt'}
+              </button>
             </div>
           </div>
         </div>

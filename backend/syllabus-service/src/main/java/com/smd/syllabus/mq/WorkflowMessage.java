@@ -3,10 +3,10 @@ package com.smd.syllabus.mq;
 import java.util.UUID;
 
 /**
- * Payload published by workflow-service when a workflow is approved/rejected.
+ * Payload published by workflow-service when a workflow transitions to APPROVED/REJECTED.
  * Kept minimal to avoid coupling to workflow-service classes.
  */
-public class WorkflowApprovalMessage {
+public class WorkflowMessage {
 
     private UUID workflowId;
     private String entityId;
@@ -65,7 +65,7 @@ public class WorkflowApprovalMessage {
 
     @Override
     public String toString() {
-        return "WorkflowApprovalMessage{" +
+        return "WorkflowMessage{" +
                 "workflowId=" + workflowId +
                 ", entityId='" + entityId + '\'' +
                 ", entityType='" + entityType + '\'' +
