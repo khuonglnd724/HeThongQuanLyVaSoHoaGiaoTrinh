@@ -1,169 +1,339 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react'
-import { BookOpen } from 'lucide-react'
-import SearchBar from '../components/SearchBar'
-import FilterPanel from '../components/FilterPanel'
-import { getPublishedSyllabi } from '../services/publicSyllabusService'
+import { BookOpen, Search, Filter, X, ChevronRight, Calendar, User, BookMarked, GraduationCap, SortAsc } from 'lucide-react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
+import syllabusService from '../../../services/syllabusService'
 
 export default function PublicSyllabusSearchPage() {
+  const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  
   const [syllabi, setSyllabi] = useState([])
   const [loading, setLoading] = useState(false)
-  const [searchTerm, setSearchTerm] = useState('')
-  const [filters, setFilters] = useState({ major: '', semester: '' })
-  const [page, setPage] = useState(0)
-  const [totalPages, setTotalPages] = useState(1)
+  const [searchTerm, setSearchTerm] = useState(searchParams.get('keyword') || '')
+  const [selectedMajor, setSelectedMajor] = useState(searchParams.get('major') || 'all')
+  const [selectedSemester, setSelectedSemester] = useState(searchParams.get('semester') || 'all')
+  const [selectedYear, setSelectedYear] = useState(searchParams.get('year') || 'all')
+  const [sortBy, setSortBy] = useState('latest')
+  const [showMobileFilters, setShowMobileFilters] = useState(false)
   const [error, setError] = useState(null)
 
-  const fetchSyllabi = useCallback(async (pageNum) => {
+  // Filter data
+  const majors = ['Công Nghệ Thông Tin', 'Kinh Tế', 'Kỹ Thuật', 'Quản Lý Kinh Doanh']
+  const semesters = ['Kỳ I', 'Kỳ II', 'Hè']
+  const academicYears = ['2024-2025', '2023-2024', '2022-2023']
+
+  const fetchSyllabi = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
-      const result = await getPublishedSyllabi(pageNum, 10, searchTerm)
-      setSyllabi(result.content || [])
-      setTotalPages(result.totalPages || 1)
-      setPage(pageNum)
+      const response = await syllabusService.getPublishedSyllabuses(0, 50)
+      // Handle both array and object response
+      setSyllabi(Array.isArray(response) ? response : (response?.data || []))
     } catch (err) {
-      setError('Không thể tải danh sách syllabus. Vui lòng thử lại.')
+      setError('Không thể tải danh sách giáo trình. Vui lòng thử lại.')
       console.error(err)
     } finally {
       setLoading(false)
     }
-  }, [searchTerm])
-
-  const filteredSyllabi = useMemo(() => syllabi.filter(item => {
-    const matchesMajor = filters.major ? String(item.majorId || item.major) === String(filters.major) : true
-    const matchesSemester = filters.semester ? String(item.semester) === String(filters.semester) : true
-    return matchesMajor && matchesSemester
-  }), [filters, syllabi])
+  }, [])
 
   useEffect(() => {
-    fetchSyllabi(0)
+    fetchSyllabi()
   }, [fetchSyllabi])
 
-  const handleSearch = (term) => {
-    setSearchTerm(term)
-    setPage(0)
+  const filteredAndSortedSyllabi = useMemo(() => {
+    let filtered = syllabi.filter(item => {
+      const matchesSearch = !searchTerm || 
+        item.subject_code?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        item.subject_name?.toLowerCase().includes(searchTerm.toLowerCase())
+      
+      const matchesMajor = selectedMajor === 'all' || item.major === selectedMajor
+      const matchesSemester = selectedSemester === 'all' || item.semester === selectedSemester
+      const matchesYear = selectedYear === 'all' || item.academic_year === selectedYear
+      
+      return matchesSearch && matchesMajor && matchesSemester && matchesYear
+    })
+
+    // Sort
+    if (sortBy === 'latest') {
+      filtered.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+    } else if (sortBy === 'oldest') {
+      filtered.sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
+    } else if (sortBy === 'alphabetical') {
+      filtered.sort((a, b) => (a.subject_name || '').localeCompare(b.subject_name || ''))
+    }
+
+    return filtered
+  }, [syllabi, searchTerm, selectedMajor, selectedSemester, selectedYear, sortBy])
+
+  const handleSearch = (e) => {
+    e.preventDefault()
+    // Search is handled by filteredAndSortedSyllabi useMemo
   }
 
-  const handleFilter = (newFilters) => {
-    setFilters(newFilters)
-    setPage(0)
+  const clearFilters = () => {
+    setSearchTerm('')
+    setSelectedMajor('all')
+    setSelectedSemester('all')
+    setSelectedYear('all')
   }
+
+  const FilterSidebar = () => (
+    <div className="space-y-6">
+      {/* Filter Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Filter className="text-blue-600" size={20} />
+          <h3 className="font-semibold text-gray-900">Bộ lọc</h3>
+        </div>
+        <button
+          onClick={clearFilters}
+          className="text-sm text-blue-600 hover:text-blue-800"
+        >
+          Xóa bộ lọc
+        </button>
+      </div>
+
+      {/* Major Filter */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          Chuyên Ngành
+        </label>
+        <select
+          value={selectedMajor}
+          onChange={(e) => setSelectedMajor(e.target.value)}
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+        >
+          <option value="all">Tất cả</option>
+          {majors.map((major) => (
+            <option key={major} value={major}>{major}</option>
+          ))}
+        </select>
+      </div>
+
+      {/* Semester Filter */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          Học Kỳ
+        </label>
+        <select
+          value={selectedSemester}
+          onChange={(e) => setSelectedSemester(e.target.value)}
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+        >
+          <option value="all">Tất cả</option>
+          {semesters.map((semester) => (
+            <option key={semester} value={semester}>{semester}</option>
+          ))}
+        </select>
+      </div>
+
+      {/* Academic Year Filter */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          Năm Học
+        </label>
+        <select
+          value={selectedYear}
+          onChange={(e) => setSelectedYear(e.target.value)}
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+        >
+          <option value="all">Tất cả</option>
+          {academicYears.map((year) => (
+            <option key={year} value={year}>{year}</option>
+          ))}
+        </select>
+      </div>
+
+      {/* Sort Options */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          Sắp xếp theo
+        </label>
+        <select
+          value={sortBy}
+          onChange={(e) => setSortBy(e.target.value)}
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+        >
+          <option value="latest">Cập nhật mới nhất</option>
+          <option value="oldest">Cập nhật cũ nhất</option>
+          <option value="alphabetical">Thứ tự A-Z</option>
+        </select>
+      </div>
+    </div>
+  )
 
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <div className="bg-gradient-to-r from-blue-600 to-blue-800 text-white py-12">
+      <div className="bg-gradient-to-r from-blue-600 via-blue-700 to-blue-800 text-white py-12">
         <div className="container mx-auto px-6">
           <div className="flex items-center gap-3 mb-3">
             <BookOpen size={32} />
-            <h1 className="text-4xl font-bold">Kho Syllabus</h1>
+            <h1 className="text-4xl font-bold">Tìm Kiếm Giáo Trình</h1>
           </div>
-          <p className="text-blue-100">Tìm kiếm và xem chi tiết các syllabus môn học</p>
+          <p className="text-blue-100">Tìm kiếm và khám phá các giáo trình môn học đã xuất bản</p>
         </div>
       </div>
 
-      {/* Search & Filter */}
-      <div className="bg-white border-b border-gray-200 sticky top-0 z-10">
-        <div className="container mx-auto px-6 py-6">
-          <div className="space-y-4">
-            <SearchBar 
-              onSearch={handleSearch}
-              onClear={() => setSearchTerm('')}
-              placeholder="Tìm kiếm mã hoặc tên môn học..."
-            />
-            <div className="flex gap-4">
-              <FilterPanel 
-                onFilter={handleFilter}
-                majors={[
-                  { id: 1, name: 'Công nghệ thông tin' },
-                  { id: 2, name: 'Kỹ thuật phần mềm' }
-                ]}
-                semesters={[
-                  { id: 1, name: 'Học kì 1' },
-                  { id: 2, name: 'Học kì 2' }
-                ]}
+      {/* Search Bar - Sticky */}
+      <div className="bg-white border-b border-gray-200 sticky top-0 z-20 shadow-md">
+        <div className="container mx-auto px-6 py-4">
+          <form onSubmit={handleSearch} className="flex gap-3">
+            <div className="flex-1 relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Tìm theo mã môn (VD: CS101), tên môn hoặc từ khóa..."
+                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
             </div>
-          </div>
+            <button
+              type="button"
+              onClick={() => setShowMobileFilters(!showMobileFilters)}
+              className="lg:hidden px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition flex items-center gap-2"
+            >
+              <Filter size={20} />
+              Lọc
+            </button>
+            <button
+              type="submit"
+              className="hidden lg:block px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium"
+            >
+              Tìm kiếm
+            </button>
+          </form>
         </div>
       </div>
 
-      {/* Main Content */}
-      <div className="container mx-auto px-6 py-12">
-        {error && (
-          <div className="mb-6 p-4 bg-red-100 border-2 border-red-400 text-red-800 rounded-lg">
-            {error}
+      {/* Mobile Filter Drawer */}
+      {showMobileFilters && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 lg:hidden">
+          <div className="absolute right-0 top-0 h-full w-80 bg-white shadow-xl p-6 overflow-y-auto">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-lg font-bold">Bộ lọc</h3>
+              <button onClick={() => setShowMobileFilters(false)}>
+                <X size={24} />
+              </button>
+            </div>
+            <FilterSidebar />
           </div>
-        )}
+        </div>
+      )}
 
-        {loading ? (
-          <div className="text-center py-12">
-            <div className="inline-block animate-spin">⏳</div>
-            <p className="mt-2 text-gray-600">Đang tải...</p>
+      {/* Main Content with Sidebar */}
+      <div className="container mx-auto px-6 py-8">
+        <div className="flex gap-8">
+          {/* Desktop Filter Sidebar */}
+          <div className="hidden lg:block w-64 flex-shrink-0">
+            <div className="bg-white rounded-xl shadow-md p-6 sticky top-24">
+              <FilterSidebar />
+            </div>
           </div>
-        ) : filteredSyllabi.length === 0 ? (
-          <div className="text-center py-12 bg-white rounded-lg border-2 border-gray-200">
-            <BookOpen size={48} className="mx-auto text-gray-400 mb-4" />
-            <p className="text-gray-600">Không tìm thấy syllabus nào phù hợp</p>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {filteredSyllabi.map((syllabus) => (
-              <div key={syllabus.id} className="bg-white rounded-lg border-2 border-gray-200 p-6 hover:shadow-lg transition">
-                <div className="flex justify-between items-start mb-3">
-                  <div className="flex-1">
-                    <h3 className="text-xl font-semibold text-gray-900 mb-1">
-                      {syllabus.subjectCode}: {syllabus.subjectName}
-                    </h3>
-                    <p className="text-gray-600 text-sm mb-2">Giảng viên: {syllabus.instructor || 'N/A'}</p>
-                  </div>
-                  <div className="text-right">
-                    <span className="inline-block px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm font-medium">
-                      ✓ Đã xuất bản
-                    </span>
-                  </div>
-                </div>
-                
-                <p className="text-gray-700 mb-4 line-clamp-2">{syllabus.description}</p>
-                
-                <div className="flex gap-4 items-center text-sm text-gray-600">
-                  <span>📚 {syllabus.credits || 3} tín chỉ</span>
-                  <span>🎓 Kì {syllabus.semester || 1}</span>
-                </div>
 
-                <a
-                  href={`/syllabus/${syllabus.id}`}
-                  className="mt-4 inline-block px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium"
-                >
-                  Xem chi tiết
-                </a>
+          {/* Syllabus List */}
+          <div className="flex-1">
+            {/* Results Info */}
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-2">
+                <SortAsc className="text-gray-600" size={20} />
+                <p className="text-gray-700">
+                  Tìm thấy <span className="font-semibold text-blue-600">{filteredAndSortedSyllabi.length}</span> giáo trình
+                </p>
               </div>
-            ))}
-          </div>
-        )}
+            </div>
 
-        {/* Pagination */}
-        {totalPages > 1 && (
-          <div className="flex justify-center gap-2 mt-12">
-            <button
-              onClick={() => fetchSyllabi(page - 1)}
-              disabled={page === 0}
-              className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Trang trước
-            </button>
-            <span className="px-4 py-2 text-gray-600">
-              Trang {page + 1} / {totalPages}
-            </span>
-            <button
-              onClick={() => fetchSyllabi(page + 1)}
-              disabled={page >= totalPages - 1}
-              className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Trang sau
-            </button>
+            {/* Error State */}
+            {error && (
+              <div className="mb-6 p-4 bg-red-100 border-2 border-red-400 text-red-800 rounded-lg">
+                {error}
+              </div>
+            )}
+
+            {/* Loading State */}
+            {loading ? (
+              <div className="text-center py-12">
+                <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-blue-600 border-t-transparent"></div>
+                <p className="mt-4 text-gray-600">Đang tải giáo trình...</p>
+              </div>
+            ) : filteredAndSortedSyllabi.length === 0 ? (
+              <div className="text-center py-12 bg-white rounded-xl shadow-md p-8">
+                <BookOpen size={64} className="mx-auto text-gray-400 mb-4" />
+                <h3 className="text-xl font-semibold text-gray-900 mb-2">Không tìm thấy giáo trình</h3>
+                <p className="text-gray-600 mb-4">Không có giáo trình nào phù hợp với bộ lọc của bạn</p>
+                <button
+                  onClick={clearFilters}
+                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+                >
+                  Xóa bộ lọc
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {filteredAndSortedSyllabi.map((syllabus) => (
+                  <div 
+                    key={syllabus.id} 
+                    className="bg-white rounded-xl shadow-md hover:shadow-xl transition-all duration-300 overflow-hidden border border-gray-200 hover:border-blue-300"
+                  >
+                    <div className="p-6">
+                      <div className="flex items-start justify-between mb-4">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-3 mb-2">
+                            <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-semibold">
+                              {syllabus.subject_code || 'N/A'}
+                            </span>
+                            <span className="px-3 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium">
+                              ✓ Đã xuất bản
+                            </span>
+                          </div>
+                          <h3 className="text-xl font-bold text-gray-900 mb-2">
+                            {syllabus.subject_name || 'Tên môn học'}
+                          </h3>
+                        </div>
+                      </div>
+
+                      {/* Summary */}
+                      <p className="text-gray-700 mb-4 line-clamp-2">
+                        {syllabus.summary || 'Không có mô tả'}
+                      </p>
+
+                      {/* Info Grid */}
+                      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+                        <div className="flex items-center gap-2 text-sm text-gray-600">
+                          <BookMarked size={16} className="text-blue-600" />
+                          <span><strong>Tín chỉ:</strong> {syllabus.credits || 3}</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-sm text-gray-600">
+                          <User size={16} className="text-green-600" />
+                          <span><strong>GV:</strong> {syllabus.created_by || 'N/A'}</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-sm text-gray-600">
+                          <GraduationCap size={16} className="text-purple-600" />
+                          <span><strong>Học kỳ:</strong> {syllabus.semester || 'N/A'}</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-sm text-gray-600">
+                          <Calendar size={16} className="text-orange-600" />
+                          <span><strong>Năm:</strong> {syllabus.academic_year || 'N/A'}</span>
+                        </div>
+                      </div>
+
+                      {/* Action Button */}
+                      <button
+                        onClick={() => navigate(`/public/syllabus/${syllabus.id}`)}
+                        className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all duration-300 font-medium group"
+                      >
+                        Xem Chi Tiết
+                        <ChevronRight size={20} className="group-hover:translate-x-1 transition-transform" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
-        )}
+        </div>
       </div>
     </div>
   )

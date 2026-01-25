@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Bell, BellOff } from 'lucide-react'
 
 export default function SubscribeButton({ 
@@ -10,6 +10,11 @@ export default function SubscribeButton({
 }) {
   const [subscribed, setSubscribed] = useState(isSubscribed)
   const [isLoading, setIsLoading] = useState(false)
+
+  // Sync with localStorage whenever isSubscribed prop changes
+  useEffect(() => {
+    setSubscribed(isSubscribed)
+  }, [isSubscribed])
 
   const handleToggle = async () => {
     setIsLoading(true)
