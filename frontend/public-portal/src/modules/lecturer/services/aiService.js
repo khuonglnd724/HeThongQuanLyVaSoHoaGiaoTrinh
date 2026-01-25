@@ -102,6 +102,16 @@ const aiService = {
       console.error(`[aiService] ❌ ERROR - Failed to save jobId:`, saveError)
       throw saveError
     }
+  },
+
+  // Check CLO-PLO consistency
+  checkCLOPLOConsistency: async (syllabusId, cloIds = [], ploIds = [], mapping = {}) => {
+    return apiClient.post(`${AI_BASE}/clo-check`, {
+      syllabusId,
+      cloList: cloIds,
+      ploList: ploIds,
+      mapping: mapping
+    })
   }
 }
 

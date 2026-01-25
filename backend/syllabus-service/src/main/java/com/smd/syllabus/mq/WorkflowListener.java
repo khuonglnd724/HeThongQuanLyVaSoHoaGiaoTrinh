@@ -105,6 +105,14 @@ public class WorkflowListener {
             }
             syllabus.setStatus(SyllabusStatus.REJECTED);
             syllabus.setRejectedAt(Instant.now());
+            
+            // Set rejection reason to syllabus.rejectionReason column (NOT to review_comment table)
+            if (message.getComment() != null && !message.getComment().isBlank()) {
+                syllabus.setRejectionReason(message.getComment().trim());
+                log.info("[WorkflowListener] Set rejection reason for syllabus {}: {}", 
+                        syllabus.getId(), message.getComment().trim());
+            }
+            
             log.info("[WorkflowListener] Syllabus {} marked REJECTED via workflow sync", syllabus.getId());
             
             // Save rejection reason to review_comment table
