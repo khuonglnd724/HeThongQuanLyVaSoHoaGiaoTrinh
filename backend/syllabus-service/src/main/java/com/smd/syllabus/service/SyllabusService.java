@@ -177,9 +177,13 @@ public class SyllabusService {
         Syllabus s = getOrThrow(id);
         SyllabusResponse response = SyllabusMapper.toResponse(s);
         
-        // Rejection reason is stored directly in syllabus.rejection_reason column
-        // No need to load from review_comment table
-        // SyllabusMapper.toResponse() will automatically map s.getRejectionReason() to response.rejectionReason
+
+        if (s.getStatus() == SyllabusStatus.REJECTED) {
+            reviewCommentService.list(id).stream()
+                    .filter(c -> "REJECTION".equals(c.getSectionKey()))
+                    .findFirst()
+                    .ifPresent(c -> response.setRejectionReason(c.getContent()));
+        }
         
         return response;
     }
@@ -378,8 +382,18 @@ public class SyllabusService {
 
         Syllabus saved = syllabusRepository.save(s);
 
-        // Rejection reason is now stored ONLY in syllabus.rejection_reason column
-        // No need to save to review_comment table anymore
+        if (reason != null && !reason.isBlank()) {
+            try {
+                reviewCommentService.add(
+                        saved.getId(),
+                        "REJECTION",
+                        reason.trim(),
+                        Long.parseLong(userId)
+                );
+            } catch (Exception ex) {
+                System.err.println("Failed to save rejection reason to review_comment: " + ex.getMessage());
+            }
+        }
 
         String msg = "Syllabus " + safeCode(saved) + " rejected";
         if (reason != null && !reason.isBlank())

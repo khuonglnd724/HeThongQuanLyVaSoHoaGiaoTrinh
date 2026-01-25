@@ -114,6 +114,22 @@ public class WorkflowListener {
             }
             
             log.info("[WorkflowListener] Syllabus {} marked REJECTED via workflow sync", syllabus.getId());
+            
+            // Save rejection reason to review_comment table
+            if (message.getComment() != null && !message.getComment().isBlank()) {
+                try {
+                    reviewCommentService.add(
+                            syllabus.getId(),
+                            "REJECTION",
+                            message.getComment().trim(),
+                            Long.parseLong(message.getActionBy())
+                    );
+                    log.info("[WorkflowListener] Saved rejection reason to review_comment for syllabus {}", syllabus.getId());
+                } catch (Exception ex) {
+                    log.warn("[WorkflowListener] Failed to save rejection reason for syllabus {}: {}", 
+                            syllabus.getId(), ex.getMessage());
+                }
+            }
         }
         
         syllabus.setLastActionBy(message.getActionBy());
