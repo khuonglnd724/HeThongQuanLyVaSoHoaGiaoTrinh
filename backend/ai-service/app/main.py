@@ -74,16 +74,16 @@ async def api_root():
         }
     }
 
-# Include routers
+# Include routers with /ai prefix for all except health and notifications
 app.include_router(health.router)
-app.include_router(jobs.router)
-app.include_router(documents.router)
-app.include_router(suggest.router)
-app.include_router(chat.router)
-app.include_router(diff.router)
-app.include_router(clo_check.router)
-app.include_router(summary.router)
-app.include_router(suggest_clo.router)
+app.include_router(jobs.router, prefix="/ai")
+app.include_router(documents.router, prefix="/ai")
+app.include_router(suggest.router, prefix="/ai")
+app.include_router(chat.router, prefix="/ai")
+app.include_router(diff.router, prefix="/ai")
+app.include_router(clo_check.router, prefix="/ai")
+app.include_router(summary.router, prefix="/ai")
+app.include_router(suggest_clo.router, prefix="/ai")
 app.include_router(notifications.router)
 
 # Startup event

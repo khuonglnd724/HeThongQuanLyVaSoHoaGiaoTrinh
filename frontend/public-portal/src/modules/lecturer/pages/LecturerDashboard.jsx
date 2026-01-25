@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
-import { BookOpen, LogOut, FileText, Plus, Edit, Eye, Trash2, Upload, CheckCircle, Clock, XCircle } from 'lucide-react'
+import { BookOpen, LogOut, FileText, Plus, Edit, Eye, Trash2, Upload, CheckCircle, Clock, XCircle, Zap, Loader } from 'lucide-react'
 import apiClient from '../../../services/api/apiClient'
 import syllabusServiceV2 from '../services/syllabusServiceV2'
+import aiService from '../services/aiService'
 import SyllabusEditorPage from './SyllabusEditorPage'
+import DocumentSummaryModal from '../components/DocumentSummaryModal'
 import workflowApi from '../../workflow/api/workflowApi'
 
 // Minimal role constants here to avoid circular import with roleConfig (roleConfig imports LecturerDashboard)
@@ -46,10 +48,31 @@ const CLODetailsDisplay = ({ cloIds }) => {
           // API returns { success, message, data: {...}, timestamp }
           const cloData = response.data?.data || response.data || response
           console.log(`CLO ${id} fetched:`, cloData)
-          details[id] = cloData
+          
+          // Fetch PLO mappings for this CLO
+          let mappedPlos = []
+          try {
+            const mappingRes = await apiClient.get(`/api/v1/mapping/clo/${id}`)
+            const mappings = mappingRes.data?.data || []
+            const ploIds = mappings.map(m => m.ploId || m.plo_id).filter(Boolean)
+            
+            // Fetch PLO details for each mapped PLO
+            mappedPlos = await Promise.all(
+              ploIds.map(ploId => 
+                apiClient.get(`/api/v1/plo/${ploId}`)
+                  .then(r => r.data?.data || r.data)
+                  .catch(() => null)
+              )
+            )
+            mappedPlos = mappedPlos.filter(Boolean)
+          } catch (mappingErr) {
+            console.warn(`Failed to fetch PLO mappings for CLO ${id}:`, mappingErr)
+          }
+          
+          details[id] = { ...cloData, mappedPlos }
         } catch (err) {
           console.error(`Failed to fetch CLO ${id}:`, err)
-          details[id] = { id, cloCode: `CLO-${id}`, description: 'Không thể tải' }
+          details[id] = { id, cloCode: `CLO-${id}`, description: 'Không thể tải', mappedPlos: [] }
         }
       }
       
@@ -67,21 +90,22 @@ const CLODetailsDisplay = ({ cloIds }) => {
 
   return (
     <div>
-      <h4 className="font-semibold text-gray-900 mb-3">🎓 CLO liên kết ({cloIds?.length || 0})</h4>
+      <h4 className="font-semibold text-gray-900 mb-3">CLO liên kết ({cloIds?.length || 0})</h4>
       {loading ? (
         <div className="text-gray-600 text-sm py-2">
           Đang tải thông tin CLO...
         </div>
       ) : (
-        <div className="space-y-2">
+        <div className="space-y-3">
           {(cloIds || []).map((id) => {
             const clo = cloDetails[id]
             const cloCode = clo?.cloCode || clo?.name || `CLO-${id}`
             const description = clo?.description || ''
+            const mappedPlos = clo?.mappedPlos || []
             
             return (
-              <div key={id} className="bg-white border border-indigo-200 rounded-lg p-3 hover:shadow-md transition">
-                <div className="flex items-start justify-between gap-3">
+              <div key={id} className="bg-white border border-indigo-200 rounded-lg p-4 hover:shadow-md transition">
+                <div className="flex items-start justify-between gap-3 mb-2">
                   <div className="flex-1 min-w-0">
                     <div className="font-semibold text-indigo-900">
                       {cloCode}
@@ -101,6 +125,28 @@ const CLODetailsDisplay = ({ cloIds }) => {
                     #{id}
                   </span>
                 </div>
+                
+                {/* Mapped PLOs */}
+                {mappedPlos && mappedPlos.length > 0 && (
+                  <div className="mt-3 pt-3 border-t border-indigo-100">
+                    <p className="text-xs font-medium text-gray-700 mb-2">PLO liên kết:</p>
+                    <div className="space-y-2">
+                      {mappedPlos.map((plo, idx) => (
+                        <div
+                          key={idx}
+                          className="text-xs bg-purple-50 border border-purple-200 rounded p-2"
+                        >
+                          <p className="font-medium text-purple-700">
+                            {plo.ploCode || plo.code || 'PLO'}
+                          </p>
+                          <p className="text-purple-600 mt-0.5">
+                            {plo.description || plo.ploName || 'Không có mô tả'}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )
           })}
@@ -164,6 +210,15 @@ const LecturerDashboard = ({ user, onLogout }) => {
   const [showSyllabusDetailModal, setShowSyllabusDetailModal] = useState(false)
   const [syllabusDetailData, setSyllabusDetailData] = useState(null)
   const [syllabusDetailLoading, setSyllabusDetailLoading] = useState(false)
+  const [syllabusDetailDocuments, setSyllabusDetailDocuments] = useState([])
+  const [syllabusDetailDocumentsLoading, setSyllabusDetailDocumentsLoading] = useState(false)
+  const [syllabusDetailAISummary, setSyllabusDetailAISummary] = useState(null)
+  const [syllabusDetailAISummaryLoading, setSyllabusDetailAISummaryLoading] = useState(false)
+  const [syllabusDetailAISummaryJobId, setSyllabusDetailAISummaryJobId] = useState(null)
+  const [documentSummaries, setDocumentSummaries] = useState({}) // Lưu tóm tắt cho từng document: {documentId: summary}
+  const [documentSummarizingId, setDocumentSummarizingId] = useState(null) // Document nào đang được tóm tắt
+  const [showDocumentSummaryModal, setShowDocumentSummaryModal] = useState(false) // Show/hide document summary modal
+  const [selectedDocumentForSummary, setSelectedDocumentForSummary] = useState(null) // Document được chọn để view summary
   
   // Create/Edit form (simplified - only basic fields, content will be added later)
   const [formData, setFormData] = useState({
@@ -441,14 +496,15 @@ const LecturerDashboard = ({ user, onLogout }) => {
   }
 
 
-  const handleViewSyllabusDetail = async (workflowItem) => {
+  const handleViewSyllabusDetail = async (item) => {
     try {
       setSyllabusDetailLoading(true)
       setShowSyllabusDetailModal(true)
       setSyllabusDetailData(null)
+      setSyllabusDetailDocuments([])
 
-      // Extract syllabusId from workflow entityId
-      const syllabusId = workflowItem.entityId
+      // Extract syllabusId - support both workflow items and syllabus objects
+      let syllabusId = item.entityId || item.id || item.syllabusId
       if (!syllabusId) {
         showToast('Không tìm thấy ID giáo trình', 'error')
         return
@@ -479,6 +535,74 @@ const LecturerDashboard = ({ user, onLogout }) => {
           console.warn('Failed to fetch subject info:', subjErr)
         }
       }
+      
+      // Fetch documents for this syllabus
+      setSyllabusDetailDocumentsLoading(true)
+      try {
+        const docsRes = await syllabusServiceV2.getDocumentsBySyllabus(syllabusId)
+        const docs = docsRes.data?.data || docsRes.data || []
+        setSyllabusDetailDocuments(Array.isArray(docs) ? docs : [])
+        
+        // Phase 6: Load cached summaries if documents have aiIngestionJobId
+        const cachedSummaries = {}
+        for (const doc of docs) {
+          if (doc.aiIngestionJobId) {
+            try {
+              console.log(`[Phase 6] Loading cached summary for doc ${doc.id}, jobId=${doc.aiIngestionJobId}`)
+              const jobStatus = await aiService.getJobStatus(doc.aiIngestionJobId)
+              const jobData = jobStatus.data?.data || jobStatus.data
+              
+              // Handle both response formats:
+              // Format 1: { status: 'SUCCEEDED', result: {...} }
+              // Format 2: { jobId, summary, bullets, ... } (direct response)
+              let resultData = null
+              
+              if (jobData?.status === 'SUCCEEDED' && jobData?.result) {
+                // Format 1: Old format with status wrapper
+                resultData = jobData.result
+                if (typeof resultData === 'string') {
+                  resultData = JSON.parse(resultData)
+                }
+              } else if (jobData?.summary) {
+                // Format 2: New format - direct response
+                resultData = jobData
+              }
+              
+              if (resultData) {
+                cachedSummaries[doc.id] = {
+                  summary: resultData.summary || '',
+                  bullets: Array.isArray(resultData.bullets) ? resultData.bullets : [],
+                  keywords: Array.isArray(resultData.keywords) ? resultData.keywords : [],
+                  targetAudience: resultData.targetAudience || '',
+                  prerequisites: resultData.prerequisites || '',
+                  ragUsed: resultData.ragUsed || false,
+                  ragContext: resultData.ragContext || '',
+                  tokens: resultData.tokens || 0,
+                  model: resultData.model || ''
+                }
+                console.log(`[Phase 6] Loaded cached summary for doc ${doc.id}`)
+              }
+            } catch (summaryErr) {
+              console.warn(`[Phase 6] Failed to load cached summary for doc ${doc.id}:`, summaryErr)
+              // Continue loading other summaries
+            }
+          }
+        }
+        
+        if (Object.keys(cachedSummaries).length > 0) {
+          setDocumentSummaries(cachedSummaries)
+          console.log('[Phase 6] Loaded all cached summaries:', cachedSummaries)
+        }
+      } catch (docsErr) {
+        console.warn('Failed to fetch documents:', docsErr)
+        setSyllabusDetailDocuments([])
+      } finally {
+        setSyllabusDetailDocumentsLoading(false)
+      }
+      
+      // Reset AI summary state
+      setSyllabusDetailAISummary(null)
+      setSyllabusDetailAISummaryJobId(null)
       
       setSyllabusDetailData({
         ...syllabusData,
@@ -512,6 +636,7 @@ const LecturerDashboard = ({ user, onLogout }) => {
         headers: { 'X-User-Id': currentUser?.userId || currentUser?.id }
       })
       console.log('Updated syllabus:', res.data)
+      
       setShowEditModal(false)
       resetForm()
       loadLecturerSyllabi()
@@ -553,13 +678,42 @@ const LecturerDashboard = ({ user, onLogout }) => {
     setShowCreateModal(true)
   }
 
-  const openEditModal = (syllabus) => {
+  const openEditModal = async (syllabus) => {
     setSelectedSyllabus(syllabus)
     setFormData({
       subjectCode: syllabus.subjectCode || syllabus.courseCode || '',
       subjectName: syllabus.subjectName || syllabus.courseName || '',
       summary: syllabus.summary || ''
     })
+    
+    // Load full syllabus data including content and documents
+    try {
+      const res = await apiClient.get(`/api/syllabuses/${syllabus.id}`)
+      const fullData = res.data
+      
+      // Update form with complete data
+      setFormData({
+        subjectCode: fullData.subjectCode || syllabus.subjectCode || '',
+        subjectName: fullData.subjectName || syllabus.subjectName || '',
+        summary: fullData.summary || ''
+      })
+      
+      // Load documents
+      try {
+        const docsRes = await syllabusServiceV2.getDocumentsBySyllabus(fullData.id)
+        setSyllabusDocuments(docsRes.data || docsRes || [])
+      } catch (docErr) {
+        console.warn('Failed to load documents:', docErr)
+        setSyllabusDocuments([])
+      }
+      
+      // Store full data for display
+      setSelectedSyllabus(fullData)
+    } catch (err) {
+      console.error('Failed to load full syllabus data:', err)
+      setSyllabusDocuments([])
+    }
+    
     setShowEditModal(true)
   }
 
@@ -620,6 +774,216 @@ const LecturerDashboard = ({ user, onLogout }) => {
     }
   }
 
+  const generateAISummary = async (syllabusId) => {
+    try {
+      setSyllabusDetailAISummaryLoading(true)
+      const res = await aiService.generateSummary(syllabusId, 'MEDIUM')
+      const jobId = res.data?.data?.jobId || res.data?.jobId
+      
+      if (jobId) {
+        setSyllabusDetailAISummaryJobId(jobId)
+        // Start polling for job completion
+        pollAISummaryJob(jobId)
+      }
+      showToast('Đang tạo tóm tắt AI...', 'info')
+    } catch (err) {
+      console.error('Generate summary failed:', err)
+      showToast('Tạo tóm tắt AI thất bại', 'error')
+      setSyllabusDetailAISummaryLoading(false)
+    }
+  }
+
+  const pollAISummaryJob = async (jobId) => {
+    let attempts = 0
+    const maxAttempts = 60 // 5 minutes with 5-second intervals
+    
+    const poll = async () => {
+      try {
+        const res = await aiService.getJobStatus(jobId)
+        const job = res.data?.data || res.data || {}
+        
+        console.log('Full job response:', job)
+        
+        if (job.status === 'SUCCEEDED') {
+          // Result might be in job.result OR directly in job response
+          let resultData = job.result || job
+          
+          // If result is a JSON string, parse it
+          if (typeof resultData === 'string') {
+            try {
+              resultData = JSON.parse(resultData)
+            } catch (e) {
+              console.warn('Failed to parse result as JSON:', e)
+            }
+          }
+          
+          // Extract only the relevant fields from the response
+          const summaryData = {
+            summary: resultData.summary || '',
+            bullets: resultData.bullets || [],
+            keywords: resultData.keywords || [],
+            targetAudience: resultData.targetAudience || '',
+            prerequisites: resultData.prerequisites || '',
+            ragUsed: resultData.ragUsed || false,
+            ragContext: resultData.ragContext || '',
+            tokens: resultData.tokens || 0,
+            model: resultData.model || ''
+          }
+          
+          console.log('Setting AI summary data:', summaryData)
+          
+          // Store full result for display
+          setSyllabusDetailAISummary(summaryData)
+          setSyllabusDetailAISummaryLoading(false)
+          showToast('Tóm tắt AI được tạo thành công', 'success')
+        } else if (job.status === 'FAILED') {
+          setSyllabusDetailAISummaryLoading(false)
+          showToast('Tạo tóm tắt AI thất bại: ' + (job.error || 'Unknown error'), 'error')
+        } else if (job.status === 'QUEUED' || job.status === 'RUNNING') {
+          attempts++
+          console.log(`Polling attempt ${attempts}/${maxAttempts}, job status: ${job.status}`)
+          if (attempts < maxAttempts) {
+            setTimeout(poll, 5000) // Poll every 5 seconds
+          } else {
+            setSyllabusDetailAISummaryLoading(false)
+            showToast('Hết thời gian chờ tạo tóm tắt AI', 'warning')
+          }
+        } else {
+          // Unknown status
+          console.warn('Unknown job status:', job.status)
+          attempts++
+          if (attempts < maxAttempts) {
+            setTimeout(poll, 5000)
+          } else {
+            setSyllabusDetailAISummaryLoading(false)
+            showToast('Không thể xác định trạng thái tóm tắt AI', 'warning')
+          }
+        }
+      } catch (err) {
+        console.error('Poll job status failed:', err)
+        setSyllabusDetailAISummaryLoading(false)
+        showToast('Lỗi khi kiểm tra trạng thái: ' + err.message, 'error')
+      }
+    }
+    
+    poll()
+  }
+
+  const downloadDocumentAsFile = async (documentId, fileName) => {
+    try {
+      const response = await apiClient.get(`/api/syllabus/documents/${documentId}/download`, {
+        responseType: 'blob'
+      })
+      // Create File object from blob
+      return new File([response.data], fileName, { type: response.data.type })
+    } catch (err) {
+      console.error('Download document failed:', err)
+      throw err
+    }
+  }
+
+  const generateDocumentSummary = async (documentId, documentFileName) => {
+    if (!syllabusDetailData?.id) {
+      showToast('Không tìm thấy giáo trình', 'error')
+      return
+    }
+
+    setDocumentSummarizingId(documentId)
+
+    try {
+      // Step 1: Download document file từ server
+      console.log('[Summary] Step 1: Downloading document:', documentId)
+      const documentFile = await downloadDocumentAsFile(documentId, documentFileName)
+      console.log('[Summary] Document downloaded successfully')
+
+      // Step 2: Ingest document vào AI service (POST /ai/documents/ingest)
+      console.log('[Summary] Step 2: Ingesting document to AI service')
+      const ingestRes = await aiService.ingestDocument(
+        documentFile,
+        syllabusDetailData.id,
+        syllabusDetailData.subjectName || '',
+        documentId  // document_id parameter
+      )
+      console.log('[Summary] Ingest response:', ingestRes)
+
+      // Check ingest response
+      if (!ingestRes.data?.success) {
+        // Extract error message from nested structure
+        const errorMsg = ingestRes.data?.error?.message || 
+                        ingestRes.data?.message || 
+                        'Lỗi tải tài liệu vào AI service'
+        console.error('[Summary] ❌ Ingest failed:', errorMsg, 'Full response:', ingestRes.data)
+        showToast(errorMsg, 'error')
+        setDocumentSummarizingId(null)
+        return
+      }
+
+      console.log('[Summary] ✅ Document ingested successfully, chunks created:', ingestRes.data?.chunks_created)
+
+      // Step 3: Generate summary (POST /ai/summary)
+      console.log('[Summary] Step 3: Generating summary using POST /ai/summary')
+      let summaryRes
+      try {
+        summaryRes = await aiService.generateDocumentSummary(
+          syllabusDetailData.id,
+          documentId,
+          'MEDIUM'
+        )
+        console.log('[Summary] Summary API response:', summaryRes)
+      } catch (summaryError) {
+        console.error('[Summary] ❌ Summary API call failed:', summaryError)
+        const errorMsg = summaryError.response?.data?.error?.message || 
+                        summaryError.response?.data?.message || 
+                        summaryError.message || 
+                        'Lỗi tạo tóm tắt'
+        showToast(errorMsg, 'error')
+        setDocumentSummarizingId(null)
+        return
+      }
+
+      // Extract jobId from response (JobCreateResponse)
+      // Response format: { jobId, status: "QUEUED", message }
+      const jobId = summaryRes.data?.jobId || summaryRes?.jobId
+      const jobStatus = summaryRes.data?.status || summaryRes?.status
+
+      if (!jobId) {
+        console.error('[Summary] ❌ No jobId in response:', summaryRes)
+        showToast('Không thể tạo job tóm tắt (không nhận được jobId)', 'error')
+        setDocumentSummarizingId(null)
+        return
+      }
+
+      console.log('[Summary] ✅ Summary job created - jobId:', jobId, 'status:', jobStatus)
+
+      // Step 4: Save jobId to syllabus_documents.ai_ingestion_job_id
+      console.log('[Summary] Step 4: Saving jobId to ai_ingestion_job_id')
+      try {
+        await aiService.saveDocumentJobIdImmediately(documentId, jobId)
+        console.log('[Summary] ✅ jobId saved to database successfully')
+
+        // Step 5: Reload documents to refresh UI
+        console.log('[Summary] Step 5: Reloading documents from server')
+        const docsRes = await syllabusServiceV2.getDocumentsBySyllabus(syllabusDetailData.id)
+        const updatedDocs = docsRes.data?.data || docsRes.data || []
+        setSyllabusDetailDocuments(updatedDocs)
+        console.log('[Summary] ✅ Documents reloaded - "Xem tóm tắt" button should now be visible')
+
+        showToast('✅ Tài liệu đã được gửi để tóm tắt. Tóm tắt sẽ có sẵn trong vài giây.', 'success')
+        setDocumentSummarizingId(null)
+      } catch (saveError) {
+        console.error('[Summary] ❌ Failed to save jobId:', saveError)
+        showToast('⚠️ Lưu jobId thất bại (job vẫn đang chạy): ' + saveError.message, 'warning')
+        setDocumentSummarizingId(null)
+      }
+    } catch (err) {
+      console.error('[Summary] ❌ Unexpected error:', err)
+      showToast('Lỗi khi tạo tóm tắt: ' + err.message, 'error')
+      setDocumentSummarizingId(null)
+    }
+  }
+
+
+
   const resetForm = () => {
     setFormData({
       subjectCode: '',
@@ -635,6 +999,7 @@ const LecturerDashboard = ({ user, onLogout }) => {
     setDocumentDescription('')
     // Don't reset selectedSyllabus - it's set when opening the modal
   }
+
 
   const handleAddDocument = async () => {
     try {
@@ -660,6 +1025,16 @@ const LecturerDashboard = ({ user, onLogout }) => {
       // Call the syllabus documents API
       const res = await syllabusServiceV2.uploadDocument(selectedSyllabus.id, documentFile, documentTitle, documentDescription, currentUser?.userId || currentUser?.id)
       console.log('Upload document response:', res?.data)
+      
+      // Also ingest into AI service for RAG
+      try {
+        await aiService.ingestDocument(documentFile, selectedSyllabus.id, selectedSyllabus.subjectName || '')
+        console.log('Document ingested into AI service')
+      } catch (aiErr) {
+        console.warn('Failed to ingest document into AI service:', aiErr)
+        // Don't fail the entire operation if AI ingest fails
+      }
+      
       showToast('Thêm tài liệu thành công', 'success')
       setShowDocumentsModal(false)
       resetDocumentsForm()
@@ -823,7 +1198,6 @@ const LecturerDashboard = ({ user, onLogout }) => {
                 <div className="relative">
                   {filteredSyllabi.length === 0 ? (
                     <div className="text-center py-12 text-gray-500">
-                      <div className="mb-4 text-2xl">📭</div>
                       <div className="mb-2 font-semibold">Bạn chưa có giáo trình nào</div>
                       <div className="mb-4 text-sm">Bắt đầu tạo giáo trình mới để quản lý tài liệu và phiên bản.</div>
                       <div className="flex justify-center">
@@ -855,22 +1229,11 @@ const LecturerDashboard = ({ user, onLogout }) => {
                           <td className="px-6 py-4">
                             <div className="flex gap-2 flex-wrap">
                               <button
-                                onClick={() => openDetailModal(s)}
+                                onClick={() => handleViewSyllabusDetail(s)}
                                 className="text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1"
                                 title="Xem chi tiết"
                               >
                                 <Eye size={16} />
-                              </button>
-                              <button
-                                onClick={() => {
-                                  setSelectedSyllabus(s)
-                                  setShowDocumentsModal(true)
-                                  resetDocumentsForm()
-                                }}
-                                className="text-orange-600 hover:text-orange-700 font-medium flex items-center gap-1"
-                                title="Thêm tài liệu"
-                              >
-                                <FileText size={16} />
                               </button>
                               {(s.status === 'DRAFT' || s.status === 'REJECTED') && (
                                 <>
@@ -1096,12 +1459,13 @@ const LecturerDashboard = ({ user, onLogout }) => {
       {/* Edit Modal - Similar to Create with different endpoint */}
       {showEditModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
             <div className="sticky top-0 bg-white border-b px-8 py-6 flex justify-between items-center">
               <h2 className="text-2xl font-bold text-gray-900">Chỉnh sửa giáo trình (Tạo phiên bản mới)</h2>
               <button onClick={() => {setShowEditModal(false); setSelectedSyllabus(null)}} className="text-gray-500 hover:text-gray-700 text-2xl">✕</button>
             </div>
             <div className="p-8 space-y-4">
+              {/* Form Fields */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Mã môn học *</label>
                 <input
@@ -1131,13 +1495,101 @@ const LecturerDashboard = ({ user, onLogout }) => {
                   rows={2}
                 />
               </div>
-              {/* Content development postponed - will be added later */}
+
+              {/* Hiển thị nội dung cũ */}
+              {selectedSyllabus?.content && selectedSyllabus?.content !== '{}' && (
+                <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mt-4">
+                  <h3 className="text-sm font-semibold text-gray-900 mb-3">Nội dung hiện tại</h3>
+                  <div className="text-xs text-gray-700 space-y-2">
+                    {(() => {
+                      try {
+                        const content = typeof selectedSyllabus.content === 'string' 
+                          ? JSON.parse(selectedSyllabus.content) 
+                          : selectedSyllabus.content
+                        
+                        return (
+                          <div className="space-y-2">
+                            {content.modules && content.modules.length > 0 && (
+                              <div>
+                                <p className="font-medium text-gray-700">Các module ({content.modules.length}):</p>
+                                <ul className="ml-3 text-gray-600">
+                                  {content.modules.map((mod, idx) => (
+                                    <li key={idx}>• {mod.title || mod.name}</li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+                            {content.learningObjectives && (
+                              <div>
+                                <p className="font-medium text-gray-700">Mục tiêu học tập:</p>
+                                <p className="ml-3 text-gray-600 whitespace-pre-wrap line-clamp-3">{content.learningObjectives}</p>
+                              </div>
+                            )}
+                            {content.teachingMethods && (
+                              <div>
+                                <p className="font-medium text-gray-700">Phương pháp giảng dạy:</p>
+                                <p className="ml-3 text-gray-600 line-clamp-2">{content.teachingMethods}</p>
+                              </div>
+                            )}
+                            {content.assessmentMethods && (
+                              <div>
+                                <p className="font-medium text-gray-700">Phương pháp đánh giá:</p>
+                                <p className="ml-3 text-gray-600 line-clamp-2">{content.assessmentMethods}</p>
+                              </div>
+                            )}
+                          </div>
+                        )
+                      } catch (err) {
+                        return <p className="text-red-600">Không thể hiển thị nội dung</p>
+                      }
+                    })()}
+                  </div>
+                </div>
+              )}
+
+              {/* Hiển thị CLO đã chọn */}
+              {selectedSyllabus?.content && (() => {
+                try {
+                  const content = typeof selectedSyllabus.content === 'string' 
+                    ? JSON.parse(selectedSyllabus.content) 
+                    : selectedSyllabus.content
+                  
+                  if (content?.cloPairIds && content.cloPairIds.length > 0) {
+                    return (
+                      <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                        <h3 className="text-sm font-semibold text-gray-900 mb-2">CLO đã liên kết ({content.cloPairIds.length})</h3>
+                        <div className="text-xs text-gray-700">
+                          <p>IDs: {content.cloPairIds.join(', ')}</p>
+                        </div>
+                      </div>
+                    )
+                  }
+                } catch (e) {
+                  return null
+                }
+              })()}
+
+              {/* Hiển thị tài liệu đã tải lên */}
+              {syllabusDocuments && syllabusDocuments.length > 0 && (
+                <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+                  <h3 className="text-sm font-semibold text-gray-900 mb-2">Tài liệu giảng dạy ({syllabusDocuments.length})</h3>
+                  <div className="space-y-2">
+                    {syllabusDocuments.map((doc, idx) => (
+                      <div key={idx} className="text-xs bg-white p-2 rounded border border-orange-100">
+                        <p className="font-medium text-gray-700">{doc.title || doc.originalName || doc.fileName}</p>
+                        {doc.description && <p className="text-gray-600 mt-1">{doc.description}</p>}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <div className="p-3 bg-blue-50 border border-blue-200 rounded text-sm text-blue-800">
-                <strong>Ghi chú:</strong> Nội dung giáo trình (modules, mục tiêu, đánh giá) sẽ được phát triển trong phiên tiếp theo. Hiện tại bạn có thể chỉnh sửa thông tin cơ bản về môn học.
+                <strong>Ghi chú:</strong> Chỉnh sửa thông tin cơ bản (mã môn, tên môn, tóm tắt) sẽ tạo phiên bản mới. Để chỉnh sửa chi tiết nội dung, modules, CLO và tài liệu, vui lòng sử dụng công cụ biên tập giáo trình.
               </div>
             </div>
             <div className="sticky bottom-0 bg-gray-50 px-8 py-4 flex justify-end gap-4 border-t">
-              <button onClick={() => {setShowEditModal(false); setSelectedSyllabus(null)}} className="px-6 py-2 border rounded-lg hover:bg-gray-100">Hủy</button>
+              <button onClick={() => {setShowEditModal(false); setSelectedSyllabus(null); setSyllabusDocuments([])}} className="px-6 py-2 border rounded-lg hover:bg-gray-100">Hủy</button>
               <button onClick={handleUpdateSyllabus} className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">Lưu phiên bản mới</button>
             </div>
           </div>
@@ -1150,51 +1602,182 @@ const LecturerDashboard = ({ user, onLogout }) => {
           <div className="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
               <div className="sticky top-0 bg-white border-b px-8 py-6 flex justify-between items-center">
               <div>
-                <h2 className="text-2xl font-bold text-gray-900">{selectedSyllabus.courseName}</h2>
-                <p className="text-sm text-gray-600">{selectedSyllabus.courseCode} • Phiên bản {selectedSyllabus.version}</p>
+                <h2 className="text-2xl font-bold text-gray-900">{selectedSyllabus.subjectName || selectedSyllabus.courseName}</h2>
+                <p className="text-sm text-gray-600">{selectedSyllabus.subjectCode || selectedSyllabus.courseCode} • v{selectedSyllabus.versionNo || selectedSyllabus.version || 1}</p>
               </div>
               <button onClick={() => {setShowDetailModal(false); setSelectedSyllabus(null); setSyllabusDocuments([])}} className="text-gray-500 hover:text-gray-700 text-2xl">✕</button>
             </div>
             <div className="p-8 space-y-6">
+              {/* Status */}
               <div className="flex items-center gap-4">
                 <span className="font-semibold">Trạng thái:</span>
                 {getStatusBadge(selectedSyllabus.status)}
               </div>
 
-              {selectedSyllabus.prerequisites && (<div><h3 className="font-semibold mb-2">Môn tiên quyết:</h3><p className="text-gray-700">{selectedSyllabus.prerequisites}</p></div>)}
-              {selectedSyllabus.description && (<div><h3 className="font-semibold mb-2">Mô tả:</h3><p className="text-gray-700">{selectedSyllabus.description}</p></div>)}
-              {selectedSyllabus.objectives && (<div><h3 className="font-semibold mb-2">Mục tiêu:</h3><p className="text-gray-700 whitespace-pre-wrap">{selectedSyllabus.objectives}</p></div>)}
-              {selectedSyllabus.content && (<div><h3 className="font-semibold mb-2">Nội dung:</h3><p className="text-gray-700 whitespace-pre-wrap">{selectedSyllabus.content}</p></div>)}
-              {selectedSyllabus.assessmentMethod && (<div><h3 className="font-semibold mb-2">Phương pháp đánh giá:</h3><p className="text-gray-700">{selectedSyllabus.assessmentMethod}</p></div>)}
-              {selectedSyllabus.references && (<div><h3 className="font-semibold mb-2">Tài liệu tham khảo:</h3><p className="text-gray-700 whitespace-pre-wrap">{selectedSyllabus.references}</p></div>)}
+              {/* Basic Info */}
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Thông tin cơ bản</h3>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <span className="text-gray-600">Mã môn học:</span>
+                    <div className="font-semibold text-gray-900 mt-1">{selectedSyllabus.subjectCode || selectedSyllabus.courseCode || '-'}</div>
+                  </div>
+                  <div>
+                    <span className="text-gray-600">Tên môn học:</span>
+                    <div className="font-semibold text-gray-900 mt-1">{selectedSyllabus.subjectName || selectedSyllabus.courseName || '-'}</div>
+                  </div>
+                  <div>
+                    <span className="text-gray-600">Người tạo:</span>
+                    <div className="font-semibold text-gray-900 mt-1">{selectedSyllabus.createdBy || '-'}</div>
+                  </div>
+                  <div>
+                    <span className="text-gray-600">Phiên bản:</span>
+                    <div className="font-semibold text-gray-900 mt-1">v{selectedSyllabus.versionNo || selectedSyllabus.version || 1}</div>
+                  </div>
+                  <div className="col-span-2">
+                    <span className="text-gray-600">Ngày tạo:</span>
+                    <div className="font-semibold text-gray-900 mt-1">
+                      {selectedSyllabus.createdAt ? new Date(selectedSyllabus.createdAt).toLocaleString('vi-VN') : '-'}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Summary */}
+              {selectedSyllabus.summary && (
+                <div className="bg-gray-50 border border-gray-200 rounded-lg p-6">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-3">Tóm tắt</h3>
+                  <p className="text-gray-700">{selectedSyllabus.summary}</p>
+                </div>
+              )}
+
+              {/* Content Preview */}
+              {selectedSyllabus.content && selectedSyllabus.content !== '{}' && (
+                <div className="bg-gray-50 border border-gray-200 rounded-lg p-6">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-3">Nội dung giáo trình</h3>
+                  <div className="text-sm text-gray-700">
+                    {(() => {
+                      try {
+                        const content = typeof selectedSyllabus.content === 'string' 
+                          ? JSON.parse(selectedSyllabus.content) 
+                          : selectedSyllabus.content
+                        
+                        if (typeof content === 'object') {
+                          return (
+                            <div className="space-y-4">
+                              {(content.subjectCode || content.academicYear || content.semester) && (
+                                <div className="bg-white p-3 rounded border border-gray-200">
+                                  <h4 className="font-semibold text-gray-900 mb-2">Thông tin</h4>
+                                  <div className="grid grid-cols-2 gap-2 text-sm">
+                                    {content.subjectCode && <div><span className="text-gray-600">Mã môn:</span> <span className="font-medium">{content.subjectCode}</span></div>}
+                                    {content.syllabusCode && <div><span className="text-gray-600">Mã giáo trình:</span> <span className="font-medium">{content.syllabusCode}</span></div>}
+                                    {content.academicYear && <div><span className="text-gray-600">Năm học:</span> <span className="font-medium">{content.academicYear}</span></div>}
+                                    {content.semester && <div><span className="text-gray-600">Học kỳ:</span> <span className="font-medium">{content.semester}</span></div>}
+                                  </div>
+                                </div>
+                              )}
+
+                              {content.modules && content.modules.length > 0 && (
+                                <div>
+                                  <h4 className="font-semibold text-gray-900 mb-2">Các module ({content.modules.length})</h4>
+                                  <ul className="space-y-1 ml-4">
+                                    {content.modules.map((mod, idx) => (
+                                      <li key={idx} className="text-gray-700">
+                                        • {mod.title || mod.name || `Module ${idx + 1}`}
+                                        {mod.description && ` - ${mod.description}`}
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              )}
+
+                              {content.learningObjectives && content.learningObjectives.trim() && (
+                                <div>
+                                  <h4 className="font-semibold text-gray-900 mb-2">Mục tiêu học tập</h4>
+                                  <p className="text-gray-700 whitespace-pre-wrap">{content.learningObjectives}</p>
+                                </div>
+                              )}
+
+                              {content.teachingMethods && content.teachingMethods.trim() && (
+                                <div>
+                                  <h4 className="font-semibold text-gray-900 mb-2">Phương pháp giảng dạy</h4>
+                                  <p className="text-gray-700 whitespace-pre-wrap">{content.teachingMethods}</p>
+                                </div>
+                              )}
+
+                              {content.assessmentMethods && content.assessmentMethods.trim() && (
+                                <div>
+                                  <h4 className="font-semibold text-gray-900 mb-2">Phương pháp đánh giá</h4>
+                                  <p className="text-gray-700 whitespace-pre-wrap">{content.assessmentMethods}</p>
+                                </div>
+                              )}
+
+                              {content.cloPairIds && content.cloPairIds.length > 0 && (
+                                <CLODetailsDisplay cloIds={content.cloPairIds} />
+                              )}
+
+                              {(!content.modules || content.modules.length === 0) &&
+                               (!content.learningObjectives || !content.learningObjectives.trim()) &&
+                               (!content.teachingMethods || !content.teachingMethods.trim()) &&
+                               (!content.assessmentMethods || !content.assessmentMethods.trim()) &&
+                               (!content.cloPairIds || content.cloPairIds.length === 0) && (
+                                <div className="text-gray-500 italic">
+                                  Chưa có nội dung chi tiết. Hãy thêm modules, mục tiêu, phương pháp giảng dạy và đánh giá.
+                                </div>
+                              )}
+                            </div>
+                          )
+                        } else {
+                          return <pre className="whitespace-pre-wrap overflow-x-auto">{content}</pre>
+                        }
+                      } catch (err) {
+                        return (
+                          <div>
+                            <p className="text-red-600 text-xs mb-2">⚠️ Không thể parse JSON, hiển thị thô:</p>
+                            <pre className="bg-white p-3 rounded border border-gray-300 text-xs overflow-x-auto max-h-48">
+                              {selectedSyllabus.content}
+                            </pre>
+                          </div>
+                        )
+                      }
+                    })()}
+                  </div>
+                </div>
+              )}
 
               {/* Documents / Lectures list */}
-              <div>
-                <h3 className="font-semibold mb-2">Bài giảng</h3>
-                {syllabusDocuments && syllabusDocuments.length > 0 ? (
+              {syllabusDocuments && syllabusDocuments.length > 0 && (
+                <div className="bg-gray-50 border border-gray-200 rounded-lg p-6">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Tài liệu giảng dạy</h3>
                   <ul className="space-y-3">
                     {syllabusDocuments.map((doc) => (
-                      <li key={doc.id} className="p-3 border rounded flex items-start justify-between">
+                      <li key={doc.id} className="p-3 bg-white border border-gray-200 rounded flex items-start justify-between">
                         <div className="flex-1">
-                          <div className="font-medium">{doc.title || doc.originalName || doc.fileName || 'Không có tiêu đề'}</div>
-                          {doc.description && <div className="text-sm text-gray-600">{doc.description}</div>}
-                          <div className="text-xs text-gray-500 mt-1">Tải lên bởi {doc.uploadedBy || doc.createdBy || doc.createdByName || 'N/A'} • {doc.uploadedAt ? new Date(doc.uploadedAt).toLocaleString('vi-VN') : (doc.createdAt ? new Date(doc.createdAt).toLocaleString('vi-VN') : '')}</div>
+                          <div className="font-medium text-gray-900">{doc.title || doc.originalName || doc.fileName || 'Không có tiêu đề'}</div>
+                          {doc.description && <div className="text-sm text-gray-600 mt-1">{doc.description}</div>}
+                          <div className="text-xs text-gray-500 mt-2">Tải lên bởi {doc.uploadedBy || doc.createdBy || doc.createdByName || 'N/A'} • {doc.uploadedAt ? new Date(doc.uploadedAt).toLocaleString('vi-VN') : (doc.createdAt ? new Date(doc.createdAt).toLocaleString('vi-VN') : '')}</div>
                         </div>
                         <div className="flex-shrink-0 ml-4 flex flex-col gap-2">
-                          <button onClick={() => handleViewDocument(doc.id)} className="px-3 py-1 bg-gray-100 text-gray-800 rounded">Xem</button>
-                          <button onClick={() => handleDownloadDocument(doc.id, doc.originalName || doc.fileName || doc.title)} className="px-3 py-1 bg-indigo-600 text-white rounded">Tải</button>
+                          <button onClick={() => handleViewDocument(doc.id)} className="px-3 py-1 text-xs bg-gray-100 text-gray-800 rounded hover:bg-gray-200">Xem</button>
+                          <button onClick={() => handleDownloadDocument(doc.id, doc.originalName || doc.fileName || doc.title)} className="px-3 py-1 text-xs bg-indigo-600 text-white rounded hover:bg-indigo-700">Tải</button>
                         </div>
                       </li>
                     ))}
                   </ul>
-                ) : (
-                  <div className="text-sm text-gray-500">Chưa có bài giảng</div>
-                )}
-              </div>
+                </div>
+              )}
 
-              <div className="text-sm text-gray-500 border-t pt-4">
-                <div>Cập nhật lần cuối: {selectedSyllabus.updatedAt ? new Date(selectedSyllabus.updatedAt).toLocaleString('vi-VN') : '-'}</div>
-                <div>Người tạo: {selectedSyllabus.createdBy || 'N/A'}</div>
+              {/* Additional Info */}
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Thông tin khác</h3>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <span className="text-gray-600">Cập nhật lần cuối:</span>
+                    <div className="text-gray-900 mt-1">
+                      {selectedSyllabus.updatedAt ? new Date(selectedSyllabus.updatedAt).toLocaleString('vi-VN') : '-'}
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
             <div className="sticky bottom-0 bg-gray-50 px-8 py-4 flex justify-end gap-4 border-t">
@@ -1453,7 +2036,7 @@ const LecturerDashboard = ({ user, onLogout }) => {
                                   {/* Metadata Section */}
                                   {(content.subjectCode || content.academicYear || content.semester) && (
                                     <div className="bg-white p-3 rounded border border-gray-200">
-                                      <h4 className="font-semibold text-gray-900 mb-2">📋 Thông tin</h4>
+                                      <h4 className="font-semibold text-gray-900 mb-2">Thông tin</h4>
                                       <div className="grid grid-cols-2 gap-2 text-sm">
                                         {content.subjectCode && <div><span className="text-gray-600">Mã môn:</span> <span className="font-medium">{content.subjectCode}</span></div>}
                                         {content.syllabusCode && <div><span className="text-gray-600">Mã giáo trình:</span> <span className="font-medium">{content.syllabusCode}</span></div>}
@@ -1466,7 +2049,7 @@ const LecturerDashboard = ({ user, onLogout }) => {
                                   {/* Modules */}
                                   {content.modules && content.modules.length > 0 && (
                                     <div>
-                                      <h4 className="font-semibold text-gray-900 mb-2">📚 Các module ({content.modules.length})</h4>
+                                      <h4 className="font-semibold text-gray-900 mb-2">Các module ({content.modules.length})</h4>
                                       <ul className="space-y-1 ml-4">
                                         {content.modules.map((mod, idx) => (
                                           <li key={idx} className="text-gray-700">
@@ -1481,7 +2064,7 @@ const LecturerDashboard = ({ user, onLogout }) => {
                                   {/* Learning Objectives */}
                                   {content.learningObjectives && content.learningObjectives.trim() && (
                                     <div>
-                                      <h4 className="font-semibold text-gray-900 mb-2">🎯 Mục tiêu học tập</h4>
+                                      <h4 className="font-semibold text-gray-900 mb-2">Mục tiêu học tập</h4>
                                       <p className="text-gray-700 whitespace-pre-wrap">{content.learningObjectives}</p>
                                     </div>
                                   )}
@@ -1489,7 +2072,7 @@ const LecturerDashboard = ({ user, onLogout }) => {
                                   {/* Teaching Methods */}
                                   {content.teachingMethods && content.teachingMethods.trim() && (
                                     <div>
-                                      <h4 className="font-semibold text-gray-900 mb-2">👨‍🏫 Phương pháp giảng dạy</h4>
+                                      <h4 className="font-semibold text-gray-900 mb-2">Phương pháp giảng dạy</h4>
                                       <p className="text-gray-700 whitespace-pre-wrap">{content.teachingMethods}</p>
                                     </div>
                                   )}
@@ -1497,7 +2080,7 @@ const LecturerDashboard = ({ user, onLogout }) => {
                                   {/* Assessment Methods */}
                                   {content.assessmentMethods && content.assessmentMethods.trim() && (
                                     <div>
-                                      <h4 className="font-semibold text-gray-900 mb-2">📝 Phương pháp đánh giá</h4>
+                                      <h4 className="font-semibold text-gray-900 mb-2">Phương pháp đánh giá</h4>
                                       <p className="text-gray-700 whitespace-pre-wrap">{content.assessmentMethods}</p>
                                     </div>
                                   )}
@@ -1514,7 +2097,7 @@ const LecturerDashboard = ({ user, onLogout }) => {
                                    (!content.assessmentMethods || !content.assessmentMethods.trim()) &&
                                    (!content.cloPairIds || content.cloPairIds.length === 0) && (
                                     <div className="text-gray-500 italic">
-                                      ℹ️ Chưa có nội dung chi tiết. Hãy thêm modules, mục tiêu, phương pháp giảng dạy và đánh giá.
+                                      Chưa có nội dung chi tiết. Hãy thêm modules, mục tiêu, phương pháp giảng dạy và đánh giá.
                                     </div>
                                   )}
                                 </div>
@@ -1538,6 +2121,149 @@ const LecturerDashboard = ({ user, onLogout }) => {
                       </div>
                     </div>
                   )}
+
+                  {/* Documents Section */}
+                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-6">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Tệp bài giảng ({syllabusDetailDocuments.length})</h3>
+                    {syllabusDetailDocumentsLoading ? (
+                      <div className="text-center py-4 text-gray-600">
+                        <p className="text-sm">Đang tải tệp...</p>
+                      </div>
+                    ) : syllabusDetailDocuments.length > 0 ? (
+                      <div className="space-y-3">
+                        {syllabusDetailDocuments.map((doc) => (
+                          <div key={doc.id} className="bg-white p-4 rounded border border-gray-200 hover:border-blue-300 hover:bg-blue-50 transition-colors">
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="flex-1 min-w-0">
+                                <p className="font-medium text-gray-900 truncate">{doc.originalName || doc.title || doc.fileName || 'Unnamed Document'}</p>
+                                {doc.description && (
+                                  <p className="text-sm text-gray-600 mt-1">{doc.description}</p>
+                                )}
+                                <div className="flex gap-4 mt-2 text-xs text-gray-600">
+                                  {doc.fileSize && (
+                                    <span>Kích thước: {(doc.fileSize / 1024 / 1024).toFixed(2)} MB</span>
+                                  )}
+                                  {doc.uploadedAt && (
+                                    <span>Ngày tải: {new Date(doc.uploadedAt).toLocaleString('vi-VN')}</span>
+                                  )}
+                                  {doc.uploadedBy && (
+                                    <span>Người tải: {doc.uploadedBy}</span>
+                                  )}
+                                </div>
+
+                                {/* Show document summary if available */}
+                                {documentSummaries[doc.id] && (
+                                  <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded text-sm space-y-2">
+                                    <div>
+                                      <p className="font-semibold text-blue-900 mb-1">📋 Tóm tắt:</p>
+                                      <p className="text-blue-800">{documentSummaries[doc.id].summary}</p>
+                                    </div>
+
+                                    {documentSummaries[doc.id].bullets && documentSummaries[doc.id].bullets.length > 0 && (
+                                      <div>
+                                        <p className="font-semibold text-blue-900 mb-1">📌 Nội dung chính:</p>
+                                        <ul className="list-disc list-inside text-blue-800 space-y-1">
+                                          {documentSummaries[doc.id].bullets.map((bullet, idx) => (
+                                            <li key={idx} className="text-xs">
+                                              {bullet}
+                                            </li>
+                                          ))}
+                                        </ul>
+                                      </div>
+                                    )}
+
+                                    {documentSummaries[doc.id].keywords && documentSummaries[doc.id].keywords.length > 0 && (
+                                      <div>
+                                        <p className="font-semibold text-blue-900 mb-1">🏷️ Từ khoá:</p>
+                                        <div className="flex flex-wrap gap-1">
+                                          {documentSummaries[doc.id].keywords.map((kw, idx) => (
+                                            <span
+                                              key={idx}
+                                              className="inline-block px-2 py-1 bg-blue-200 text-blue-900 text-xs rounded"
+                                            >
+                                              {kw}
+                                            </span>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    )}
+
+                                    {documentSummaries[doc.id].targetAudience && (
+                                      <div>
+                                        <p className="font-semibold text-blue-900 mb-1">👥 Đối tượng học:</p>
+                                        <p className="text-blue-800 text-xs">{documentSummaries[doc.id].targetAudience}</p>
+                                      </div>
+                                    )}
+
+                                    {documentSummaries[doc.id].prerequisites && (
+                                      <div>
+                                        <p className="font-semibold text-blue-900 mb-1">📚 Điều kiện tiên quyết:</p>
+                                        <p className="text-blue-800 text-xs">{documentSummaries[doc.id].prerequisites}</p>
+                                      </div>
+                                    )}
+
+                                    {documentSummaries[doc.id].ragUsed && (
+                                      <div className="bg-purple-100 p-2 rounded">
+                                        <p className="font-semibold text-purple-900 mb-1">🔗 RAG Context:</p>
+                                        <p className="text-purple-800 text-xs whitespace-pre-wrap">{documentSummaries[doc.id].ragContext}</p>
+                                      </div>
+                                    )}
+
+                                    {documentSummaries[doc.id].model && (
+                                      <p className="text-xs text-blue-600 italic border-t border-blue-200 pt-2">
+                                        ⚙️ Model: {documentSummaries[doc.id].model} | 💬 Tokens: {documentSummaries[doc.id].tokens}
+                                      </p>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+
+                              <div className="flex gap-2 flex-shrink-0 flex-col">
+                                <button
+                                  onClick={() => handleViewDocument(doc.id)}
+                                  title="Xem trực tiếp"
+                                  className="px-3 py-1.5 bg-blue-600 text-white rounded hover:bg-blue-700 text-xs font-medium flex items-center gap-1 whitespace-nowrap"
+                                >
+                                  <Eye size={14} />
+                                  Xem
+                                </button>
+                                {doc.aiIngestionJobId && (
+                                  <button
+                                    onClick={() => {
+                                      setSelectedDocumentForSummary(doc)
+                                      setShowDocumentSummaryModal(true)
+                                    }}
+                                    title="Xem tóm tắt tài liệu"
+                                    className="px-3 py-1.5 bg-purple-600 text-white rounded hover:bg-purple-700 text-xs font-medium flex items-center gap-1 whitespace-nowrap"
+                                  >
+                                    <Zap size={14} />
+                                    Xem tóm tắt
+                                  </button>
+                                )}
+                                <button
+                                  onClick={() => generateDocumentSummary(doc.id, doc.fileName)}
+                                  disabled={documentSummarizingId === doc.id}
+                                  title="Tóm tắt tài liệu bằng AI"
+                                  className="px-3 py-1.5 bg-amber-600 text-white rounded hover:bg-amber-700 text-xs font-medium flex items-center gap-1 whitespace-nowrap disabled:bg-gray-400 disabled:cursor-not-allowed"
+                                >
+                                  {documentSummarizingId === doc.id ? (
+                                    <Loader size={14} className="animate-spin" />
+                                  ) : (
+                                    <Zap size={14} />
+                                  )}
+                                  {documentSummarizingId === doc.id ? 'Đang...' : 'Tóm tắt'}
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-center py-4 text-gray-500">
+                        <p className="text-sm italic">Chưa có tệp bài giảng nào được tải lên</p>
+                      </div>
+                    )}
+                  </div>
 
                   {/* Additional Info */}
                   <div className="bg-gray-50 border border-gray-200 rounded-lg p-6">
@@ -1584,6 +2310,17 @@ const LecturerDashboard = ({ user, onLogout }) => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Document Summary Modal */}
+      {showDocumentSummaryModal && selectedDocumentForSummary && (
+        <DocumentSummaryModal 
+          document={selectedDocumentForSummary}
+          onClose={() => {
+            setShowDocumentSummaryModal(false)
+            setSelectedDocumentForSummary(null)
+          }}
+        />
       )}
     </div>
   )

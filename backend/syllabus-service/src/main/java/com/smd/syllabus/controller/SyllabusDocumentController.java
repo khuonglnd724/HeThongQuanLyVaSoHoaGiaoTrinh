@@ -1,6 +1,7 @@
 package com.smd.syllabus.controller;
 
 import com.smd.syllabus.dto.DocumentResponse;
+import com.smd.syllabus.dto.UpdateJobIdRequest;
 import com.smd.syllabus.service.SyllabusDocumentService;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
@@ -181,5 +182,28 @@ public class SyllabusDocumentController {
     public ResponseEntity<?> approveDocuments(@PathVariable UUID syllabusId) {
         documentService.approveDocuments(syllabusId);
         return ResponseEntity.ok(Map.of("message", "Documents approved successfully"));
+    }
+
+    /**
+     * Update AI ingestion job ID for a document
+     * PUT /api/syllabus/documents/{documentId}/update-job-id
+     */
+    @PutMapping("/{documentId}/update-job-id")
+    public ResponseEntity<?> updateJobId(
+            @PathVariable UUID documentId,
+            @RequestBody UpdateJobIdRequest request) {
+        try {
+            LOGGER.info("[updateJobId] Received request: documentId={}, jobId={}", documentId, request.getJobId());
+            DocumentResponse response = documentService.updateJobId(documentId, request.getJobId());
+            LOGGER.info("Updated jobId for documentId={}, jobId={}", documentId, request.getJobId());
+            return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException e) {
+            LOGGER.warn("Invalid request for updateJobId: {}", e.getMessage());
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            LOGGER.error("Error updating jobId for documentId={}", documentId, e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Failed to update job ID: " + e.getMessage()));
+        }
     }
 }
