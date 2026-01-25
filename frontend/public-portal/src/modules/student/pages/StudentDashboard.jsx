@@ -1,11 +1,15 @@
 import React, { useEffect, useState } from 'react'
-import { BookOpen, BarChart3, LogOut, FileText, RefreshCcw, AlertTriangle } from 'lucide-react'
+import { BookOpen, BarChart3, LogOut, FileText, RefreshCcw, AlertTriangle, Heart, Clock } from 'lucide-react'
+import { getSyllabusDetail } from '../../public/services/publicSyllabusService'
 import studentAPI from '../services/studentService'
 
 const StudentDashboard = ({ user, onLogout }) => {
   const [dashboard, setDashboard] = useState({ syllabi: 0, averageGrade: 0, progress: 0 })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [followedSyllabi, setFollowedSyllabi] = useState([])
+  const [followedDetails, setFollowedDetails] = useState({})
+  const [recentSyllabi, setRecentSyllabi] = useState([])
 
   useEffect(() => {
     let mounted = true
@@ -13,6 +17,7 @@ const StudentDashboard = ({ user, onLogout }) => {
       setLoading(true)
       setError(null)
       try {
+        // Load API data
         const res = await studentAPI.getDashboard()
         const data = res?.data || {}
         if (mounted) {
@@ -22,6 +27,26 @@ const StudentDashboard = ({ user, onLogout }) => {
             progress: data.progressPercent ?? 0
           })
         }
+
+        // Load followed syllabi from localStorage
+        const followed = JSON.parse(localStorage.getItem('followedSyllabuses') || '[]')
+        setFollowedSyllabi(followed)
+
+        // Load details for followed syllabi
+        const details = {}
+        for (const id of followed) {
+          try {
+            const syl = await getSyllabusDetail(id)
+            details[id] = syl
+          } catch (err) {
+            console.warn('Could not load detail for', id)
+          }
+        }
+        if (mounted) setFollowedDetails(details)
+
+        // Load recent syllabi from localStorage
+        const recent = JSON.parse(localStorage.getItem('recentlySyllabuses') || '[]')
+        setRecentSyllabi(recent.slice(0, 1)) // Show only first one
       } catch (err) {
         if (mounted) setError('Không thể tải dữ liệu dashboard')
         console.error(err)
@@ -32,6 +57,14 @@ const StudentDashboard = ({ user, onLogout }) => {
     load()
     return () => { mounted = false }
   }, [])
+
+  const handleNavigateToFollowed = (id) => {
+    window.location.href = `/public/syllabus/${id}`
+  }
+
+  const handleNavigateToRecent = (id) => {
+    window.location.href = `/public/syllabus/${id}`
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white">
@@ -102,20 +135,103 @@ const StudentDashboard = ({ user, onLogout }) => {
           </div>
         </div>
 
-        {/* Quick Actions */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="bg-white rounded-xl shadow-lg p-8">
-            <h2 className="text-xl font-bold text-gray-900 mb-4">🔍 Tìm kiếm giáo trình</h2>
-            <button className="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition font-medium">
-              Khám phá thêm
-            </button>
+        {/* Followed Syllabi */}
+        <div className="mb-12">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-3">
+              <Heart size={28} className="text-yellow-500" />
+              <h2 className="text-2xl font-bold text-gray-900">Giáo trình đang theo dõi</h2>
+              {followedSyllabi.length > 0 && (
+                <span className="bg-blue-500 text-white rounded-full px-3 py-1 text-sm font-bold">
+                  {followedSyllabi.length}
+                </span>
+              )}
+            </div>
+            <a
+              href="/student/followed"
+              className="text-blue-600 hover:text-blue-800 font-medium flex items-center gap-2"
+            >
+              Xem tất cả →
+            </a>
           </div>
-          <div className="bg-white rounded-xl shadow-lg p-8">
-            <h2 className="text-xl font-bold text-gray-900 mb-4">📋 Tải xuống giáo trình</h2>
-            <button className="w-full bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 transition font-medium">
-              Xem danh sách
-            </button>
+
+          {followedSyllabi.length === 0 ? (
+            <div className="bg-yellow-50 border-l-4 border-yellow-400 rounded-lg p-8 text-center">
+              <Heart size={32} className="text-yellow-400 mx-auto mb-3" />
+              <p className="text-gray-600 text-lg">Chưa theo dõi giáo trình nào</p>
+              <p className="text-gray-500 text-sm mt-1">Hãy khám phá và theo dõi những giáo trình bạn quan tâm</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {followedSyllabi.map((id) => {
+                const syl = followedDetails[id]
+                if (!syl) return null
+                return (
+                  <button
+                    key={id}
+                    onClick={() => handleNavigateToFollowed(id)}
+                    className="text-left bg-gradient-to-br from-yellow-50 to-yellow-100 rounded-lg shadow-md hover:shadow-xl transition border-l-4 border-yellow-500 p-6"
+                  >
+                    <div className="flex items-start justify-between mb-2">
+                      <span className="inline-block bg-yellow-500 text-white px-3 py-1 rounded text-xs font-bold">
+                        {syl.subject_code}
+                      </span>
+                    </div>
+                    <h3 className="text-lg font-bold text-gray-900 mb-2">{syl.subject_name}</h3>
+                    <p className="text-gray-600 text-sm mb-3 line-clamp-1">{syl.summary}</p>
+                    <div className="flex gap-4 text-sm text-gray-600">
+                      <span>💳 {syl.credits} tín</span>
+                      <span>📅 {syl.semester}</span>
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Recently Viewed */}
+        <div className="mb-12">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-3">
+              <Clock size={28} className="text-blue-500" />
+              <h2 className="text-2xl font-bold text-gray-900">Xem gần đây</h2>
+            </div>
           </div>
+
+          {recentSyllabi.length === 0 ? (
+            <div className="bg-blue-50 border-l-4 border-blue-400 rounded-lg p-8 text-center">
+              <Clock size={32} className="text-blue-400 mx-auto mb-3" />
+              <p className="text-gray-600 text-lg">Chưa có lịch sử xem giáo trình</p>
+              <p className="text-gray-500 text-sm mt-1">Các giáo trình bạn xem sẽ hiển thị ở đây</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {recentSyllabi.map((id) => {
+                const syl = followedDetails[id]
+                if (!syl) return null
+                return (
+                  <button
+                    key={id}
+                    onClick={() => handleNavigateToRecent(id)}
+                    className="text-left bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg shadow-md hover:shadow-xl transition border-l-4 border-blue-500 p-6"
+                  >
+                    <div className="flex items-start justify-between mb-2">
+                      <span className="inline-block bg-blue-500 text-white px-3 py-1 rounded text-xs font-bold">
+                        {syl.subject_code}
+                      </span>
+                    </div>
+                    <h3 className="text-lg font-bold text-gray-900 mb-2">{syl.subject_name}</h3>
+                    <p className="text-gray-600 text-sm mb-3 line-clamp-1">{syl.summary}</p>
+                    <div className="flex gap-4 text-sm text-gray-600">
+                      <span>💳 {syl.credits} tín</span>
+                      <span>📅 {syl.semester}</span>
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+          )}
         </div>
       </div>
     </div>

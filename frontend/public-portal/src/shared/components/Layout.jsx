@@ -37,7 +37,7 @@ export const Header = () => {
     
     if (user) {
       // Add dashboard link for logged-in users
-      baseLinks.splice(1, 0, { icon: User, label: 'My Dashboard', path: '/student/dashboard' });
+      baseLinks.splice(1, 0, { icon: User, label: 'My Dashboard', path: '/student' });
     }
     
     return baseLinks;
@@ -46,33 +46,35 @@ export const Header = () => {
   const navLinks = getNavLinks();
 
   return (
-    <header className="bg-white border-b border-gray-200 sticky top-0 z-50">
-      <div className="container mx-auto px-6 py-4">
+    <header className="bg-white border-b border-gray-200 sticky top-0 z-50 shadow-sm">
+      <div className="container mx-auto px-6 py-3">
         <div className="flex items-center justify-between">
           {/* Logo */}
           <button 
             onClick={handleLogoClick}
-            className="flex items-center gap-3 hover:opacity-80 transition cursor-pointer"
+            className="flex items-center gap-3 hover:opacity-80 transition cursor-pointer group"
           >
-            <div className="text-3xl">📚</div>
+            <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-700 rounded-lg flex items-center justify-center shadow-md group-hover:shadow-lg transition-shadow">
+              <span className="text-white text-xl font-bold">📚</span>
+            </div>
             <div>
-              <h1 className="text-xl font-bold text-gray-900">
+              <h1 className="text-lg font-bold text-gray-900 tracking-tight">
                 SMD System
               </h1>
-              <p className="text-xs text-gray-600">
+              <p className="text-xs text-gray-500 font-medium">
                 Syllabus Management
               </p>
             </div>
           </button>
 
           {/* Desktop Navigation */}
-          <nav className="hidden md:flex items-center gap-1">
+          <nav className="hidden md:flex items-center gap-2">
             {navLinks.map((link, idx) => (
               link.path.startsWith('#') ? (
                 <a 
                   key={idx}
                   href={link.path}
-                  className="flex items-center gap-2 px-4 py-2 text-gray-700 hover:bg-blue-50 rounded-lg transition"
+                  className="flex items-center gap-2 px-4 py-2.5 text-gray-700 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all duration-200"
                 >
                   <link.icon size={18} />
                   <span className="text-sm font-medium">{link.label}</span>
@@ -81,10 +83,10 @@ export const Header = () => {
                 <Link 
                   key={idx}
                   to={link.path}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-lg transition ${
+                  className={`flex items-center gap-2 px-4 py-2.5 rounded-lg transition-all duration-200 ${
                     link.label === 'My Dashboard' 
-                      ? 'text-white bg-blue-600 hover:bg-blue-700 font-medium' 
-                      : 'text-gray-700 hover:bg-blue-50'
+                      ? 'text-white bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 shadow-md hover:shadow-lg font-medium' 
+                      : 'text-gray-700 hover:text-blue-600 hover:bg-blue-50'
                   }`}
                 >
                   <link.icon size={18} />
@@ -94,38 +96,42 @@ export const Header = () => {
             ))}
           </nav>
 
-          {/* Login/Logout Button & Mobile Menu */}
-          <div className="flex items-center gap-4">
+          {/* User Info & Login/Logout Button */}
+          <div className="flex items-center gap-3">
             {user ? (
               <>
                 <div className="hidden sm:flex items-center gap-3">
-                  <div className="flex items-center gap-2 text-gray-700">
-                    <User size={18} />
-                    <span className="text-sm font-medium">{user.name || user.email}</span>
+                  <div className="flex items-center gap-2.5 px-3 py-2 bg-gradient-to-r from-gray-50 to-gray-100 rounded-lg border border-gray-200">
+                    <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center text-white font-semibold text-sm shadow-sm">
+                      {(user.fullName || user.email || 'U')[0].toUpperCase()}
+                    </div>
+                    <span className="text-sm font-semibold text-gray-800 max-w-[150px] truncate">
+                      {user.fullName || user.email}
+                    </span>
                   </div>
                   <button 
                     onClick={handleLogout}
-                    className="flex items-center gap-2 bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition font-medium text-sm"
+                    className="flex items-center gap-2 bg-gradient-to-r from-red-600 to-red-700 text-white px-4 py-2.5 rounded-lg hover:from-red-700 hover:to-red-800 transition-all duration-200 shadow-md hover:shadow-lg font-medium text-sm"
                   >
                     <LogOut size={18} />
-                    Đăng xuất
+                    <span>Đăng xuất</span>
                   </button>
                 </div>
               </>
             ) : (
               <Link 
                 to="/login"
-                className="hidden sm:flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition font-medium text-sm"
+                className="hidden sm:flex items-center gap-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white px-5 py-2.5 rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all duration-200 shadow-md hover:shadow-lg font-medium text-sm"
               >
                 <LogIn size={18} />
-                Login
+                <span>Login</span>
               </Link>
             )}
 
             {/* Mobile Menu Button */}
             <button 
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="md:hidden p-2 hover:bg-gray-100 rounded-lg"
+              className="md:hidden p-2.5 hover:bg-gray-100 rounded-lg transition-colors"
             >
               {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
             </button>
@@ -134,39 +140,41 @@ export const Header = () => {
 
         {/* Mobile Navigation */}
         {mobileMenuOpen && (
-          <nav className="md:hidden mt-4 border-t border-gray-200 pt-4 space-y-2">
+          <nav className="md:hidden mt-4 border-t border-gray-200 pt-4 space-y-2 animate-fadeIn">
             {navLinks.map((link, idx) => (
               link.path.startsWith('#') ? (
                 <a 
                   key={idx}
                   href={link.path}
-                  className="flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-blue-50 rounded-lg transition"
+                  className="flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-blue-50 hover:text-blue-600 rounded-lg transition-all"
                   onClick={() => setMobileMenuOpen(false)}
                 >
                   <link.icon size={20} />
-                  <span>{link.label}</span>
+                  <span className="font-medium">{link.label}</span>
                 </a>
               ) : (
                 <Link 
                   key={idx}
                   to={link.path}
-                  className="flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-blue-50 rounded-lg transition"
+                  className="flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-blue-50 hover:text-blue-600 rounded-lg transition-all"
                   onClick={() => setMobileMenuOpen(false)}
                 >
                   <link.icon size={20} />
-                  <span>{link.label}</span>
+                  <span className="font-medium">{link.label}</span>
                 </Link>
               )
             ))}
             {user ? (
               <>
-                <div className="flex items-center gap-3 px-4 py-3 text-gray-700 border-t border-gray-200 mt-2 pt-4">
-                  <User size={20} />
-                  <span className="font-medium">{user.name || user.email}</span>
+                <div className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-gray-50 to-gray-100 rounded-lg border border-gray-200 mt-2">
+                  <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center text-white font-semibold shadow-sm">
+                    {(user.fullName || user.email || 'U')[0].toUpperCase()}
+                  </div>
+                  <span className="font-semibold text-gray-800">{user.fullName || user.email}</span>
                 </div>
                 <button 
                   onClick={handleLogout}
-                  className="flex items-center gap-3 px-4 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition font-medium"
+                  className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-red-600 to-red-700 text-white rounded-lg hover:from-red-700 hover:to-red-800 transition-all shadow-md font-medium w-full"
                 >
                   <LogOut size={20} />
                   <span>Đăng xuất</span>
@@ -175,7 +183,7 @@ export const Header = () => {
             ) : (
               <Link 
                 to="/login"
-                className="flex items-center gap-3 px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium"
+                className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all shadow-md font-medium"
                 onClick={() => setMobileMenuOpen(false)}
               >
                 <LogIn size={20} />
