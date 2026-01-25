@@ -10,12 +10,14 @@ import {
   X,
   ChevronDown,
   Check,
-  AlertCircle
+  AlertCircle,
+  Eye
 } from 'lucide-react'
 import syllabusServiceV2 from '../services/syllabusServiceV2'
 import dualSyllabusOrchestrator from '../services/dualSyllabusOrchestrator'
 import { academicAPI } from '../services/academicAPI'
 import { syllabusApprovalService } from '../services/syllabusApprovalService'
+import aiService from '../services/aiService'
 
 const SyllabusEditorPage = ({ syllabusId: initialSyllabusId, rootId, user, onBack }) => {
   const [syllabusId, setSyllabusId] = useState(initialSyllabusId)
@@ -36,9 +38,14 @@ const SyllabusEditorPage = ({ syllabusId: initialSyllabusId, rootId, user, onBac
   const [plosLoading, setPlosLoading] = useState(false)
   const [programInfo, setProgramInfo] = useState(null)
   const [academicSyllabusId, setAcademicSyllabusId] = useState(null)  // ID từ academic-service
+  const [loadedSubjectCode, setLoadedSubjectCode] = useState(null)  // Temp storage for matching subject
+  const [loadedCloPairIds, setLoadedCloPairIds] = useState([])
   const [formData, setFormData] = useState({
     subjectId: '',
-    description: '',
+    summary: '',
+    learningObjectives: '',
+    teachingMethods: '',
+    assessmentMethods: '',
     cloPairIds: [],
     modules: []
   })
@@ -70,6 +77,20 @@ const SyllabusEditorPage = ({ syllabusId: initialSyllabusId, rootId, user, onBac
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [syllabusId, mode])
 
+  // After subjects are loaded, try to match subjectId if we have subjectCode
+  useEffect(() => {
+    if (subjects.length > 0 && loadedSubjectCode && !formData.subjectId) {
+      const matchedSubject = subjects.find(s => 
+        (s.subjectCode || '').toLowerCase() === loadedSubjectCode.toLowerCase()
+      )
+      if (matchedSubject) {
+        console.log('Matched subject:', matchedSubject)
+        setFormData(prev => ({ ...prev, subjectId: matchedSubject.id }))
+        // CLOs will be loaded by the next useEffect
+      }
+    }
+  }, [subjects, loadedSubjectCode, formData.subjectId])
+
   const loadSubjects = async () => {
     setSubjectsLoading(true)
     try {
@@ -97,15 +118,40 @@ const SyllabusEditorPage = ({ syllabusId: initialSyllabusId, rootId, user, onBac
     try {
       const res = await syllabusServiceV2.getById(syllabusId)
       const data = res.data?.data || res.data || {}
-      setFormData({
-        subjectId: data.subjectId || '',
-        description: data.content || '',
-        cloPairIds: data.cloPairIds || [],
-        modules: data.modules || []
-      })
-      if (data.subjectId) {
-        await loadClos(data.subjectId)
+      
+      console.log('Loaded syllabus from API:', data)
+      
+      // Parse content JSON to extract cloPairIds and other fields
+      let cloPairIds = []
+      let contentObj = {}
+      if (data.content) {
+        try {
+          contentObj = typeof data.content === 'string' ? JSON.parse(data.content) : data.content
+          cloPairIds = contentObj.cloPairIds || []
+        } catch (e) {
+          console.warn('Failed to parse content JSON:', e)
+        }
       }
+      
+      // Get subject code to match with subjects list later
+      const subjectCode = data.subjectCode || contentObj.subjectCode || ''
+      const subjectId = data.subjectId || contentObj.subjectId || ''
+      
+      console.log('Parsed data:', { subjectId, subjectCode, cloPairIds })
+      
+      // Store for later matching
+      setLoadedSubjectCode(subjectCode)
+      setLoadedCloPairIds(cloPairIds)
+      
+      setFormData({
+        subjectId: subjectId,
+        summary: contentObj.summary || '',
+        learningObjectives: contentObj.learningObjectives || '',
+        teachingMethods: contentObj.teachingMethods || '',
+        assessmentMethods: contentObj.assessmentMethods || '',
+        cloPairIds: cloPairIds,
+        modules: contentObj.modules || []
+      })
     } catch (err) {
       console.error('Failed to load syllabus', err)
       alert('Không thể tải giáo trình')
@@ -119,7 +165,8 @@ const SyllabusEditorPage = ({ syllabusId: initialSyllabusId, rootId, user, onBac
     }
     setClosLoading(true)
     try {
-      const res = await academicAPI.getClosBySubject(subjectId)
+      // Use new API that enriches CLOs with PLO mapping information
+      const res = await academicAPI.getClosBySubjectWithPloMapping(subjectId)
       const closList = res.data?.data || res.data || []
       setClos(Array.isArray(closList) ? closList : [])
     } catch (err) {
@@ -229,6 +276,11 @@ const SyllabusEditorPage = ({ syllabusId: initialSyllabusId, rootId, user, onBac
     setSelectedFiles(prev => prev.filter((_, i) => i !== index))
   }
 
+  const previewFile = (file) => {
+    const fileUrl = URL.createObjectURL(file)
+    window.open(fileUrl, '_blank')
+  }
+
   const uploadDocuments = async (savedId) => {
     if (!savedId || selectedFiles.length === 0) return
     setUploading(true)
@@ -236,17 +288,121 @@ const SyllabusEditorPage = ({ syllabusId: initialSyllabusId, rootId, user, onBac
       for (const file of selectedFiles) {
         await syllabusServiceV2.uploadDocument(savedId, file, file.name, formData.description, userId)
       }
+      return true
     } catch (err) {
       console.error('Upload documents failed', err)
       alert('Tải tệp thất bại cho một số tài liệu')
+      return false
     } finally {
       setUploading(false)
+    }
+  }
+
+  // Auto-ingest documents to AI service after upload
+  const autoIngestDocuments = async (syllabusId) => {
+    try {
+      // Fetch documents that were just uploaded
+      const docsRes = await syllabusServiceV2.getDocumentsBySyllabus(syllabusId)
+      const documents = docsRes.data?.data || docsRes.data || []
+
+      if (!documents || documents.length === 0) {
+        console.log('[AutoIngest] No documents to ingest')
+        return
+      }
+
+      console.log(`[AutoIngest] Starting ingest for ${documents.length} documents`)
+      const subject = subjects.find(s => String(s.id) === String(formData.subjectId))
+      const subjectName = subject?.subjectName || ''
+
+      for (const doc of documents) {
+        try {
+          // Skip if already has jobId
+          if (doc.aiIngestionJobId) {
+            console.log(`[AutoIngest] Document ${doc.id} already ingested, skipping`)
+            continue
+          }
+
+          console.log(`[AutoIngest] Ingesting document: ${doc.id}`)
+          
+          // Download document
+          const res = await syllabusServiceV2.downloadDocument(doc.id)
+          const blob = res.data instanceof Blob ? res.data : new Blob([res.data], { type: 'application/octet-stream' })
+          const file = new File([blob], doc.fileName, { type: blob.type })
+          
+          // Ingest to AI service
+          await aiService.ingestDocument(
+            file,
+            syllabusId,
+            subjectName,
+            doc.id
+          )
+          
+          console.log(`[AutoIngest] Successfully ingested document: ${doc.id}`)
+        } catch (err) {
+          console.warn(`[AutoIngest] Failed to ingest document ${doc.id}:`, err)
+        }
+      }
+
+      console.log('[AutoIngest] Ingest phase complete')
+      return true
+    } catch (err) {
+      console.error('[AutoIngest] Error:', err)
+      return false
+    }
+  }
+
+  // Auto-generate summaries for ingested documents
+  const autoGenerateSummaries = async (syllabusId) => {
+    try {
+      const docsRes = await syllabusServiceV2.getDocumentsBySyllabus(syllabusId)
+      const documents = docsRes.data?.data || docsRes.data || []
+
+      if (!documents || documents.length === 0) {
+        console.log('[AutoSummary] No documents to summarize')
+        return
+      }
+
+      console.log(`[AutoSummary] Starting summary generation for ${documents.length} documents`)
+
+      for (const doc of documents) {
+        try {
+          if (doc.aiIngestionJobId) {
+            console.log(`[AutoSummary] Document ${doc.id} already has summary, skipping`)
+            continue
+          }
+
+          console.log(`[AutoSummary] Generating summary for document: ${doc.id}`)
+          const res = await aiService.generateDocumentSummary(syllabusId, doc.id, 'MEDIUM')
+          const jobId = res.data?.jobId || res.data?.data?.jobId
+          
+          if (jobId) {
+            console.log(`[AutoSummary] Summary job created for ${doc.id}, jobId=${jobId}`)
+            // Poll in background (non-blocking)
+            aiService.pollDocumentSummaryJob(jobId, doc.id).catch(err => {
+              console.warn(`[AutoSummary] Poll failed for ${doc.id}:`, err)
+            })
+          }
+        } catch (err) {
+          console.warn(`[AutoSummary] Failed to generate summary for document ${doc.id}:`, err)
+        }
+      }
+
+      console.log('[AutoSummary] All summaries initiated')
+      return true
+    } catch (err) {
+      console.error('[AutoSummary] Error:', err)
+      return false
     }
   }
 
   const handleSave = async () => {
     if (!formData.subjectId) {
       alert('Vui lòng chọn môn học')
+      return
+    }
+
+    if (formData.cloPairIds.length === 0) {
+      alert('Vui lòng chọn ít nhất 1 CLO')
       return
     }
 
@@ -266,11 +422,17 @@ const SyllabusEditorPage = ({ syllabusId: initialSyllabusId, rootId, user, onBac
       subjectId: Number(formData.subjectId),
       academicYear: formData.academicYear || new Date().getFullYear().toString(),
       semester: formData.semester || 1,
-      content: formData.description || '',
-      summary: formData.description || '',
-      learningObjectives: formData.learningObjectives || '',
-      teachingMethods: formData.teachingMethods || '',
-      assessmentMethods: formData.assessmentMethods || '',
+      content: JSON.stringify({
+        summary: formData.summary || '',
+        learningObjectives: formData.learningObjectives || '',
+        teachingMethods: formData.teachingMethods || '',
+        assessmentMethods: formData.assessmentMethods || '',
+        modules: formData.modules || [],
+        cloPairIds: formData.cloPairIds || [],
+        subjectId: Number(formData.subjectId),
+        subjectCode: subjectCode
+      }),
+      summary: formData.summary || '',
       cloPairIds: formData.cloPairIds,
       modules: formData.modules,
       version: formData.version || 1
@@ -299,8 +461,22 @@ const SyllabusEditorPage = ({ syllabusId: initialSyllabusId, rootId, user, onBac
         setSyllabusId(savedId)
         // setIsEditMode(true) - removed as isEditMode state was unused
 
-        await uploadDocuments(savedId)
-        alert('Tạo giáo trình thành công (lưu ở cả academic_db và syllabus_db)')
+        const uploadSuccess = await uploadDocuments(savedId)
+        alert('Tạo giáo trình thành công')
+
+        // Background AI processing (non-blocking)
+        if (uploadSuccess && selectedFiles.length > 0) {
+          alert('Đang xử lý tài liệu...')
+          setTimeout(async () => {
+            try {
+              await autoIngestDocuments(savedId)
+              await autoGenerateSummaries(savedId)
+              alert('Tài liệu đã được xử lý. Bạn có thể xem tóm tắt bất cứ lúc nào.')
+            } catch (err) {
+              console.error('[SyllabusEditorPage] Background AI processing failed:', err)
+            }
+          }, 500)
+        }
       } else {
         // ===== Update dùng dual orchestrator =====
         console.log('[SyllabusEditorPage] Updating with dual orchestrator')
@@ -320,8 +496,22 @@ const SyllabusEditorPage = ({ syllabusId: initialSyllabusId, rootId, user, onBac
           academicId: newAcademicId
         })
 
-        await uploadDocuments(savedId)
+        const uploadSuccess = await uploadDocuments(savedId)
         alert('Cập nhật giáo trình thành công (cập nhật cả 2 database)')
+
+        // Background AI processing (non-blocking)
+        if (uploadSuccess && selectedFiles.length > 0) {
+          alert('Đang xử lý tài liệu...')
+          setTimeout(async () => {
+            try {
+              await autoIngestDocuments(savedId)
+              await autoGenerateSummaries(savedId)
+              alert('Tài liệu đã được xử lý. Bạn có thể xem tóm tắt bất cứ lúc nào.')
+            } catch (err) {
+              console.error('[SyllabusEditorPage] Background AI processing failed:', err)
+            }
+          }, 500)
+        }
       }
 
       onBack?.()
@@ -368,6 +558,10 @@ const SyllabusEditorPage = ({ syllabusId: initialSyllabusId, rootId, user, onBac
     }
     if (!newClo.cloCode.trim()) {
       alert('Vui lòng nhập mã CLO')
+      return
+    }
+    if (newClo.selectedPloIds.length === 0) {
+      alert('Vui lòng chọn ít nhất 1 PLO để liên kết với CLO')
       return
     }
 
@@ -492,12 +686,45 @@ const SyllabusEditorPage = ({ syllabusId: initialSyllabusId, rootId, user, onBac
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Mô tả / Ghi chú</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Tóm tắt giáo trình</label>
                   <textarea
-                    value={formData.description}
-                    onChange={(e) => onChangeField('description', e.target.value)}
-                    placeholder="Mô tả ngắn gọn về giáo trình, mục tiêu học tập, yêu cầu tiên quyết..."
-                    rows={4}
+                    value={formData.summary}
+                    onChange={(e) => onChangeField('summary', e.target.value)}
+                    placeholder="Tóm tắt ngắn gọn về giáo trình"
+                    rows={3}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Mục tiêu học tập</label>
+                  <textarea
+                    value={formData.learningObjectives}
+                    onChange={(e) => onChangeField('learningObjectives', e.target.value)}
+                    placeholder="Các mục tiêu học tập mà sinh viên sẽ đạt được"
+                    rows={3}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Phương pháp giảng dạy</label>
+                  <textarea
+                    value={formData.teachingMethods}
+                    onChange={(e) => onChangeField('teachingMethods', e.target.value)}
+                    placeholder="Mô tả các phương pháp giảng dạy được sử dụng"
+                    rows={3}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Phương pháp đánh giá</label>
+                  <textarea
+                    value={formData.assessmentMethods}
+                    onChange={(e) => onChangeField('assessmentMethods', e.target.value)}
+                    placeholder="Mô tả các phương pháp và tiêu chí đánh giá"
+                    rows={3}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
@@ -569,18 +796,45 @@ const SyllabusEditorPage = ({ syllabusId: initialSyllabusId, rootId, user, onBac
                   <div className="border border-gray-300 rounded-lg p-4 bg-gray-50">
                     <div className="space-y-3 max-h-96 overflow-y-auto">
                       {clos.map(clo => (
-                        <label key={clo.id} className="flex items-start gap-3 p-3 bg-white rounded cursor-pointer hover:bg-gray-50">
-                          <input
-                            type="checkbox"
-                            checked={formData.cloPairIds.includes(clo.id)}
-                            onChange={() => toggleCloPair(clo.id)}
-                            className="mt-1"
-                          />
-                          <div className="flex-1">
-                            <p className="font-medium text-sm text-gray-700">{clo.cloCode || 'N/A'}</p>
-                            <p className="text-xs text-gray-600">{clo.description || 'Không có mô tả'}</p>
-                          </div>
-                        </label>
+                        <div
+                          key={clo.id}
+                          className="p-3 bg-white rounded border border-gray-200 hover:border-blue-300 hover:bg-blue-50 transition-colors"
+                        >
+                          <label className="flex items-start gap-3 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={formData.cloPairIds.includes(clo.id)}
+                              onChange={() => toggleCloPair(clo.id)}
+                              className="mt-1"
+                            />
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium text-sm text-gray-700">{clo.cloCode || 'N/A'}</p>
+                              <p className="text-xs text-gray-600 mt-0.5">{clo.description || 'Không có mô tả'}</p>
+                              
+                              {/* Display mapped PLOs */}
+                              {clo.mappedPlos && clo.mappedPlos.length > 0 && (
+                                <div className="mt-2 pt-2 border-t border-gray-200">
+                                  <p className="text-xs font-medium text-gray-600 mb-1">Mapping PLO:</p>
+                                  <div className="space-y-1">
+                                    {clo.mappedPlos.map((plo, idx) => (
+                                      <div
+                                        key={idx}
+                                        className="text-xs bg-purple-50 border border-purple-200 rounded p-1.5"
+                                      >
+                                        <p className="font-medium text-purple-700">
+                                          {plo.ploCode || 'PLO'}
+                                        </p>
+                                        <p className="text-purple-600">
+                                          {plo.description || plo.ploName || 'Không có mô tả'}
+                                        </p>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </label>
+                        </div>
                       ))}
                     </div>
                   </div>
@@ -603,6 +857,28 @@ const SyllabusEditorPage = ({ syllabusId: initialSyllabusId, rootId, user, onBac
                                 {clo.cloCode}
                               </p>
                               <p className="text-xs text-gray-600 mt-1">{clo.description}</p>
+                              
+                              {/* Display mapped PLOs for selected CLO */}
+                              {clo.mappedPlos && clo.mappedPlos.length > 0 && (
+                                <div className="mt-2 pt-2 border-t border-green-200">
+                                  <p className="text-xs font-medium text-gray-600 mb-1">Mapping PLO:</p>
+                                  <div className="space-y-1">
+                                    {clo.mappedPlos.map((plo, idx) => (
+                                      <div
+                                        key={idx}
+                                        className="text-xs bg-purple-50 border border-purple-200 rounded p-1.5"
+                                      >
+                                        <p className="font-medium text-purple-700">
+                                          {plo.ploCode || 'PLO'}
+                                        </p>
+                                        <p className="text-purple-600">
+                                          {plo.description || plo.ploName || 'Không có mô tả'}
+                                        </p>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
                             </div>
                             <button
                               onClick={() => toggleCloPair(clo.id)}
@@ -658,7 +934,7 @@ const SyllabusEditorPage = ({ syllabusId: initialSyllabusId, rootId, user, onBac
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Chọn PLO liên kết (tùy chọn)</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Chọn PLO liên kết *</label>
                       {plosLoading && <p className="text-xs text-gray-500">Đang tải PLO...</p>}
                       {!plosLoading && plos.length === 0 && (
                         <p className="text-xs text-gray-600">Chưa có PLO cho chương trình này.</p>
@@ -740,9 +1016,21 @@ const SyllabusEditorPage = ({ syllabusId: initialSyllabusId, rootId, user, onBac
                             <File size={16} className="text-gray-500" />
                             <span className="text-sm text-gray-700">{file.name}</span>
                           </div>
-                          <button onClick={() => removeFile(idx)} className="text-red-600 hover:text-red-800">
-                            <Trash2 size={16} />
-                          </button>
+                          <div className="flex gap-2">
+                            <button 
+                              onClick={() => previewFile(file)} 
+                              className="text-blue-600 hover:text-blue-800"
+                              title="Xem tệp"
+                            >
+                              <Eye size={16} />
+                            </button>
+                            <button 
+                              onClick={() => removeFile(idx)} 
+                              className="text-red-600 hover:text-red-800"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
                         </li>
                       ))}
                     </ul>

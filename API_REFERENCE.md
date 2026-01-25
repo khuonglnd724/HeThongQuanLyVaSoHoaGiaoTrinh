@@ -509,6 +509,18 @@ Tài liệu này liệt kê toàn bộ API endpoints của dự án. Sử dụng
 **Headers:** `Authorization: Bearer <token>`
 **Response:** 200 OK
 
+#### PUT /api/syllabus/documents/{documentId}/update-job-id
+**Mô tả:** Cập nhật AI ingestion job ID cho tài liệu (lưu trữ jobId từ AI service)
+**Headers:** `Authorization: Bearer <token>`
+**Request Body:**
+```json
+{
+  "jobId": "string"
+}
+```
+**Response:** DocumentResponse (200 OK)
+**Ghi chú:** Được gọi tự động từ frontend sau khi summary generation thành công. Lưu jobId để có thể tải lại cached summary lần sau.
+
 #### GET /api/syllabus/documents/syllabus/{syllabusId}/statistics
 **Mô tả:** Lấy thống kê tài liệu của giáo trình
 **Response:** DocumentStatistics (200 OK)
@@ -816,7 +828,7 @@ Tài liệu này liệt kê toàn bộ API endpoints của dự án. Sử dụng
 
 ## 🤖 AI SERVICE
 
-**Port:** 8006 (Development)
+**Port:** 8000 (Development)
 **Base URL:** `/ai`
 
 ### Health Check
@@ -834,12 +846,13 @@ Tài liệu này liệt kê toàn bộ API endpoints của dự án. Sử dụng
 ### Document Management & RAG
 
 #### POST /ai/documents/ingest
-**Mô tả:** Tải giáo trình vào vector store cho RAG
+**Mô tả:** Tải bài giảng vào vector store cho RAG
 **Content-Type:** multipart/form-data
 **Form Parameters:**
 - `file` (File, required) - PDF, DOCX, DOC, TXT
 - `syllabus_id` (String, required)
 - `subject_name` (String, optional)
+- `document_id` (String, optional) - UUID of document in syllabus_documents table for tracking
 **Response:** DocumentIngestResponse (201 Created)
 ```json
 {
@@ -950,15 +963,32 @@ Tài liệu này liệt kê toàn bộ API endpoints của dự án. Sử dụng
 ### Summary Generation
 
 #### POST /ai/summary
-**Mô tả:** Tạo tóm tắt giáo trình
+**Mô tả:** Tạo tóm tắt cho một document hoặc toàn bộ syllabus
 **Request Body:**
 ```json
 {
   "syllabusId": "uuid",
-  "length": "SHORT|MEDIUM|LONG"
+  "documentId": "uuid (optional)",
+  "length": "SHORT|MEDIUM|LONG",
+  "versionId": "integer (optional)",
+  "sections": ["section1", "section2"] (optional)
 }
 ```
 **Response:** JobCreateResponse (202 Accepted)
+```json
+{
+  "jobId": "uuid",
+  "status": "QUEUED",
+  "message": "Summary task queued successfully"
+}
+```
+**Flow:**
+1. Frontend calls POST /ai/summary with syllabusId + documentId (optional)
+2. AI Service returns jobId and status QUEUED
+3. **Backend saves jobId** to `SyllabusDocument.aiIngestionJobId` if documentId provided
+4. Frontend polls GET /ai/jobs/{jobId} to get result
+5. Result contains: summary, bullets, keywords, targetAudience, prerequisites, ragUsed, tokens, model
+6. Next time user views this document, use cached summary from jobId (no need to regenerate)
 
 ---
 
@@ -1146,6 +1176,13 @@ POST /api/auth/refresh
 4. **Version Control**: Track syllabus versions via `rootId`
 5. **Workflow States**: Follow the state machine carefully
 6. **User Headers**: Some endpoints require `X-User-Id` header
+7. **Document Summary Flow**:
+   - User selects a document in the syllabus detail view
+   - Frontend downloads the document file
+   - Frontend ingests it via POST `/ai/documents/ingest`
+   - Frontend calls POST `/ai/summary` with syllabusId + documentId
+   - Frontend polls GET `/ai/jobs/{jobId}` until status is SUCCEEDED
+   - Result contains: summary, bullets, keywords, targetAudience, prerequisites, ragUsed, tokens, model
 
 ---
 
