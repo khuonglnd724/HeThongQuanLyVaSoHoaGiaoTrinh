@@ -177,7 +177,7 @@ public class SyllabusService {
         Syllabus s = getOrThrow(id);
         SyllabusResponse response = SyllabusMapper.toResponse(s);
         
-        // Load rejection reason from review_comment table if status is REJECTED
+
         if (s.getStatus() == SyllabusStatus.REJECTED) {
             reviewCommentService.list(id).stream()
                     .filter(c -> "REJECTION".equals(c.getSectionKey()))
@@ -376,13 +376,12 @@ public class SyllabusService {
 
         s.setStatus(SyllabusStatus.REJECTED);
         s.setRejectedAt(Instant.now());
-        s.setRejectionReason(reason);
+        s.setRejectionReason(reason);  // ✅ Save rejection reason to syllabus.rejection_reason column
         s.setUpdatedBy(actor);
         s.setLastActionBy(actor);
 
         Syllabus saved = syllabusRepository.save(s);
 
-        // Save rejection reason to review_comment table
         if (reason != null && !reason.isBlank()) {
             try {
                 reviewCommentService.add(

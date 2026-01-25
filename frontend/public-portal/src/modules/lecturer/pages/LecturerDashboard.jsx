@@ -5,6 +5,7 @@ import syllabusServiceV2 from '../services/syllabusServiceV2'
 import aiService from '../services/aiService'
 import SyllabusEditorPage from './SyllabusEditorPage'
 import DocumentSummaryModal from '../components/DocumentSummaryModal'
+import SyllabusDetailModal from '../../../shared/components/SyllabusDetailModal'
 import workflowApi from '../../workflow/api/workflowApi'
 
 // Minimal role constants here to avoid circular import with roleConfig (roleConfig imports LecturerDashboard)
@@ -219,6 +220,31 @@ const LecturerDashboard = ({ user, onLogout }) => {
   const [documentSummarizingId, setDocumentSummarizingId] = useState(null) // Document nào đang được tóm tắt
   const [showDocumentSummaryModal, setShowDocumentSummaryModal] = useState(false) // Show/hide document summary modal
   const [selectedDocumentForSummary, setSelectedDocumentForSummary] = useState(null) // Document được chọn để view summary
+  
+  // CLO-PLO Check state
+  const [showCLOCheckModal, setShowCLOCheckModal] = useState(false)
+  const [cloCheckLoading, setCloCheckLoading] = useState(false)
+  const [cloCheckJobId, setCloCheckJobId] = useState(null)
+  const [cloCheckResult, setCloCheckResult] = useState(null)
+  const [cloCheckSyllabusId, setCloCheckSyllabusId] = useState(null)
+  const [cloCheckHistory, setCloCheckHistory] = useState({}) // Lưu lịch sử: {syllabusId: {jobId, result, timestamp}}
+  
+  // Load history from localStorage on mount
+  useEffect(() => {
+    const saved = localStorage.getItem('cloCheckHistory')
+    if (saved) {
+      try {
+        setCloCheckHistory(JSON.parse(saved))
+      } catch (e) {
+        console.warn('Failed to load CLO check history:', e)
+      }
+    }
+  }, [])
+  
+  // Save history to localStorage when it changes
+  useEffect(() => {
+    localStorage.setItem('cloCheckHistory', JSON.stringify(cloCheckHistory))
+  }, [cloCheckHistory])
   
   // Create/Edit form (simplified - only basic fields, content will be added later)
   const [formData, setFormData] = useState({
@@ -461,28 +487,34 @@ const LecturerDashboard = ({ user, onLogout }) => {
   }
 
   const handleRejectWorkflow = async (workflowId) => {
-    const comment = window.prompt('Nhập lý do từ chối')
-    if (!comment) return
+    const rejectionReason = window.prompt('Nhập lý do từ chối')
+    if (!rejectionReason) return
     try {
       setReviewLoading(true)
       
-      // Reject workflow
-      await workflowApi.reject(workflowId, { actionBy: resolveActionBy(), role: ROLES.HOD }, { comment })
+      // Step 1: Reject workflow with rejection reason in body
+      // Backend WorkflowController.reject() expects: CommentRequest { comment: string }
+      await workflowApi.reject(
+        workflowId, 
+        { actionBy: resolveActionBy(), role: ROLES.HOD }, 
+        { comment: rejectionReason }  // ✅ Send rejection reason in request body
+      )
       
-      // Find the corresponding syllabus from reviewItems
+      // Step 2: Find the corresponding syllabus and update its rejection_reason
       const reviewItem = reviewItems.find(item => item.id === workflowId)
       if (reviewItem && reviewItem.syllabusData) {
-        // Update syllabus status to REJECTED
+        const syllabusId = reviewItem.syllabusData.id
         try {
-          // Make direct API call to update syllabus
-          await apiClient.patch(`/api/syllabi/${reviewItem.syllabusData.id}`, {
+          // Update syllabus with rejection reason (redundant but for direct API calls)
+          // Backend should have already updated via WorkflowListener MQ
+          await apiClient.put(`/api/syllabuses/${syllabusId}`, {
             status: 'REJECTED',
-            rejectionReason: comment
+            rejectionReason: rejectionReason
           })
-          console.log('Syllabus status updated to REJECTED with reason:', comment)
+          console.log('[LecturerDashboard] Syllabus rejected with reason:', rejectionReason)
         } catch (updateErr) {
-          console.warn('Failed to update syllabus status:', updateErr)
-          // Don't throw error - workflow was already rejected
+          console.error('[LecturerDashboard] Failed to update syllabus rejection reason:', updateErr)
+          // Don't fail - workflow was already rejected via MQ
         }
       }
       
@@ -987,7 +1019,221 @@ const LecturerDashboard = ({ user, onLogout }) => {
     }
   }
 
+  const handleCheckCLOPLOConsistency = async () => {
+    if (!syllabusDetailData || !syllabusDetailData.id) {
+      showToast('Không tìm thấy giáo trình', 'error')
+      return
+    }
 
+    setCloCheckLoading(true)
+    try {
+      const content = typeof syllabusDetailData.content === 'string'
+        ? JSON.parse(syllabusDetailData.content)
+        : syllabusDetailData.content
+
+      const cloIds = content?.cloPairIds || content?.cloIds || []
+      
+      if (cloIds.length === 0) {
+        showToast('Giáo trình này chưa có CLO liên kết', 'warning')
+        setCloCheckLoading(false)
+        return
+      }
+
+      console.log(`[LecturerDashboard] Fetching details for ${cloIds.length} CLOs...`)
+      
+      // STEP 1: Fetch CLO details + collect all PLO IDs from mappings
+      const cloDetails = {}
+      const cloToMappedPloIds = {}
+      const allPloIds = new Set()
+      
+      for (const cloId of cloIds) {
+        try {
+          const cloRes = await syllabusServiceV2.getCLOById(cloId)
+          const cloData = cloRes.data?.data || cloRes.data || {}
+          cloDetails[cloId] = {
+            code: cloData.cloCode || cloData.code || `CLO-${cloId}`,
+            description: cloData.description || ''
+          }
+          
+          try {
+            const mappingRes = await apiClient.get(`/api/v1/mapping/clo/${cloId}`)
+            const mappings = mappingRes.data?.data || mappingRes.data || []
+            const ploIds = mappings.map(m => m.ploId || m.plo_id).filter(Boolean)
+            cloToMappedPloIds[cloId] = ploIds
+            ploIds.forEach(ploId => allPloIds.add(ploId))
+          } catch (mappingErr) {
+            console.warn(`[LecturerDashboard] Failed to fetch PLO mappings for CLO ${cloId}:`, mappingErr)
+            cloToMappedPloIds[cloId] = []
+          }
+        } catch (cloErr) {
+          console.warn(`[LecturerDashboard] Failed to fetch CLO ${cloId}:`, cloErr)
+          cloDetails[cloId] = {
+            code: `CLO-${cloId}`,
+            description: 'Không lấy được mô tả'
+          }
+          cloToMappedPloIds[cloId] = []
+        }
+      }
+
+      // STEP 2: Fetch PLO details
+      const ploIdToCode = {}
+      const ploCodeToDetails = {}
+      
+      for (const ploId of allPloIds) {
+        try {
+          const ploRes = await apiClient.get(`/api/v1/plo/${ploId}`)
+          const ploData = ploRes.data?.data || ploRes.data || {}
+          const ploCode = ploData.ploCode || ploData.code || `PLO-${ploId}`
+          ploIdToCode[ploId] = ploCode
+          ploCodeToDetails[ploCode] = {
+            code: ploCode,
+            description: ploData.description || ''
+          }
+        } catch (ploErr) {
+          console.warn(`[LecturerDashboard] Failed to fetch PLO ${ploId}:`, ploErr)
+        }
+      }
+
+      // STEP 3: Build final lists
+      const cloList = Object.values(cloDetails).map(clo => ({
+        id: clo.code,
+        description: clo.description
+      }))
+      
+      const ploList = Object.values(ploCodeToDetails).map(plo => ({
+        id: plo.code,
+        description: plo.description
+      }))
+      
+      // STEP 4: Build mapping with validation
+      const mappingInfo = {}
+      for (const cloId of cloIds) {
+        const cloCode = cloDetails[cloId]?.code
+        const mappedPloIds = cloToMappedPloIds[cloId] || []
+        const validPloCodesForClo = mappedPloIds
+          .map(backendPloId => ploIdToCode[backendPloId])
+          .filter(Boolean)
+        
+        if (validPloCodesForClo.length > 0) {
+          mappingInfo[cloCode] = validPloCodesForClo
+        }
+      }
+      
+      if (ploList.length === 0) {
+        showToast('Không tìm thấy PLO nào để kiểm tra', 'warning')
+        setCloCheckLoading(false)
+        return
+      }
+      
+      // Call AI service - returns jobId immediately
+      console.log('[LecturerDashboard] Calling AI service...')
+      const response = await aiService.checkCLOPLOConsistency(syllabusDetailData.id, cloList, ploList, mappingInfo)
+      const jobId = response.data?.jobId || response.jobId
+      
+      if (!jobId) {
+        showToast('Không nhận được Job ID từ AI service', 'error')
+        setCloCheckLoading(false)
+        return
+      }
+
+      console.log(`[LecturerDashboard] Job ID: ${jobId}, polling for result...`)
+      setCloCheckJobId(jobId)
+      setCloCheckSyllabusId(syllabusDetailData.id)
+      
+      // Poll for result with intelligent backoff
+      const maxWaitTime = 300000 // 5 minutes
+      const startTime = Date.now()
+      let pollInterval = 1000 // Start with 1 second
+      let pollCount = 0
+      
+      const pollResult = await new Promise((resolve, reject) => {
+        const pollFn = async () => {
+          try {
+            pollCount++
+            const jobStatus = await aiService.getJobStatus(jobId)
+            const jobData = jobStatus.data || jobStatus
+            
+            console.log(`[CLO Check] Poll #${pollCount} - Status: ${jobData.status}`)
+            
+            if (jobData.status === 'succeeded' || jobData.status === 'SUCCEEDED') {
+              console.log('[CLO Check] ✅ Job succeeded!', jobData.result)
+              resolve(jobData.result)
+            } else if (jobData.status === 'failed' || jobData.status === 'FAILED' || jobData.status === 'canceled' || jobData.status === 'CANCELED') {
+              reject(new Error(`Job failed with status: ${jobData.status}`))
+            } else if (jobData.status === 'running' || jobData.status === 'RUNNING') {
+              // Still running, continue polling
+              const elapsedTime = Date.now() - startTime
+              if (elapsedTime > maxWaitTime) {
+                reject(new Error('Timeout waiting for CLO check result'))
+              } else {
+                // Increase interval gradually (backoff: 1s -> 2s -> 3s -> max 5s)
+                pollInterval = Math.min(5000, pollInterval + 500)
+                setTimeout(pollFn, pollInterval)
+              }
+            } else {
+              // Unknown status, still poll
+              const elapsedTime = Date.now() - startTime
+              if (elapsedTime > maxWaitTime) {
+                reject(new Error('Timeout waiting for CLO check result'))
+              } else {
+                setTimeout(pollFn, pollInterval)
+              }
+            }
+          } catch (err) {
+            console.error(`[CLO Check] Poll error:`, err)
+            reject(err)
+          }
+        }
+        pollFn()
+      })
+
+      let resultData = pollResult
+      if (typeof resultData === 'string') {
+        resultData = JSON.parse(resultData)
+      }
+
+      setCloCheckResult(resultData)
+      setShowCLOCheckModal(true)
+      
+      // Save to history for later access
+      setCloCheckHistory(prev => ({
+        ...prev,
+        [syllabusDetailData.id]: {
+          jobId,
+          result: resultData,
+          syllabusName: `${syllabusDetailData.subjectCode} - ${syllabusDetailData.subjectName}`,
+          timestamp: new Date().toLocaleString('vi-VN')
+        }
+      }))
+      
+      showToast('✅ Kiểm tra CLO-PLO thành công!', 'success')
+    } catch (err) {
+      console.error('Error checking CLO-PLO consistency:', err)
+      showToast(`❌ Lỗi: ${err.message}`, 'error')
+      setCloCheckResult(null)
+    } finally {
+      setCloCheckLoading(false)
+    }
+  }
+
+  const handleViewCLOCheckHistory = (syllabusId) => {
+    const history = cloCheckHistory[syllabusId]
+    if (history && history.result) {
+      setCloCheckResult(history.result)
+      setCloCheckJobId(history.jobId)
+      setCloCheckSyllabusId(syllabusId)
+      setShowCLOCheckModal(true)
+    }
+  }
+
+  const handleClearCLOCheckHistory = (syllabusId) => {
+    setCloCheckHistory(prev => {
+      const newHistory = { ...prev }
+      delete newHistory[syllabusId]
+      return newHistory
+    })
+    showToast('✅ Đã xoá kết quả kiểm tra', 'success')
+  }
 
   const resetForm = () => {
     setFormData({
@@ -1894,459 +2140,32 @@ const LecturerDashboard = ({ user, onLogout }) => {
       )}
 
       {/* Syllabus Detail Modal */}
-      {showSyllabusDetailModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="sticky top-0 bg-white border-b px-8 py-6 flex justify-between items-center">
-              <h2 className="text-2xl font-bold text-gray-900">Chi tiết giáo trình</h2>
-              <button 
-                onClick={() => {
-                  setShowSyllabusDetailModal(false)
-                  setSyllabusDetailData(null)
-                }} 
-                className="text-gray-500 hover:text-gray-700 text-2xl"
-              >
-                ✕
-              </button>
-            </div>
-            
-            <div className="p-8 space-y-6">
-              {syllabusDetailLoading ? (
-                <div className="text-center py-8 text-gray-600">
-                  Đang tải thông tin giáo trình...
-                </div>
-              ) : syllabusDetailData ? (
-                <div className="space-y-6">
-                  {/* Basic Info */}
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Thông tin cơ bản</h3>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <span className="text-sm text-gray-600">Mã môn học:</span>
-                        <div className="font-semibold text-gray-900">{syllabusDetailData.subjectCode}</div>
-                      </div>
-                      <div>
-                        <span className="text-sm text-gray-600">Tên môn học:</span>
-                        <div className="font-semibold text-gray-900">{syllabusDetailData.subjectName}</div>
-                      </div>
-                      {syllabusDetailData.programInfo && (
-                        <div className="col-span-2">
-                          <span className="text-sm text-gray-600">Chương trình đào tạo:</span>
-                          <div className="font-semibold text-gray-900">
-                            {syllabusDetailData.programInfo.programCode} - {syllabusDetailData.programInfo.programName}
-                          </div>
-                        </div>
-                      )}
-                      {syllabusDetailData.subjectInfo && (
-                        <>
-                          <div>
-                            <span className="text-sm text-gray-600">Số tín chỉ:</span>
-                            <div className="font-semibold text-gray-900">{syllabusDetailData.subjectInfo.credits || '-'}</div>
-                          </div>
-                          <div>
-                            <span className="text-sm text-gray-600">Học kỳ:</span>
-                            <div className="font-semibold text-gray-900">{syllabusDetailData.subjectInfo.semester || '-'}</div>
-                          </div>
-                        </>
-                      )}
-                      <div>
-                        <span className="text-sm text-gray-600">Trạng thái:</span>
-                        <div className="font-semibold">
-                          <span className={`px-2 py-1 rounded text-xs ${
-                            syllabusDetailData.status === 'APPROVED' ? 'bg-green-100 text-green-800' :
-                            syllabusDetailData.status === 'PENDING_REVIEW' ? 'bg-yellow-100 text-yellow-800' :
-                            syllabusDetailData.status === 'PENDING_APPROVAL' ? 'bg-blue-100 text-blue-800' :
-                            syllabusDetailData.status === 'DRAFT' ? 'bg-gray-100 text-gray-800' :
-                            syllabusDetailData.status === 'REJECTED' ? 'bg-red-100 text-red-800' :
-                            'bg-purple-100 text-purple-800'
-                          }`}>
-                            {syllabusDetailData.status}
-                          </span>
-                        </div>
-                      </div>
-                      <div>
-                        <span className="text-sm text-gray-600">Phiên bản:</span>
-                        <div className="font-semibold text-gray-900">v{syllabusDetailData.versionNo || 1}</div>
-                      </div>
-                      <div>
-                        <span className="text-sm text-gray-600">Người tạo:</span>
-                        <div className="font-semibold text-gray-900">{syllabusDetailData.createdBy}</div>
-                      </div>
-                      <div>
-                        <span className="text-sm text-gray-600">Ngày tạo:</span>
-                        <div className="font-semibold text-gray-900">
-                          {syllabusDetailData.createdAt ? new Date(syllabusDetailData.createdAt).toLocaleString('vi-VN') : '-'}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Workflow Timeline */}
-                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-6">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Lịch sử workflow</h3>
-                    <div className="space-y-3">
-                      {syllabusDetailData.submittedAt && (
-                        <div className="flex items-center gap-3">
-                          <div className="w-3 h-3 rounded-full bg-blue-500"></div>
-                          <div>
-                            <span className="text-sm font-medium text-gray-900">Đã nộp:</span>
-                            <span className="text-sm text-gray-600 ml-2">
-                              {new Date(syllabusDetailData.submittedAt).toLocaleString('vi-VN')}
-                            </span>
-                          </div>
-                        </div>
-                      )}
-                      {syllabusDetailData.reviewedAt && (
-                        <div className="flex items-center gap-3">
-                          <div className="w-3 h-3 rounded-full bg-indigo-500"></div>
-                          <div>
-                            <span className="text-sm font-medium text-gray-900">Đã duyệt bởi HoD:</span>
-                            <span className="text-sm text-gray-600 ml-2">
-                              {new Date(syllabusDetailData.reviewedAt).toLocaleString('vi-VN')}
-                            </span>
-                          </div>
-                        </div>
-                      )}
-                      {syllabusDetailData.approvedAt && (
-                        <div className="flex items-center gap-3">
-                          <div className="w-3 h-3 rounded-full bg-green-500"></div>
-                          <div>
-                            <span className="text-sm font-medium text-gray-900">Đã phê duyệt:</span>
-                            <span className="text-sm text-gray-600 ml-2">
-                              {new Date(syllabusDetailData.approvedAt).toLocaleString('vi-VN')}
-                            </span>
-                          </div>
-                        </div>
-                      )}
-                      {syllabusDetailData.rejectedAt && (
-                        <div className="flex items-center gap-3">
-                          <div className="w-3 h-3 rounded-full bg-red-500"></div>
-                          <div>
-                            <span className="text-sm font-medium text-gray-900">Bị từ chối:</span>
-                            <span className="text-sm text-gray-600 ml-2">
-                              {new Date(syllabusDetailData.rejectedAt).toLocaleString('vi-VN')}
-                            </span>
-                            {syllabusDetailData.rejectionReason && (
-                              <div className="text-sm text-red-600 mt-1">Lý do: {syllabusDetailData.rejectionReason}</div>
-                            )}
-                          </div>
-                        </div>
-                      )}
-                      {syllabusDetailData.publishedAt && (
-                        <div className="flex items-center gap-3">
-                          <div className="w-3 h-3 rounded-full bg-purple-500"></div>
-                          <div>
-                            <span className="text-sm font-medium text-gray-900">Đã công bố:</span>
-                            <span className="text-sm text-gray-600 ml-2">
-                              {new Date(syllabusDetailData.publishedAt).toLocaleString('vi-VN')}
-                            </span>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Summary */}
-                  {syllabusDetailData.summary && (
-                    <div className="bg-gray-50 border border-gray-200 rounded-lg p-6">
-                      <h3 className="text-lg font-semibold text-gray-900 mb-3">Tóm tắt</h3>
-                      <p className="text-gray-700">{syllabusDetailData.summary}</p>
-                    </div>
-                  )}
-
-                  {/* Content Preview */}
-                  {syllabusDetailData.content && syllabusDetailData.content !== '{}' && (
-                    <div className="bg-gray-50 border border-gray-200 rounded-lg p-6">
-                      <h3 className="text-lg font-semibold text-gray-900 mb-3">Nội dung giáo trình</h3>
-                      <div className="text-sm text-gray-700">
-                        {(() => {
-                          try {
-                            const content = typeof syllabusDetailData.content === 'string' 
-                              ? JSON.parse(syllabusDetailData.content) 
-                              : syllabusDetailData.content
-                            
-                            // Nếu là object, render từng field
-                            if (typeof content === 'object') {
-                              return (
-                                <div className="space-y-4">
-                                  {/* Metadata Section */}
-                                  {(content.subjectCode || content.academicYear || content.semester) && (
-                                    <div className="bg-white p-3 rounded border border-gray-200">
-                                      <h4 className="font-semibold text-gray-900 mb-2">Thông tin</h4>
-                                      <div className="grid grid-cols-2 gap-2 text-sm">
-                                        {content.subjectCode && <div><span className="text-gray-600">Mã môn:</span> <span className="font-medium">{content.subjectCode}</span></div>}
-                                        {content.syllabusCode && <div><span className="text-gray-600">Mã giáo trình:</span> <span className="font-medium">{content.syllabusCode}</span></div>}
-                                        {content.academicYear && <div><span className="text-gray-600">Năm học:</span> <span className="font-medium">{content.academicYear}</span></div>}
-                                        {content.semester && <div><span className="text-gray-600">Học kỳ:</span> <span className="font-medium">{content.semester}</span></div>}
-                                      </div>
-                                    </div>
-                                  )}
-
-                                  {/* Modules */}
-                                  {content.modules && content.modules.length > 0 && (
-                                    <div>
-                                      <h4 className="font-semibold text-gray-900 mb-2">Các module ({content.modules.length})</h4>
-                                      <ul className="space-y-1 ml-4">
-                                        {content.modules.map((mod, idx) => (
-                                          <li key={idx} className="text-gray-700">
-                                            • {mod.title || mod.name || `Module ${idx + 1}`}
-                                            {mod.description && ` - ${mod.description}`}
-                                          </li>
-                                        ))}
-                                      </ul>
-                                    </div>
-                                  )}
-
-                                  {/* Learning Objectives */}
-                                  {content.learningObjectives && content.learningObjectives.trim() && (
-                                    <div>
-                                      <h4 className="font-semibold text-gray-900 mb-2">Mục tiêu học tập</h4>
-                                      <p className="text-gray-700 whitespace-pre-wrap">{content.learningObjectives}</p>
-                                    </div>
-                                  )}
-
-                                  {/* Teaching Methods */}
-                                  {content.teachingMethods && content.teachingMethods.trim() && (
-                                    <div>
-                                      <h4 className="font-semibold text-gray-900 mb-2">Phương pháp giảng dạy</h4>
-                                      <p className="text-gray-700 whitespace-pre-wrap">{content.teachingMethods}</p>
-                                    </div>
-                                  )}
-
-                                  {/* Assessment Methods */}
-                                  {content.assessmentMethods && content.assessmentMethods.trim() && (
-                                    <div>
-                                      <h4 className="font-semibold text-gray-900 mb-2">Phương pháp đánh giá</h4>
-                                      <p className="text-gray-700 whitespace-pre-wrap">{content.assessmentMethods}</p>
-                                    </div>
-                                  )}
-
-                                  {/* CLO Pair IDs */}
-                                  {content.cloPairIds && content.cloPairIds.length > 0 && (
-                                    <CLODetailsDisplay cloIds={content.cloPairIds} />
-                                  )}
-
-                                  {/* Empty state */}
-                                  {(!content.modules || content.modules.length === 0) &&
-                                   (!content.learningObjectives || !content.learningObjectives.trim()) &&
-                                   (!content.teachingMethods || !content.teachingMethods.trim()) &&
-                                   (!content.assessmentMethods || !content.assessmentMethods.trim()) &&
-                                   (!content.cloPairIds || content.cloPairIds.length === 0) && (
-                                    <div className="text-gray-500 italic">
-                                      Chưa có nội dung chi tiết. Hãy thêm modules, mục tiêu, phương pháp giảng dạy và đánh giá.
-                                    </div>
-                                  )}
-                                </div>
-                              )
-                            } else {
-                              // Nếu là string, hiển thị thô
-                              return <pre className="whitespace-pre-wrap overflow-x-auto">{content}</pre>
-                            }
-                          } catch (err) {
-                            // Nếu parse lỗi, hiển thị thô
-                            return (
-                              <div>
-                                <p className="text-red-600 text-xs mb-2">⚠️ Không thể parse JSON, hiển thị thô:</p>
-                                <pre className="bg-white p-3 rounded border border-gray-300 text-xs overflow-x-auto max-h-48">
-                                  {syllabusDetailData.content}
-                                </pre>
-                              </div>
-                            )
-                          }
-                        })()}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Documents Section */}
-                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-6">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Tệp bài giảng ({syllabusDetailDocuments.length})</h3>
-                    {syllabusDetailDocumentsLoading ? (
-                      <div className="text-center py-4 text-gray-600">
-                        <p className="text-sm">Đang tải tệp...</p>
-                      </div>
-                    ) : syllabusDetailDocuments.length > 0 ? (
-                      <div className="space-y-3">
-                        {syllabusDetailDocuments.map((doc) => (
-                          <div key={doc.id} className="bg-white p-4 rounded border border-gray-200 hover:border-blue-300 hover:bg-blue-50 transition-colors">
-                            <div className="flex items-start justify-between gap-3">
-                              <div className="flex-1 min-w-0">
-                                <p className="font-medium text-gray-900 truncate">{doc.originalName || doc.title || doc.fileName || 'Unnamed Document'}</p>
-                                {doc.description && (
-                                  <p className="text-sm text-gray-600 mt-1">{doc.description}</p>
-                                )}
-                                <div className="flex gap-4 mt-2 text-xs text-gray-600">
-                                  {doc.fileSize && (
-                                    <span>Kích thước: {(doc.fileSize / 1024 / 1024).toFixed(2)} MB</span>
-                                  )}
-                                  {doc.uploadedAt && (
-                                    <span>Ngày tải: {new Date(doc.uploadedAt).toLocaleString('vi-VN')}</span>
-                                  )}
-                                  {doc.uploadedBy && (
-                                    <span>Người tải: {doc.uploadedBy}</span>
-                                  )}
-                                </div>
-
-                                {/* Show document summary if available */}
-                                {documentSummaries[doc.id] && (
-                                  <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded text-sm space-y-2">
-                                    <div>
-                                      <p className="font-semibold text-blue-900 mb-1">📋 Tóm tắt:</p>
-                                      <p className="text-blue-800">{documentSummaries[doc.id].summary}</p>
-                                    </div>
-
-                                    {documentSummaries[doc.id].bullets && documentSummaries[doc.id].bullets.length > 0 && (
-                                      <div>
-                                        <p className="font-semibold text-blue-900 mb-1">📌 Nội dung chính:</p>
-                                        <ul className="list-disc list-inside text-blue-800 space-y-1">
-                                          {documentSummaries[doc.id].bullets.map((bullet, idx) => (
-                                            <li key={idx} className="text-xs">
-                                              {bullet}
-                                            </li>
-                                          ))}
-                                        </ul>
-                                      </div>
-                                    )}
-
-                                    {documentSummaries[doc.id].keywords && documentSummaries[doc.id].keywords.length > 0 && (
-                                      <div>
-                                        <p className="font-semibold text-blue-900 mb-1">🏷️ Từ khoá:</p>
-                                        <div className="flex flex-wrap gap-1">
-                                          {documentSummaries[doc.id].keywords.map((kw, idx) => (
-                                            <span
-                                              key={idx}
-                                              className="inline-block px-2 py-1 bg-blue-200 text-blue-900 text-xs rounded"
-                                            >
-                                              {kw}
-                                            </span>
-                                          ))}
-                                        </div>
-                                      </div>
-                                    )}
-
-                                    {documentSummaries[doc.id].targetAudience && (
-                                      <div>
-                                        <p className="font-semibold text-blue-900 mb-1">👥 Đối tượng học:</p>
-                                        <p className="text-blue-800 text-xs">{documentSummaries[doc.id].targetAudience}</p>
-                                      </div>
-                                    )}
-
-                                    {documentSummaries[doc.id].prerequisites && (
-                                      <div>
-                                        <p className="font-semibold text-blue-900 mb-1">📚 Điều kiện tiên quyết:</p>
-                                        <p className="text-blue-800 text-xs">{documentSummaries[doc.id].prerequisites}</p>
-                                      </div>
-                                    )}
-
-                                    {documentSummaries[doc.id].ragUsed && (
-                                      <div className="bg-purple-100 p-2 rounded">
-                                        <p className="font-semibold text-purple-900 mb-1">🔗 RAG Context:</p>
-                                        <p className="text-purple-800 text-xs whitespace-pre-wrap">{documentSummaries[doc.id].ragContext}</p>
-                                      </div>
-                                    )}
-
-                                    {documentSummaries[doc.id].model && (
-                                      <p className="text-xs text-blue-600 italic border-t border-blue-200 pt-2">
-                                        ⚙️ Model: {documentSummaries[doc.id].model} | 💬 Tokens: {documentSummaries[doc.id].tokens}
-                                      </p>
-                                    )}
-                                  </div>
-                                )}
-                              </div>
-
-                              <div className="flex gap-2 flex-shrink-0 flex-col">
-                                <button
-                                  onClick={() => handleViewDocument(doc.id)}
-                                  title="Xem trực tiếp"
-                                  className="px-3 py-1.5 bg-blue-600 text-white rounded hover:bg-blue-700 text-xs font-medium flex items-center gap-1 whitespace-nowrap"
-                                >
-                                  <Eye size={14} />
-                                  Xem
-                                </button>
-                                {doc.aiIngestionJobId && (
-                                  <button
-                                    onClick={() => {
-                                      setSelectedDocumentForSummary(doc)
-                                      setShowDocumentSummaryModal(true)
-                                    }}
-                                    title="Xem tóm tắt tài liệu"
-                                    className="px-3 py-1.5 bg-purple-600 text-white rounded hover:bg-purple-700 text-xs font-medium flex items-center gap-1 whitespace-nowrap"
-                                  >
-                                    <Zap size={14} />
-                                    Xem tóm tắt
-                                  </button>
-                                )}
-                                <button
-                                  onClick={() => generateDocumentSummary(doc.id, doc.fileName)}
-                                  disabled={documentSummarizingId === doc.id}
-                                  title="Tóm tắt tài liệu bằng AI"
-                                  className="px-3 py-1.5 bg-amber-600 text-white rounded hover:bg-amber-700 text-xs font-medium flex items-center gap-1 whitespace-nowrap disabled:bg-gray-400 disabled:cursor-not-allowed"
-                                >
-                                  {documentSummarizingId === doc.id ? (
-                                    <Loader size={14} className="animate-spin" />
-                                  ) : (
-                                    <Zap size={14} />
-                                  )}
-                                  {documentSummarizingId === doc.id ? 'Đang...' : 'Tóm tắt'}
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="text-center py-4 text-gray-500">
-                        <p className="text-sm italic">Chưa có tệp bài giảng nào được tải lên</p>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Additional Info */}
-                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-6">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Thông tin khác</h3>
-                    <div className="grid grid-cols-2 gap-4 text-sm">
-                      <div>
-                        <span className="text-gray-600">Workflow ID:</span>
-                        <div className="font-mono text-xs text-gray-900 mt-1">{syllabusDetailData.workflowId || '-'}</div>
-                      </div>
-                      <div>
-                        <span className="text-gray-600">Người cập nhật gần nhất:</span>
-                        <div className="text-gray-900 mt-1">{syllabusDetailData.lastActionBy || syllabusDetailData.updatedBy || '-'}</div>
-                      </div>
-                      <div>
-                        <span className="text-gray-600">Root ID:</span>
-                        <div className="font-mono text-xs text-gray-900 mt-1">{syllabusDetailData.rootId || '-'}</div>
-                      </div>
-                      <div>
-                        <span className="text-gray-600">Cập nhật lần cuối:</span>
-                        <div className="text-gray-900 mt-1">
-                          {syllabusDetailData.updatedAt ? new Date(syllabusDetailData.updatedAt).toLocaleString('vi-VN') : '-'}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="text-center py-8 text-red-600">
-                  Không tải được thông tin giáo trình
-                </div>
-              )}
-            </div>
-
-            <div className="sticky bottom-0 bg-gray-50 px-8 py-4 flex justify-end border-t">
-              <button 
-                onClick={() => {
-                  setShowSyllabusDetailModal(false)
-                  setSyllabusDetailData(null)
-                }} 
-                className="px-6 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
-              >
-                Đóng
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Syllabus Detail Modal - Extracted to shared component */}
+      <SyllabusDetailModal
+        isOpen={showSyllabusDetailModal}
+        onClose={() => {
+          setShowSyllabusDetailModal(false)
+          setSyllabusDetailData(null)
+          setCloCheckResult(null)
+        }}
+        syllabusDetailData={syllabusDetailData}
+        syllabusDetailLoading={syllabusDetailLoading}
+        syllabusDetailDocuments={syllabusDetailDocuments}
+        syllabusDetailDocumentsLoading={syllabusDetailDocumentsLoading}
+        documentSummaries={documentSummaries}
+        documentSummarizingId={documentSummarizingId}
+        cloCheckLoading={cloCheckLoading}
+        cloCheckHistory={cloCheckHistory}
+        handleViewSyllabusDetail={handleViewSyllabusDetail}
+        handleCheckCLOPLOConsistency={handleCheckCLOPLOConsistency}
+        handleViewCLOCheckHistory={handleViewCLOCheckHistory}
+        handleClearCLOCheckHistory={handleClearCLOCheckHistory}
+        handleViewDocument={handleViewDocument}
+        generateDocumentSummary={generateDocumentSummary}
+        setShowDocumentSummaryModal={setShowDocumentSummaryModal}
+        setSelectedDocumentForSummary={setSelectedDocumentForSummary}
+        showToast={showToast}
+      />
 
       {/* Document Summary Modal */}
       {showDocumentSummaryModal && selectedDocumentForSummary && (
@@ -2357,6 +2176,133 @@ const LecturerDashboard = ({ user, onLogout }) => {
             setSelectedDocumentForSummary(null)
           }}
         />
+      )}
+
+      {/* CLO-PLO Check Modal */}
+      {showCLOCheckModal && cloCheckResult && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-white border-b px-8 py-6 flex justify-between items-center">
+              <h2 className="text-2xl font-bold text-gray-900">Kết quả kiểm tra CLO-PLO</h2>
+              <button 
+                onClick={() => setShowCLOCheckModal(false)} 
+                className="text-gray-500 hover:text-gray-700 text-2xl font-light"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="p-8 space-y-6">
+              {/* Tổng quan kết quả từ overallAssessment */}
+              <div className="bg-gradient-to-r from-slate-50 to-gray-50 border-l-4 border-blue-600 rounded-lg p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-3">Đánh giá tổng quan</h3>
+                <div className="space-y-2">
+                  <p className="text-gray-700">
+                    Điểm kiểm tra: <span className="font-bold text-xl text-blue-600">{cloCheckResult?.overallAssessment?.score?.toFixed(1) || 'N/A'}/10</span>
+                  </p>
+                  <p className="text-gray-700">
+                    Trạng thái: <span className="font-semibold text-gray-800">{cloCheckResult?.overallAssessment?.status || 'N/A'}</span>
+                  </p>
+                  {cloCheckResult?.overallAssessment?.keyStrengths && cloCheckResult.overallAssessment.keyStrengths.length > 0 && (
+                    <div className="mt-4 pt-4 border-t">
+                      <p className="text-sm font-semibold text-gray-900 mb-2">Điểm mạnh:</p>
+                      <ul className="text-sm text-gray-700 space-y-1">
+                        {cloCheckResult.overallAssessment.keyStrengths.map((strength, idx) => (
+                          <li key={idx} className="flex gap-2">
+                            <span className="text-blue-600">•</span>
+                            <span>{strength}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Phân tích mapping */}
+              {cloCheckResult?.mappingAnalysis && (
+                <div className="border border-gray-200 rounded-lg p-6">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Phân tích Mapping</h3>
+                  <div className="grid grid-cols-2 gap-4 mb-4">
+                    <div className="bg-slate-50 p-4 rounded border border-gray-200">
+                      <p className="text-xs text-gray-600 mb-1">Tổng số CLO</p>
+                      <p className="text-3xl font-bold text-gray-900">{cloCheckResult.mappingAnalysis.totalClos || 0}</p>
+                    </div>
+                    <div className="bg-slate-50 p-4 rounded border border-gray-200">
+                      <p className="text-xs text-gray-600 mb-1">PLO được cover</p>
+                      <p className="text-3xl font-bold text-gray-900">{cloCheckResult.mappingAnalysis.coveredPlos || 0}</p>
+                    </div>
+                  </div>
+                  
+                  {cloCheckResult.mappingAnalysis.unmappedClos && cloCheckResult.mappingAnalysis.unmappedClos.length > 0 && (
+                    <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded">
+                      <p className="text-sm font-semibold text-red-900 mb-1">CLO chưa mapping:</p>
+                      <p className="text-sm text-red-800">{cloCheckResult.mappingAnalysis.unmappedClos.join(', ')}</p>
+                    </div>
+                  )}
+                  
+                  {cloCheckResult.mappingAnalysis.uncoveredPlos && cloCheckResult.mappingAnalysis.uncoveredPlos.length > 0 && (
+                    <div className="p-3 bg-orange-50 border border-orange-200 rounded">
+                      <p className="text-sm font-semibold text-orange-900 mb-1">PLO chưa cover:</p>
+                      <p className="text-sm text-orange-800">{cloCheckResult.mappingAnalysis.uncoveredPlos.join(', ')}</p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Các vấn đề phát hiện */}
+              {cloCheckResult?.issues && cloCheckResult.issues.length > 0 && (
+                <div className="border border-gray-200 rounded-lg p-6">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                    Các vấn đề phát hiện ({cloCheckResult.issues.length})
+                  </h3>
+                  <div className="space-y-3">
+                    {cloCheckResult.issues.map((issue, idx) => (
+                      <div
+                        key={idx}
+                        className={`p-4 rounded-lg border-l-4 ${
+                          issue.severity === 'critical'
+                            ? 'bg-red-50 border-red-500'
+                            : issue.severity === 'major'
+                            ? 'bg-orange-50 border-orange-500'
+                            : 'bg-yellow-50 border-yellow-500'
+                        }`}
+                      >
+                        <div className="font-semibold text-gray-900 mb-2">
+                          {issue.severity === 'critical'
+                            ? 'Mức độ: Nghiêm trọng'
+                            : issue.severity === 'major'
+                            ? 'Mức độ: Cao'
+                            : 'Mức độ: Trung bình'}
+                        </div>
+                        <p className="text-sm text-gray-700 mb-2"><strong>Vấn đề:</strong> {issue.problem}</p>
+                        {issue.why && <p className="text-sm text-gray-700 mb-2"><strong>Nguyên nhân:</strong> {issue.why}</p>}
+                        {issue.impact && <p className="text-sm text-gray-700 mb-2"><strong>Tác động:</strong> {issue.impact}</p>}
+                        {issue.recommendation && <p className="text-sm text-gray-700 mb-2"><strong>Khuyến nghị:</strong> {issue.recommendation}</p>}
+                        {issue.howToFix && (
+                          <div className="mt-2 p-3 bg-white rounded border border-gray-200">
+                            <strong className="text-sm">Hướng dẫn sửa:</strong>
+                            <div className="mt-2 text-xs text-gray-700 whitespace-pre-wrap">{issue.howToFix}</div>
+                          </div>
+                        )}
+                        <p className="text-xs text-gray-500 mt-2">Ưu tiên: {issue.priority}/3</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="sticky bottom-0 bg-gray-50 px-8 py-4 flex justify-end gap-2 border-t">
+              <button
+                onClick={() => setShowCLOCheckModal(false)}
+                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              >
+                Đóng
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )
