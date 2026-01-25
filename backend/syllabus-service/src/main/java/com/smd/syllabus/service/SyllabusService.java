@@ -29,16 +29,19 @@ public class SyllabusService {
     private final NotificationService notificationService;
     private final SyllabusDocumentRepository documentRepository;
     private final WorkflowClient workflowClient;
+    private final ReviewCommentService reviewCommentService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public SyllabusService(SyllabusRepository syllabusRepository,
             NotificationService notificationService,
             SyllabusDocumentRepository documentRepository,
-            WorkflowClient workflowClient) {
+            WorkflowClient workflowClient,
+            ReviewCommentService reviewCommentService) {
         this.syllabusRepository = syllabusRepository;
         this.notificationService = notificationService;
         this.documentRepository = documentRepository;
         this.workflowClient = workflowClient;
+        this.reviewCommentService = reviewCommentService;
     }
 
     // helper
@@ -171,7 +174,18 @@ public class SyllabusService {
 
     @Transactional(readOnly = true)
     public SyllabusResponse getById(UUID id) {
-        return SyllabusMapper.toResponse(getOrThrow(id));
+        Syllabus s = getOrThrow(id);
+        SyllabusResponse response = SyllabusMapper.toResponse(s);
+        
+        // Load rejection reason from review_comment table if status is REJECTED
+        if (s.getStatus() == SyllabusStatus.REJECTED) {
+            reviewCommentService.list(id).stream()
+                    .filter(c -> "REJECTION".equals(c.getSectionKey()))
+                    .findFirst()
+                    .ifPresent(c -> response.setRejectionReason(c.getContent()));
+        }
+        
+        return response;
     }
 
     @Transactional(readOnly = true)
@@ -367,6 +381,20 @@ public class SyllabusService {
         s.setLastActionBy(actor);
 
         Syllabus saved = syllabusRepository.save(s);
+
+        // Save rejection reason to review_comment table
+        if (reason != null && !reason.isBlank()) {
+            try {
+                reviewCommentService.add(
+                        saved.getId(),
+                        "REJECTION",
+                        reason.trim(),
+                        Long.parseLong(userId)
+                );
+            } catch (Exception ex) {
+                System.err.println("Failed to save rejection reason to review_comment: " + ex.getMessage());
+            }
+        }
 
         String msg = "Syllabus " + safeCode(saved) + " rejected";
         if (reason != null && !reason.isBlank())

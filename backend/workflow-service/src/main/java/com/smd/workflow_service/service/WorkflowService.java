@@ -147,6 +147,7 @@ public class WorkflowService {
                 syncEvent.setFromState(fromState);
                 syncEvent.setToState(toState);
                 syncEvent.setActionBy(actionBy);
+                syncEvent.setComment(comment); // Include comment (rejection reason)
 
                 workflowProducer.send(syncEvent);
             } catch (Exception e) {
