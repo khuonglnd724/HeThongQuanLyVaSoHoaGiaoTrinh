@@ -12,7 +12,7 @@ import org.springframework.context.annotation.Configuration;
 public class RabbitMQConfig {
 
     public static final String WORKFLOW_EXCHANGE = "workflow.exchange";
-    public static final String SYNC_QUEUE = "workflow.sync.queue";
+    public static final String SYNC_QUEUE = "workflow.sync.syllabus";  // Match syllabus-service listener
     public static final String SYNC_ROUTING_KEY = "workflow.sync";
 
     @Bean

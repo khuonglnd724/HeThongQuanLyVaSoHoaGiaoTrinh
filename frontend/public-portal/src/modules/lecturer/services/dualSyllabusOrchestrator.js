@@ -127,10 +127,11 @@ const dualSyllabusOrchestrator = {
 
   /**
    * Update Syllabus ở cả 2 database (tạo version mới)
+   * NOTE: academicSyllabusId parameter deprecated (not used in new architecture)
    */
   updateDualSyllabusVersion: async (
     rootId,
-    academicSyllabusId,
+    academicSyllabusId,  // DEPRECATED: kept for backward compatibility
     syllabusServiceId,
     formData,
     userId
@@ -138,31 +139,14 @@ const dualSyllabusOrchestrator = {
     console.log('[Orchestrator] Starting dual syllabus update', {
       rootId,
       syllabusServiceId,
-      cloIds: formData.cloPairIds?.length || 0
+      cloIds: formData.cloPairIds?.length || 0,
+      deprecatedAcademicId: academicSyllabusId  // Log for debugging
     })
 
     try {
-      // ========== Step 1: Update ở academic-service ==========
-      const academicPayload = {
-        syllabusCode: formData.syllabusCode,
-        subjectId: formData.subjectId,
-        version: formData.version,
-        academicYear: formData.academicYear,
-        semester: formData.semester,
-        content: formData.content || '',
-        learningObjectives: formData.learningObjectives || '',
-        teachingMethods: formData.teachingMethods || '',
-        assessmentMethods: formData.assessmentMethods || '',
-        status: 'Draft',
-        approvalStatus: 'Pending'
-      }
-
-      console.log('[Orchestrator] Updating in academic-service...')
-      await apiClient.put(
-        `${ACADEMIC_API_BASE}/syllabus/${academicSyllabusId}`,
-        academicPayload
-      )
-      console.log('[Orchestrator] Academic syllabus updated')
+      // ========== SKIP Step 1: Academic-service update (not used in new architecture) ==========
+      // Architecture changed: Syllabi now stored only in syllabus-service
+      console.log('[Orchestrator] Skipping academic-service update (deprecated)')
 
       // ========== Step 2: Create new version ở syllabus-service ==========
       const versionPayload = {
@@ -206,7 +190,7 @@ const dualSyllabusOrchestrator = {
 
       const result = {
         id: syllabusRes.data.id,
-        academicId: academicSyllabusId,
+        academicId: syllabusRes.data.id,  // Use syllabus-service ID (no separate academic ID in new architecture)
         rootId: syllabusRes.data.rootId,
         versionNo: syllabusRes.data.versionNo,
         status: syllabusRes.data.status
@@ -220,6 +204,68 @@ const dualSyllabusOrchestrator = {
       throw new Error(
         `Failed to update syllabus: ${error.response?.data?.message || error.message}`
       )
+    }
+  },
+
+  /**
+   * Update Syllabus PARTIAL - chỉ update documents, không tạo version mới
+   * Dùng khi status khác DRAFT/REJECTED
+   */
+  updateDualSyllabusPartial: async (syllabusServiceId, formData, userId) => {
+    console.log('[Orchestrator] Starting partial syllabus update', {
+      syllabusServiceId,
+      hasModules: formData.modules?.length || 0
+    })
+
+    try {
+      // Chỉ update nội dung cơ bản và modules (documents)
+      const contentObj = {
+        syllabusCode: formData.syllabusCode,
+        subjectCode: formData.subjectCode,
+        subjectId: formData.subjectId,
+        academicYear: formData.academicYear,
+        semester: formData.semester,
+        learningObjectives: formData.learningObjectives || '',
+        teachingMethods: formData.teachingMethods || '',
+        assessmentMethods: formData.assessmentMethods || '',
+        cloPairIds: formData.cloPairIds || [],
+        modules: formData.modules || []
+      }
+      
+      const updatePayload = {
+        summary: formData.summary || '',
+        content: JSON.stringify(contentObj)  // Convert to JSON string for backend
+      }
+
+      console.log('[Orchestrator] Updating in syllabus-service (no version change)...')
+      console.log('[Orchestrator] Payload:', updatePayload)
+      const syllabusRes = await apiClient.put(
+        `${SYLLABUS_API_BASE}/${syllabusServiceId}`,
+        updatePayload,
+        { headers: { 'X-User-Id': userId } }
+      )
+      console.log('[Orchestrator] Partial update successful')
+
+      const result = {
+        id: syllabusRes.data.id,
+        status: syllabusRes.data.status,
+        versionNo: syllabusRes.data.versionNo
+      }
+
+      console.log('[Orchestrator] Partial update result:', result)
+      return result
+
+    } catch (error) {
+      console.error('[Orchestrator] Error during partial update:', error)
+      console.error('[Orchestrator] Error response:', error.response?.data)
+      console.error('[Orchestrator] Error status:', error.response?.status)
+      
+      const errorMsg = error.response?.data?.message 
+        || error.response?.data?.error
+        || error.message 
+        || 'Unexpected server error'
+      
+      throw new Error(`Failed to update syllabus: ${errorMsg}`)
     }
   }
 }

@@ -29,16 +29,19 @@ public class SyllabusService {
     private final NotificationService notificationService;
     private final SyllabusDocumentRepository documentRepository;
     private final WorkflowClient workflowClient;
+    private final ReviewCommentService reviewCommentService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public SyllabusService(SyllabusRepository syllabusRepository,
             NotificationService notificationService,
             SyllabusDocumentRepository documentRepository,
-            WorkflowClient workflowClient) {
+            WorkflowClient workflowClient,
+            ReviewCommentService reviewCommentService) {
         this.syllabusRepository = syllabusRepository;
         this.notificationService = notificationService;
         this.documentRepository = documentRepository;
         this.workflowClient = workflowClient;
+        this.reviewCommentService = reviewCommentService;
     }
 
     // helper
@@ -171,7 +174,14 @@ public class SyllabusService {
 
     @Transactional(readOnly = true)
     public SyllabusResponse getById(UUID id) {
-        return SyllabusMapper.toResponse(getOrThrow(id));
+        Syllabus s = getOrThrow(id);
+        SyllabusResponse response = SyllabusMapper.toResponse(s);
+        
+        // Rejection reason is stored directly in syllabus.rejection_reason column
+        // No need to load from review_comment table
+        // SyllabusMapper.toResponse() will automatically map s.getRejectionReason() to response.rejectionReason
+        
+        return response;
     }
 
     @Transactional(readOnly = true)
@@ -362,11 +372,14 @@ public class SyllabusService {
 
         s.setStatus(SyllabusStatus.REJECTED);
         s.setRejectedAt(Instant.now());
-        s.setRejectionReason(reason);
+        s.setRejectionReason(reason);  // ✅ Save rejection reason to syllabus.rejection_reason column
         s.setUpdatedBy(actor);
         s.setLastActionBy(actor);
 
         Syllabus saved = syllabusRepository.save(s);
+
+        // Rejection reason is now stored ONLY in syllabus.rejection_reason column
+        // No need to save to review_comment table anymore
 
         String msg = "Syllabus " + safeCode(saved) + " rejected";
         if (reason != null && !reason.isBlank())
