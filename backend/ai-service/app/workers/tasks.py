@@ -554,8 +554,8 @@ def clo_check_task(self, payload: dict, job_id: str):
     """CLO-PLO Check task - Real AI implementation with OpenAI"""
     user_id = payload.get("userId")
     syllabus_id = payload.get("syllabusId")
-    clos = payload.get("clos", [])
-    plos = payload.get("plos", [])
+    clos = payload.get("cloList", [])  # Changed from "clos" to "cloList"
+    plos = payload.get("ploList", [])  # Changed from "plos" to "ploList"
     mapping = payload.get("mapping", {})
     
     try:
@@ -597,15 +597,38 @@ def clo_check_task(self, payload: dict, job_id: str):
             logger.error(f"Failed to parse CLO check response as JSON: {e}")
             raise ValueError(f"AI returned invalid JSON for CLO check: {ai_response['content'][:100]}")
         
-        # Build result with safe access
+        # Build result with detailed analysis structure from updated prompt
         usage_data = ai_response.get("usage", {})
+        
+        # Extract data from AI response (aligned with new prompt structure)
+        issues = check_data.get("issues", [])
+        mapping_analysis = check_data.get("mappingAnalysis", {})
+        overall_assessment = check_data.get("overallAssessment", {})
+        editing_guidelines = check_data.get("editingGuidelines", {})
+        
+        # Legacy fields for backward compatibility
+        legacy_report = {
+            "issues": issues,
+            "mappingSuggestions": mapping_analysis.get("suggestions", [])
+        }
+        
         result = {
             "jobId": job_id,
-            "report": check_data.get("report", {}),
-            "score": check_data.get("score", 0.0),
-            "summary": check_data.get("summary", ""),
+            # Legacy format for backward compatibility
+            "report": legacy_report,
+            "score": overall_assessment.get("score", 0.0),
+            "summary": overall_assessment.get("summary", ""),
+            
+            # New detailed analysis structure
+            "issues": issues,
+            "mappingAnalysis": mapping_analysis,
+            "overallAssessment": overall_assessment,
+            "editingGuidelines": editing_guidelines,
+            
+            # Metadata
             "tokens": usage_data.get("total_tokens", 0),
-            "model": ai_response.get("model", "unknown")
+            "model": ai_response.get("model", "unknown"),
+            "timestamp": time.time()
         }
         
         # Update DB status: SUCCEEDED
@@ -848,6 +871,82 @@ def process_suggest_similar_clo(job_id: str, payload: dict):
             status="failed",
             user_id=None,
             syllabus_id=None,
+            error=error_msg
+        )
+        raise
+
+@celery_app.task(bind=True, name='tasks.test_clo_prompt')
+def test_clo_prompt(self, payload: dict, job_id: str):
+    """
+    Test/Export CLO-PLO check prompt - For debugging and prompt validation
+    Returns the generated prompt without calling AI
+    """
+    clos = payload.get("cloList", [])
+    plos = payload.get("ploList", [])
+    mapping = payload.get("mapping", {})
+    
+    try:
+        # Update DB status: RUNNING
+        update_job_in_db(job_id, AIJobStatus.RUNNING, progress=25)
+        self.update_state(state='PROGRESS', meta={'progress': 25})
+        
+        # Build prompt
+        update_job_in_db(job_id, AIJobStatus.RUNNING, progress=50)
+        self.update_state(state='PROGRESS', meta={'progress': 50})
+        
+        prompt = prompts.build_clo_check_prompt(clos, plos, mapping)
+        
+        # Calculate some statistics about the prompt
+        prompt_length = len(prompt)
+        prompt_lines = prompt.count('\n')
+        
+        update_job_in_db(job_id, AIJobStatus.RUNNING, progress=75)
+        self.update_state(state='PROGRESS', meta={'progress': 75})
+        
+        # Result contains the full prompt for inspection
+        result = {
+            "jobId": job_id,
+            "taskType": "test_clo_prompt",
+            "prompt": prompt,
+            "statistics": {
+                "promptLength": prompt_length,
+                "promptLines": prompt_lines,
+                "cloCount": len(clos),
+                "ploCount": len(plos),
+                "mappingCount": len(mapping) if mapping else 0,
+                "generatedAt": time.time()
+            },
+            "input": {
+                "clos": clos,
+                "plos": plos,
+                "mapping": mapping
+            },
+            "purpose": "Debug prompt before running actual AI analysis"
+        }
+        
+        # Update DB status: SUCCEEDED
+        update_job_in_db(job_id, AIJobStatus.SUCCEEDED, progress=100, result=result)
+        self.update_state(state='PROGRESS', meta={'progress': 100})
+        
+        # Publish completion event
+        publish_completion_event(
+            job_id=job_id,
+            task_type="test_clo_prompt",
+            status="succeeded"
+        )
+        
+        return result
+    except Exception as e:
+        error_msg = str(e)
+        
+        # Update DB status: FAILED
+        update_job_in_db(job_id, AIJobStatus.FAILED, error=error_msg)
+        
+        # Publish failure event
+        publish_completion_event(
+            job_id=job_id,
+            task_type="test_clo_prompt",
+            status="failed",
             error=error_msg
         )
         raise

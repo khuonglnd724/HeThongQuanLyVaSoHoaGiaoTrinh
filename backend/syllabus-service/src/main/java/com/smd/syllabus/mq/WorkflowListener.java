@@ -3,6 +3,7 @@ package com.smd.syllabus.mq;
 import com.smd.syllabus.domain.Syllabus;
 import com.smd.syllabus.domain.SyllabusStatus;
 import com.smd.syllabus.repository.SyllabusRepository;
+import com.smd.syllabus.service.ReviewCommentService;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
@@ -18,9 +19,11 @@ public class WorkflowListener {
     private static final Logger log = LoggerFactory.getLogger(WorkflowListener.class);
 
     private final SyllabusRepository syllabusRepository;
+    private final ReviewCommentService reviewCommentService;
 
-    public WorkflowListener(SyllabusRepository syllabusRepository) {
+    public WorkflowListener(SyllabusRepository syllabusRepository, ReviewCommentService reviewCommentService) {
         this.syllabusRepository = syllabusRepository;
+        this.reviewCommentService = reviewCommentService;
     }
 
     @Transactional
@@ -101,6 +104,15 @@ public class WorkflowListener {
                 return; // Already in sync
             }
             syllabus.setStatus(SyllabusStatus.REJECTED);
+            syllabus.setRejectedAt(Instant.now());
+            
+            // Set rejection reason to syllabus.rejectionReason column (NOT to review_comment table)
+            if (message.getComment() != null && !message.getComment().isBlank()) {
+                syllabus.setRejectionReason(message.getComment().trim());
+                log.info("[WorkflowListener] Set rejection reason for syllabus {}: {}", 
+                        syllabus.getId(), message.getComment().trim());
+            }
+            
             log.info("[WorkflowListener] Syllabus {} marked REJECTED via workflow sync", syllabus.getId());
         }
         

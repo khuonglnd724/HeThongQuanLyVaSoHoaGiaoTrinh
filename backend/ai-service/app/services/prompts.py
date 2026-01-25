@@ -241,24 +241,200 @@ Phân tích chi tiết các thay đổi và đánh giá mức độ ảnh hưở
 
 
 def build_clo_check_prompt(clos: List[Dict], plos: List[Dict], mapping: Dict = None) -> str:
-    """Build prompt for CLO-PLO check task"""
-    clo_text = "\n".join([f"- {clo['id']}: {clo['description']}" for clo in clos])
-    plo_text = "\n".join([f"- {plo['id']}: {plo['description']}" for plo in plos])
+    """Build prompt for CLO-PLO check task with detailed analysis and actionable recommendations"""
+    clo_text = "\n".join([f"• [{clo['id']}] {clo['description']}" for clo in clos])
+    plo_text = "\n".join([f"• [{plo['id']}] {plo['description']}" for plo in plos])
     
-    prompt = f"""Kiểm tra tính nhất quán giữa CLO và PLO:
+    prompt = f"""KIỂM TRA TÍNH NHẤT QUÁN VÀ SỰ PHỐI HỢP CLO-PLO
 
---- CÁC CLO (Course Learning Outcomes) ---
+BẠN LÀ CHUYÊN GIA ĐẢM BẢO CHẤT LƯỢNG GIÁO DỤC:
+- Phân tích sự phù hợp giữa chuẩn đầu ra học phần (CLOs) và chương trình (PLOs)
+- Cung cấp gợi ý cải thiện mapping cụ thể, dễ thực hiện
+- Đánh giá tính hiệu quả của chương trình đào tạo
+
+=== INPUT DATA ===
+
+CÁC CLO (Course Learning Outcomes - Chuẩn đầu ra học phần):
 {clo_text}
 
---- CÁC PLO (Program Learning Outcomes) ---
+CÁC PLO (Program Learning Outcomes - Chuẩn đầu ra chương trình):
 {plo_text}
 """
     
     if mapping:
-        mapping_text = "\n".join([f"- {k} -> {v}" for k, v in mapping.items()])
-        prompt += f"\n--- MAPPING HIỆN TẠI ---\n{mapping_text}\n"
+        # Build detailed mapping context
+        mapping_lines = []
+        all_clos = set()
+        all_plos = set()
+        
+        if isinstance(mapping, dict):
+            for clo_id, plo_ids in mapping.items():
+                all_clos.add(clo_id)
+                if isinstance(plo_ids, list):
+                    plo_list = [str(p) for p in plo_ids if p]
+                    all_plos.update(plo_list)
+                    if plo_list:
+                        mapping_lines.append(f"• [{clo_id}] ──> {', '.join(plo_list)}")
+                    else:
+                        mapping_lines.append(f"• [{clo_id}] ──> [KHÔNG CÓ MAPPING]")
+                else:
+                    all_plos.add(str(plo_ids))
+                    mapping_lines.append(f"• [{clo_id}] ──> {plo_ids}")
+        
+        mapping_text = "\n".join(mapping_lines) if mapping_lines else "Không có mapping nào"
+        
+        # Find unmapped CLOs and uncovered PLOs
+        # Unmapped CLOs: CLOs not in mapping dict
+        all_clo_ids = {clo['id'] for clo in clos}
+        unmapped_clos = all_clo_ids - all_clos
+        
+        # Uncovered PLOs: PLOs not in the mapping values
+        # Get all PLO IDs from input ploList
+        all_plo_ids = {plo['id'] for plo in plos}
+        uncovered_plos = all_plo_ids - all_plos
+        
+        prompt += f"""
+MAPPING HIỆN TẠI (CLO → PLO):
+{mapping_text}
+
+THỐNG KÊ MAPPING:
+• Tổng CLOs: {len(clos)}
+• Tổng PLOs: {len(plos)}
+• CLOs có mapping: {len(all_clos)}/{len(clos)}
+• PLOs được cover: {len(all_plos)}/{len(plos)}"""
+        
+        if unmapped_clos:
+            prompt += f"\n• CLOs chưa mapping: {', '.join(sorted(unmapped_clos))}"
+        if uncovered_plos:
+            prompt += f"\n• PLOs không được cover: {', '.join(sorted(uncovered_plos))}"
+        
+        prompt += """
+
+=== HƯỚNG DẪN PHÂN TÍCH CHI TIẾT ===
+
+PHẦN 1: KIỂM TRA TỪNG CẶP CLO-PLO
+- Với mỗi cặp (CLO, PLO) trong mapping:
+  1. Xác định MỨC ĐỘ PHỐI HỢP: 
+     • HOÀN HẢO: Nội dung CLO trực tiếp support PLO
+     • TỐT: Phần lớn nội dung CLO support PLO
+     • TRUNG BÌNH: Có liên kết nhưng chưa chặt chẽ
+     • YẾU: Liên kết không rõ ràng
+     • KHÔNG PHỐI HỢP: Hoàn toàn khác lĩnh vực
+  
+  2. So sánh CẤP ĐỘ BLOOM:
+     • CLO cấp độ nào? (Remember, Understand, Apply, Analyze, Evaluate, Create)
+     • PLO cấp độ nào?
+     • Có phù hợp không? (CLO thường = hoặc < PLO)
+  
+  3. Kiểm tra NỘI DUNG:
+     • Mô tả CLO có bao phủ đủ PLO không?
+     • Có kiến thức/kỹ năng nào thiếu?
+
+PHẦN 2: PHÁT HIỆN CÁC VẤN ĐỀ
+- VẤN ĐỀ CRITICAL: CLO-PLO mapping sai lệch hoàn toàn
+- VẤN ĐỀ MAJOR: Mapping yếu, phù hợp nhưng không chặt chẽ
+- ℹVẤN ĐỀ MINOR: Cải thiện được nhưng không cấp bách
+
+PHẦN 3: GỢI ý CẢI THIỆN
+- Với mỗi vấn đề, đưa ra gợi ý cụ thể:
+  1. VẤN ĐỀ LÀ GÌ? (nêu rõ)
+  2. TẠI SAO LẠI VẤN ĐỀ? (giải thích logic)
+  3. NÊN LÀM GÌ? (đưa ra hành động cụ thể)
+  4. DÙNG LÀM SAO? (hướng dẫn chi tiết)
+
+PHẦN 4: KIẾN NGHỊ CHIẾN LƯỢC
+- Liệu mapping hiện tại có đủ cover PLOs không?
+- Nên bổ sung CLOs nào?
+- Nên loại bỏ hoặc sửa CLOs nào?
+- Xếp hạng ưu tiên cải thiện (1=cấp bách, 2=nên sửa, 3=có thể sửa)
+
+=== ĐỊNH DẠNG TRÌNH BÀY ===
+Trả về JSON với cấu trúc:
+{
+    "issues": [
+        {
+            "id": "ISSUE-001",
+            "type": "missing_mapping | weak_alignment | taxonomy_mismatch | coverage_gap | contradiction",
+            "severity": "critical | major | minor",
+            "relatedClo": "CLO ID",
+            "relatedPlo": "PLO ID (nếu có)",
+            
+            "problem": "Mô tả rõ ràng vấn đề LÀ GÌ",
+            "why": "Giải thích TẠI SAO nó là vấn đề (dùng logic giáo dục)",
+            "impact": "Tác động: ảnh hưởng đến gì, ai?",
+            
+            "recommendation": "Gợi ý cụ thể phải LÀM GÌ",
+            "howToFix": "Hướng dẫn DÙNG LÀM SAO để sửa (chi tiết từng bước)",
+            "priority": 1 | 2 | 3
+        }
+    ],
     
-    prompt += "\nPhân tích và đưa ra đánh giá chi tiết về mapping CLO-PLO."
+    "mappingAnalysis": {
+        "totalClos": số,
+        "totalPlos": số,
+        "coveredClos": số,
+        "coveredPlos": số,
+        "coverage": "Phần trăm %",
+        
+        "unmappedClos": ["CLO1", "CLO2"],
+        "uncoveredPlos": ["PLO1", "PLO2"],
+        
+        "suggestions": [
+            {
+                "action": "ADD | MODIFY | REMOVE",
+                "description": "Mô tả hành động cụ thể",
+                "cloId": "CLO ID",
+                "suggestedPlos": ["PLO1", "PLO2"],
+                "rationale": "Lý do chi tiết",
+                "implementationGuide": "Hướng dẫn thực hiện"
+            }
+        ]
+    },
+    
+    "overallAssessment": {
+        "score": 6.5,  // 0-10
+        "status": "GOOD | ACCEPTABLE | NEEDS_IMPROVEMENT | CRITICAL",
+        "summary": "Tóm tắt tổng quan (2-3 câu)",
+        "keyStrengths": ["Điểm mạnh 1", "Điểm mạnh 2"],
+        "keyWeaknesses": ["Điểm yếu 1", "Điểm yếu 2"],
+        "nextSteps": ["Hành động tiếp theo 1", "Hành động tiếp theo 2"]
+    },
+    
+    "editingGuidelines": {
+        "descriptions": [
+            "Nếu sửa CLO/PLO, cần sửa từng từ, không thay hoàn toàn",
+            "Khi sửa, cần đảm bảo vẫn match với Bloom's Taxonomy",
+            "Nên thêm ví dụ cụ thể vào mô tả"
+        ],
+        "mappingTips": [
+            "Một CLO có thể map với nhiều PLOs",
+            "Tránh mapping một CLO với quá 3 PLOs",
+            "Ưu tiên mapping với PLOs có liên quan chặt chẽ nhất"
+        ]
+    }
+}
+
+=== LƯU Ý QUAN TRỌNG ===
+✓ LÀM: Cung cấp gợi ý cụ thể dựa trên NỘI DUNG thực tế
+✓ LÀM: Giải thích TẠI SAO một cặp mapping là tốt hoặc xấu
+✓ LÀM: Đưa ra hướng dẫn CHI TIẾT về cách sửa
+✗ KHÔNG: Chỉ nêu "cần sửa" mà không giải thích
+✗ KHÔNG: Gợi ý quá chung chung hoặc không khả thi
+✗ KHÔNG: Gợi ý thay đổi hoàn toàn nội dung"""
+    
+    else:
+        prompt += """
+LƯU Ý: Không có mapping dữ liệu được cung cấp.
+
+HƯỚNG DẪN PHÂN TÍCH:
+1. Phân tích nội dung từng CLO
+2. Xác định những cấp độ Bloom của CLO
+3. So sánh với nội dung PLO để tìm sự tương đồng
+4. Gợi ý mapping nên là gì
+5. Xác định những lỗ hổng cần bổ sung
+
+Trả về JSON với các gợi ý mapping chi tiết."""
+    
     return prompt
 
 
