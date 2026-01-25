@@ -9,6 +9,7 @@ const SyllabusApproval = ({ user, onLogout, approvalStage = 'REVIEW' }) => {
 
   const [selected, setSelected] = useState(null)
   const [detail, setDetail] = useState(null)
+  const [rejectionReason, setRejectionReason] = useState('')
   const [versionHistory, setVersionHistory] = useState([])
   const [actionLoading, setActionLoading] = useState(false)
   const [message, setMessage] = useState('')
@@ -37,6 +38,7 @@ const SyllabusApproval = ({ user, onLogout, approvalStage = 'REVIEW' }) => {
       ])
 
       setDetail(detailRes?.data || null)
+      setRejectionReason(detailRes?.data?.rejectionReason || detailRes?.data?.review_comment || '')
       setVersionHistory(versionsRes?.data || [])
     } catch (err) {
       console.error('Failed to load syllabus detail:', err)
@@ -49,6 +51,7 @@ const SyllabusApproval = ({ user, onLogout, approvalStage = 'REVIEW' }) => {
 
   const handleSelect = (syllabus) => {
     setSelected(syllabus)
+    setRejectionReason('')
     loadDetailAndVersions(syllabus)
   }
 
@@ -310,6 +313,17 @@ const SyllabusApproval = ({ user, onLogout, approvalStage = 'REVIEW' }) => {
                           )}
                         </div>
                       </>
+                    )}
+
+                    {/* Rejection Reason */}
+                    {detail.status === 'REJECTED' && rejectionReason && (
+                      <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+                        <h3 className="font-semibold text-red-900 mb-2 flex items-center gap-2">
+                          <XCircle size={18} />
+                          Lý do từ chối
+                        </h3>
+                        <p className="text-red-800 text-sm">{rejectionReason}</p>
+                      </div>
                     )}
 
                     {/* Action Buttons */}

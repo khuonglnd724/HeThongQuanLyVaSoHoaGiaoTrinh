@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useRef } from 'react'
 import {
   ArrowLeft,
   Save,
@@ -20,9 +20,35 @@ import { syllabusApprovalService } from '../services/syllabusApprovalService'
 import aiService from '../services/aiService'
 
 const SyllabusEditorPage = ({ syllabusId: initialSyllabusId, rootId, user, onBack }) => {
+  // Debug logging
+  console.log('[SyllabusEditorPage] Component initialized with:', {
+    initialSyllabusId,
+    rootId,
+    hasUser: !!user
+  })
+
   const [syllabusId, setSyllabusId] = useState(initialSyllabusId)
+  const syllabusIdRef = useRef(initialSyllabusId)  // Keep immutable reference
   const mode = syllabusId ? 'edit' : 'create'
   const userId = user?.userId || user?.id
+
+  // Keep syllabusIdRef in sync with syllabusId state and log changes
+  useEffect(() => {
+    console.log('[SyllabusEditorPage] syllabusId state updated:', syllabusId)
+    if (syllabusId) {
+      syllabusIdRef.current = syllabusId
+      console.log('[SyllabusEditorPage] syllabusIdRef updated to:', syllabusIdRef.current)
+    }
+  }, [syllabusId])
+
+  // Monitor prop changes
+  useEffect(() => {
+    console.log('[SyllabusEditorPage] Props changed - initialSyllabusId:', initialSyllabusId)
+    if (initialSyllabusId && initialSyllabusId !== syllabusId) {
+      console.log('[SyllabusEditorPage] Updating syllabusId from prop:', initialSyllabusId)
+      setSyllabusId(initialSyllabusId)
+    }
+  }, [initialSyllabusId])
 
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -38,6 +64,7 @@ const SyllabusEditorPage = ({ syllabusId: initialSyllabusId, rootId, user, onBac
   const [plosLoading, setPlosLoading] = useState(false)
   const [programInfo, setProgramInfo] = useState(null)
   const [academicSyllabusId, setAcademicSyllabusId] = useState(null)  // ID từ academic-service
+  const [loadedRootId, setLoadedRootId] = useState(null)  // rootId loaded from API
   const [loadedSubjectCode, setLoadedSubjectCode] = useState(null)  // Temp storage for matching subject
   const [loadedCloPairIds, setLoadedCloPairIds] = useState([])
   const [formData, setFormData] = useState({
@@ -64,6 +91,7 @@ const SyllabusEditorPage = ({ syllabusId: initialSyllabusId, rootId, user, onBac
     description: '',
     selectedPloIds: []
   })
+  const [syllabusStatus, setSyllabusStatus] = useState(null)  // DRAFT, REJECTED, etc.
 
   useEffect(() => {
     const init = async () => {
@@ -120,6 +148,33 @@ const SyllabusEditorPage = ({ syllabusId: initialSyllabusId, rootId, user, onBac
       const data = res.data?.data || res.data || {}
       
       console.log('Loaded syllabus from API:', data)
+      console.log('[SyllabusEditorPage] Checking rootId from API:', data.rootId || 'NOT FOUND')
+      console.log('[SyllabusEditorPage] Current syllabusId:', syllabusId)
+      console.log('[SyllabusEditorPage] Checking for academicId:', data.academicId || data.academicSyllabusId || 'NOT FOUND')
+      
+      // CRITICAL: Set rootId from API response (this is the root syllabus ID)
+      if (data.rootId) {
+        // This is a child version, set rootId
+        console.log('[SyllabusEditorPage] Setting loadedRootId from API:', data.rootId)
+        setLoadedRootId(data.rootId)
+      } else {
+        // This IS the root version (no rootId in response means this is the root)
+        console.log('[SyllabusEditorPage] No rootId in response - this IS the root version')
+        setLoadedRootId(null)  // null means this is the root
+      }
+      
+      // Set academicSyllabusId if exists in response
+      if (data.academicId || data.academicSyllabusId) {
+        setAcademicSyllabusId(data.academicId || data.academicSyllabusId)
+        console.log('[SyllabusEditorPage] Set academicSyllabusId to:', data.academicId || data.academicSyllabusId)
+      } else {
+        // Fallback: use syllabusId as academicId for backward compatibility
+        setAcademicSyllabusId(syllabusId)
+        console.log('[SyllabusEditorPage] No academicId found, using syllabusId as fallback:', syllabusId)
+      }
+      
+      // Set status
+      setSyllabusStatus(data.status || null)
       
       // Parse content JSON to extract cloPairIds and other fields
       let cloPairIds = []
@@ -137,7 +192,7 @@ const SyllabusEditorPage = ({ syllabusId: initialSyllabusId, rootId, user, onBac
       const subjectCode = data.subjectCode || contentObj.subjectCode || ''
       const subjectId = data.subjectId || contentObj.subjectId || ''
       
-      console.log('Parsed data:', { subjectId, subjectCode, cloPairIds })
+      console.log('Parsed data:', { subjectId, subjectCode, cloPairIds, status: data.status })
       
       // Store for later matching
       setLoadedSubjectCode(subjectCode)
@@ -298,103 +353,6 @@ const SyllabusEditorPage = ({ syllabusId: initialSyllabusId, rootId, user, onBac
     }
   }
 
-  // Auto-ingest documents to AI service after upload
-  const autoIngestDocuments = async (syllabusId) => {
-    try {
-      // Fetch documents that were just uploaded
-      const docsRes = await syllabusServiceV2.getDocumentsBySyllabus(syllabusId)
-      const documents = docsRes.data?.data || docsRes.data || []
-
-      if (!documents || documents.length === 0) {
-        console.log('[AutoIngest] No documents to ingest')
-        return
-      }
-
-      console.log(`[AutoIngest] Starting ingest for ${documents.length} documents`)
-      const subject = subjects.find(s => String(s.id) === String(formData.subjectId))
-      const subjectName = subject?.subjectName || ''
-
-      for (const doc of documents) {
-        try {
-          // Skip if already has jobId
-          if (doc.aiIngestionJobId) {
-            console.log(`[AutoIngest] Document ${doc.id} already ingested, skipping`)
-            continue
-          }
-
-          console.log(`[AutoIngest] Ingesting document: ${doc.id}`)
-          
-          // Download document
-          const res = await syllabusServiceV2.downloadDocument(doc.id)
-          const blob = res.data instanceof Blob ? res.data : new Blob([res.data], { type: 'application/octet-stream' })
-          const file = new File([blob], doc.fileName, { type: blob.type })
-          
-          // Ingest to AI service
-          await aiService.ingestDocument(
-            file,
-            syllabusId,
-            subjectName,
-            doc.id
-          )
-          
-          console.log(`[AutoIngest] Successfully ingested document: ${doc.id}`)
-        } catch (err) {
-          console.warn(`[AutoIngest] Failed to ingest document ${doc.id}:`, err)
-        }
-      }
-
-      console.log('[AutoIngest] Ingest phase complete')
-      return true
-    } catch (err) {
-      console.error('[AutoIngest] Error:', err)
-      return false
-    }
-  }
-
-  // Auto-generate summaries for ingested documents
-  const autoGenerateSummaries = async (syllabusId) => {
-    try {
-      const docsRes = await syllabusServiceV2.getDocumentsBySyllabus(syllabusId)
-      const documents = docsRes.data?.data || docsRes.data || []
-
-      if (!documents || documents.length === 0) {
-        console.log('[AutoSummary] No documents to summarize')
-        return
-      }
-
-      console.log(`[AutoSummary] Starting summary generation for ${documents.length} documents`)
-
-      for (const doc of documents) {
-        try {
-          if (doc.aiIngestionJobId) {
-            console.log(`[AutoSummary] Document ${doc.id} already has summary, skipping`)
-            continue
-          }
-
-          console.log(`[AutoSummary] Generating summary for document: ${doc.id}`)
-          const res = await aiService.generateDocumentSummary(syllabusId, doc.id, 'MEDIUM')
-          const jobId = res.data?.jobId || res.data?.data?.jobId
-          
-          if (jobId) {
-            console.log(`[AutoSummary] Summary job created for ${doc.id}, jobId=${jobId}`)
-            // Poll in background (non-blocking)
-            aiService.pollDocumentSummaryJob(jobId, doc.id).catch(err => {
-              console.warn(`[AutoSummary] Poll failed for ${doc.id}:`, err)
-            })
-          }
-        } catch (err) {
-          console.warn(`[AutoSummary] Failed to generate summary for document ${doc.id}:`, err)
-        }
-      }
-
-      console.log('[AutoSummary] All summaries initiated')
-      return true
-    } catch (err) {
-      console.error('[AutoSummary] Error:', err)
-      return false
-    }
-  }
-
   const handleSave = async () => {
     if (!formData.subjectId) {
       alert('Vui lòng chọn môn học')
@@ -459,59 +417,96 @@ const SyllabusEditorPage = ({ syllabusId: initialSyllabusId, rootId, user, onBac
 
         setAcademicSyllabusId(newAcademicId)
         setSyllabusId(savedId)
-        // setIsEditMode(true) - removed as isEditMode state was unused
 
-        const uploadSuccess = await uploadDocuments(savedId)
+        await uploadDocuments(savedId)
         alert('Tạo giáo trình thành công')
-
-        // Background AI processing (non-blocking)
-        if (uploadSuccess && selectedFiles.length > 0) {
-          alert('Đang xử lý tài liệu...')
-          setTimeout(async () => {
-            try {
-              await autoIngestDocuments(savedId)
-              await autoGenerateSummaries(savedId)
-              alert('Tài liệu đã được xử lý. Bạn có thể xem tóm tắt bất cứ lúc nào.')
-            } catch (err) {
-              console.error('[SyllabusEditorPage] Background AI processing failed:', err)
-            }
-          }, 500)
-        }
       } else {
-        // ===== Update dùng dual orchestrator =====
-        console.log('[SyllabusEditorPage] Updating with dual orchestrator')
-        const res = await dualSyllabusOrchestrator.updateDualSyllabusVersion(
-          rootId || syllabusId,
-          academicSyllabusId,
-          syllabusId,
-          { ...payload, changes: 'Cập nhật thông tin cơ bản' },
-          userId
-        )
-
-        savedId = res.id
-        newAcademicId = res.academicId
-
-        console.log('[SyllabusEditorPage] Dual update successful', {
-          syllabusServiceId: savedId,
-          academicId: newAcademicId
+        // ===== Update mode =====
+        // Check status: nếu DRAFT hoặc REJECTED → tạo version mới
+        // Ngược lại → chỉ update partial (documents)
+        const effectiveSyllabusId = syllabusIdRef.current || syllabusId  // Use ref as fallback
+        
+        console.log('[SyllabusEditorPage] Update mode DEBUG:', {
+          syllabusId: syllabusId,
+          syllabusIdRef: syllabusIdRef.current,
+          effectiveSyllabusId: effectiveSyllabusId,
+          initialSyllabusId: initialSyllabusId,
+          rootId: rootId,
+          syllabusStatus: syllabusStatus
+        })
+        
+        if (!effectiveSyllabusId) {
+          console.error('[SyllabusEditorPage] CRITICAL ERROR: No syllabusId available for update!')
+          alert('Lỗi: Không có ID giáo trình để cập nhật. Vui lòng đóng và mở lại trang chỉnh sửa.')
+          throw new Error('Không có ID giáo trình để cập nhật')
+        }
+        
+        console.log('[SyllabusEditorPage] Update mode - status:', syllabusStatus, 'syllabusId:', effectiveSyllabusId)
+        
+        // Determine rootId for version creation
+        // Use loadedRootId from API response (set during loadSyllabus)
+        // If no loadedRootId, this IS the root version, so use syllabusId as rootId
+        const effectiveRootId = loadedRootId || effectiveSyllabusId
+        console.log('[SyllabusEditorPage] Using rootId for version creation:', {
+          loadedRootId: loadedRootId,
+          syllabusId: effectiveSyllabusId,
+          effectiveRootId: effectiveRootId
         })
 
-        const uploadSuccess = await uploadDocuments(savedId)
-        alert('Cập nhật giáo trình thành công (cập nhật cả 2 database)')
+        if (syllabusStatus === 'REJECTED') {
+          // ===== REJECTED: Create NEW version from rejected one =====
+          console.log('[SyllabusEditorPage] Creating new version from REJECTED syllabus')
+          console.log('[SyllabusEditorPage] academicSyllabusId:', academicSyllabusId)
+          
+          const res = await dualSyllabusOrchestrator.updateDualSyllabusVersion(
+            effectiveRootId,
+            academicSyllabusId || effectiveSyllabusId,
+            effectiveSyllabusId,
+            { ...payload, changes: 'Tạo version mới từ bản bị từ chối' },
+            userId
+          )
+          savedId = res.id
+          newAcademicId = res.academicId
 
-        // Background AI processing (non-blocking)
-        if (uploadSuccess && selectedFiles.length > 0) {
-          alert('Đang xử lý tài liệu...')
-          setTimeout(async () => {
-            try {
-              await autoIngestDocuments(savedId)
-              await autoGenerateSummaries(savedId)
-              alert('Tài liệu đã được xử lý. Bạn có thể xem tóm tắt bất cứ lúc nào.')
-            } catch (err) {
-              console.error('[SyllabusEditorPage] Background AI processing failed:', err)
-            }
-          }, 500)
+          console.log('[SyllabusEditorPage] New version created from REJECTED', {
+            syllabusServiceId: savedId,
+            academicId: newAcademicId
+          })
+        } else if (syllabusStatus === 'DRAFT') {
+          // ===== DRAFT: Create NEW version (backend doesn't have update endpoint) =====
+          console.log('[SyllabusEditorPage] Creating new version for DRAFT (backend has no update API)')
+          const res = await dualSyllabusOrchestrator.updateDualSyllabusVersion(
+            effectiveRootId,
+            academicSyllabusId || effectiveSyllabusId,
+            effectiveSyllabusId,
+            { ...payload, changes: 'Cập nhật giáo trình' },
+            userId
+          )
+          savedId = res.id
+          newAcademicId = res.academicId
+
+          console.log('[SyllabusEditorPage] New DRAFT version created', {
+            syllabusServiceId: savedId,
+            academicId: newAcademicId,
+            versionNo: res.versionNo
+          })
+        } else {
+          // ===== Other status: Partial update (documents only) =====
+          console.log('[SyllabusEditorPage] Partial update (documents only) for status:', syllabusStatus)
+          const res = await dualSyllabusOrchestrator.updateDualSyllabusPartial(
+            effectiveSyllabusId,
+            payload,
+            userId
+          )
+
+          console.log('[SyllabusEditorPage] Partial update successful', {
+            syllabusServiceId: res.id,
+            status: res.status,
+            versionNo: res.versionNo
+          })
         }
+
+        await uploadDocuments(savedId)
       }
 
       onBack?.()
