@@ -152,9 +152,9 @@ const Login = () => {
         'ROLE_HOD': '/lecturer/dashboard',              // HoD acts as lecturer by default (can still access /hod/dashboard for approvals)
         'ROLE_ADMIN': '/admin/portal',                  // Admin → Admin Portal
         'ROLE_LECTURER': '/lecturer/dashboard',
-        'ROLE_STUDENT': '/student/dashboard'
+        'ROLE_STUDENT': '/student'                      // Student → Student Page with syllabuses
       }
-      const targetPath = roleToPath[primaryRole] || '/student/dashboard'
+      const targetPath = roleToPath[primaryRole] || '/student'
       console.log(`[Login] Will navigate ${primaryRole} → ${targetPath}`)
       console.log('[Login] Current userData.role:', userData.role)
       console.log('[Login] Current userData.roles:', userData.roles)
