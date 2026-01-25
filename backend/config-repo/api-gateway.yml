@@ -1,8 +1,15 @@
 server:
   port: 8080
+  tomcat:
+    connection-timeout: 120000ms
+  netty:
+    connection-timeout: 120000ms
+
 spring:
   application:
     name: api-gateway
+  webflux:
+    base-path: /
   cloud:
     gateway:
       globalcors:
@@ -55,7 +62,7 @@ spring:
           predicates:
             - Path=/api/ai/**,/ai/**
           filters:
-            - RewritePath=/api/ai(?<segment>/?.*), ${segment}
+            - RewritePath=/api/ai(?<segment>/?.*), /ai${segment}
             - RemoveResponseHeader=Access-Control-Allow-Origin
             - RemoveResponseHeader=Access-Control-Allow-Methods
             - RemoveResponseHeader=Access-Control-Allow-Headers
@@ -64,8 +71,39 @@ spring:
       default-filters:
         - RemoveRequestHeader=Cookie
       httpclient:
-        connect-timeout: 5000
-        response-timeout: 5000ms
+        connect-timeout: 60000
+        response-timeout: 120000ms
+        pool:
+          type: ELASTIC
+          max-idle-time: 60s
+        websocket:
+          max-frame-payload-length: 100000
+
+hystrix:
+  command:
+    default:
+      execution:
+        isolation:
+          thread:
+            timeoutInMilliseconds: 120000
+
+resilience4j:
+  circuitbreaker:
+    configs:
+      default:
+        registerHealthIndicator: false
+        slidingWindowSize: 100
+        minimumNumberOfCalls: 100
+        permittedNumberOfCallsInHalfOpenState: 30
+        automaticTransitionFromOpenToHalfOpenEnabled: false
+        waitDurationInOpenState: 60000
+        failureRateThreshold: 99
+        eventConsumerBufferSize: 10
+  timelimiter:
+    configs:
+      default:
+        cancelRunningFuture: false
+        timeoutDuration: 120000
 
 eureka:
   client:

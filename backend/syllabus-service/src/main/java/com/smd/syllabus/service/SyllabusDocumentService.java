@@ -257,4 +257,38 @@ public class SyllabusDocumentService {
             default -> throw new IllegalArgumentException("Unsupported file type: " + extension);
         };
     }
+
+    /**
+     * Update AI ingestion job ID for a document
+     */
+    @Transactional
+    public DocumentResponse updateJobId(UUID documentId, String jobId) {
+        LOGGER.debug("=== [updateJobId] START: documentId={}, jobId={}", documentId, jobId);
+        
+        SyllabusDocument document = documentRepository.findByIdAndDeletedFalse(documentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Document not found with id: " + documentId));
+        
+        LOGGER.debug("[updateJobId] Found document: id={}, currentJobId={}, fileName={}", 
+                documentId, document.getAiIngestionJobId(), document.getFileName());
+        
+        if (jobId == null || jobId.isBlank()) {
+            LOGGER.warn("[updateJobId] Job ID is null or empty, rejecting request");
+            throw new IllegalArgumentException("Job ID cannot be empty");
+        }
+        
+        LOGGER.debug("[updateJobId] Setting aiIngestionJobId to: {}", jobId);
+        document.setAiIngestionJobId(jobId);
+        
+        LOGGER.debug("[updateJobId] Setting aiSummaryGeneratedAt");
+        document.setAiSummaryGeneratedAt(java.time.Instant.now());
+        
+        LOGGER.debug("[updateJobId] Saving document...");
+        SyllabusDocument saved = documentRepository.save(document);
+        
+        LOGGER.info("[updateJobId] SUCCESS - Updated AI job tracking for documentId={}, jobId={}, savedId={}", 
+                documentId, jobId, saved.getId());
+        LOGGER.debug("[updateJobId] Saved document aiIngestionJobId={}", saved.getAiIngestionJobId());
+        
+        return DocumentResponse.fromEntity(saved);
+    }
 }

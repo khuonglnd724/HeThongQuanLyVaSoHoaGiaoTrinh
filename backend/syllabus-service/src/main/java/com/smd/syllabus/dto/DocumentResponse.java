@@ -21,6 +21,8 @@ public class DocumentResponse {
     private Instant uploadedAt;
     private Instant updatedAt;
     private String downloadUrl;
+    private String aiIngestionJobId;
+    private Instant aiSummaryGeneratedAt;
 
     public DocumentResponse() {
     }
@@ -40,6 +42,8 @@ public class DocumentResponse {
         response.setUploadedAt(doc.getUploadedAt());
         response.setUpdatedAt(doc.getUpdatedAt());
         response.setDownloadUrl("/api/syllabus/documents/" + doc.getId() + "/download");
+        response.setAiIngestionJobId(doc.getAiIngestionJobId());
+        response.setAiSummaryGeneratedAt(doc.getAiSummaryGeneratedAt());
         return response;
     }
 
@@ -146,6 +150,22 @@ public class DocumentResponse {
 
     public void setDownloadUrl(String downloadUrl) {
         this.downloadUrl = downloadUrl;
+    }
+
+    public String getAiIngestionJobId() {
+        return aiIngestionJobId;
+    }
+
+    public void setAiIngestionJobId(String aiIngestionJobId) {
+        this.aiIngestionJobId = aiIngestionJobId;
+    }
+
+    public Instant getAiSummaryGeneratedAt() {
+        return aiSummaryGeneratedAt;
+    }
+
+    public void setAiSummaryGeneratedAt(Instant aiSummaryGeneratedAt) {
+        this.aiSummaryGeneratedAt = aiSummaryGeneratedAt;
     }
     
     // Get MIME type based on file type

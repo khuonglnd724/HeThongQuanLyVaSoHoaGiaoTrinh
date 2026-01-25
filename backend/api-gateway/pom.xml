@@ -47,10 +47,12 @@
 			<groupId>org.springframework.cloud</groupId>
 			<artifactId>spring-cloud-starter-gateway</artifactId>
 		</dependency>
+		<!-- Circuit breaker disabled - causes 1s default timeout
 		<dependency>
 			<groupId>org.springframework.cloud</groupId>
 			<artifactId>spring-cloud-starter-circuitbreaker-reactor-resilience4j</artifactId>
 		</dependency>
+		-->
 		<!-- JWT parsing -->
 		<dependency>
 			<groupId>io.jsonwebtoken</groupId>

@@ -20,6 +20,7 @@ class DocumentIngestRequest(BaseModel):
     """Request for ingesting document"""
     syllabus_id: str
     subject_name: str
+    document_id: Optional[str] = None  # UUID of the document in syllabus_documents table
 
 
 class DocumentIngestResponse(BaseModel):
@@ -35,6 +36,7 @@ async def ingest_document(
     file: UploadFile = File(...),
     syllabus_id: str = Form(...),
     subject_name: str = Form(default=""),
+    document_id: str = Form(default=None),  # Optional document ID for tracking
 ):
     """
     Ingest syllabus document (PDF/DOCX) into vector store
@@ -95,6 +97,7 @@ async def ingest_document(
         metadatas = [
             {
                 "syllabus_id": syllabus_id,
+                "document_id": document_id or "",  # Store document_id if provided
                 "subject": subject_name or "Unknown",
                 "chunk_index": i,
                 "file_name": file.filename

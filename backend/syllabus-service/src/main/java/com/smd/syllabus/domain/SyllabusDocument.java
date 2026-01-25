@@ -68,6 +68,12 @@ public class SyllabusDocument {
     @Column(name = "is_deleted", nullable = false)
     private boolean deleted = false;
 
+    @Column(name = "ai_ingestion_job_id", length = 50)
+    private String aiIngestionJobId;
+
+    @Column(name = "ai_summary_generated_at")
+    private Instant aiSummaryGeneratedAt;
+
     // Constructors
     public SyllabusDocument() {
     }
@@ -203,5 +209,21 @@ public class SyllabusDocument {
 
     public void setDeleted(boolean deleted) {
         this.deleted = deleted;
+    }
+
+    public String getAiIngestionJobId() {
+        return aiIngestionJobId;
+    }
+
+    public void setAiIngestionJobId(String aiIngestionJobId) {
+        this.aiIngestionJobId = aiIngestionJobId;
+    }
+
+    public Instant getAiSummaryGeneratedAt() {
+        return aiSummaryGeneratedAt;
+    }
+
+    public void setAiSummaryGeneratedAt(Instant aiSummaryGeneratedAt) {
+        this.aiSummaryGeneratedAt = aiSummaryGeneratedAt;
     }
 }
