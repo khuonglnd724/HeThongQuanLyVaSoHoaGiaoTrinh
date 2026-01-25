@@ -4,6 +4,12 @@ server:
 spring:
   application:
     name: api-gateway
+  webflux:
+    base-path: /
+  http:
+    client:
+      connectTimeout: 120000
+      readTimeout: 120000
   
   cloud:
     gateway:
@@ -48,13 +54,16 @@ spring:
           predicates:
             - Path=/api/ai/**,/ai/**
           filters:
-            - RewritePath=/api/ai(?<segment>/?.*), ${segment}
+            - RewritePath=/api/ai(?<segment>/?.*), /ai${segment}
 
-      default-filters:
-        - name: CircuitBreaker
-          args:
-            name: defaultCircuitBreaker
-            fallbackUri: forward:/fallback
+      httpclient:
+        connect-timeout: 120000
+        response-timeout: 120000ms
+        pool:
+          type: ELASTIC
+          max-idle-time: 120s
+        websocket:
+          max-frame-payload-length: 100000
 
       # Enable CORS globally
       globalcors:
@@ -114,19 +123,16 @@ springdoc:
       - name: Gateway
         url: /v3/api-docs
 
-resilience4j:
-  circuitbreaker:
-    configs:
-      default:
-        sliding-window-size: 20
-        minimum-number-of-calls: 5
-        wait-duration-in-open-state: 10s
-        failure-rate-threshold: 50
-        slow-call-duration-threshold: 5s
-        slow-call-rate-threshold: 50
-    instances:
-      defaultCircuitBreaker:
-        base-config: default
+# Hystrix Configuration - Override default 1s timeout
+hystrix:
+  command:
+    default:
+      execution:
+        timeout:
+          enabled: false
+        isolation:
+          thread:
+            timeoutInMilliseconds: 120000
 
 # Eureka Client Configuration
 eureka:

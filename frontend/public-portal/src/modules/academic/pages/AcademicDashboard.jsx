@@ -8,11 +8,15 @@ import {
   Settings,
   LogOut,
   BarChart3,
-  Eye
+  Eye,
+  Zap,
+  Loader
 } from 'lucide-react'
 import syllabusApprovalService from '../services/syllabusApprovalService'
 import syllabusServiceV2 from '../../../modules/lecturer/services/syllabusServiceV2'
 import academicAPI from '../services/academicService'
+import aiService from '../../lecturer/services/aiService'
+import DocumentSummaryModal from '../../lecturer/components/DocumentSummaryModal'
 
 const AcademicDashboard = () => {
   const navigate = useNavigate()
@@ -25,6 +29,12 @@ const AcademicDashboard = () => {
   const [statsData, setStatsData] = useState({ departments: '--', programs: '--' })
   const [cloDetails, setCloDetails] = useState({})
   const [cloLoading, setCloLoading] = useState(false)
+  const [syllabusDocuments, setSyllabusDocuments] = useState([])
+  const [documentsLoading, setDocumentsLoading] = useState(false)
+  const [documentSummaries, setDocumentSummaries] = useState({})
+  const [documentSummarizingId, setDocumentSummarizingId] = useState(null)
+  const [showDocumentSummaryModal, setShowDocumentSummaryModal] = useState(false)
+  const [selectedDocumentForSummary, setSelectedDocumentForSummary] = useState(null)
 
   useEffect(() => {
     const storedUser = (() => {
@@ -151,6 +161,56 @@ const AcademicDashboard = () => {
     }
   }
 
+  const loadDocumentsForSyllabus = async (syllabusId) => {
+    if (!syllabusId) return
+    
+    setDocumentsLoading(true)
+    try {
+      const docsRes = await syllabusServiceV2.getDocumentsBySyllabus(syllabusId)
+      const docs = docsRes.data?.data || docsRes.data || []
+      setSyllabusDocuments(Array.isArray(docs) ? docs : [])
+      
+      // Load cached summaries if documents have aiIngestionJobId
+      const cachedSummaries = {}
+      for (const doc of docs) {
+        if (doc.aiIngestionJobId) {
+          try {
+            const jobStatus = await aiService.getJobStatus(doc.aiIngestionJobId)
+            const jobData = jobStatus.data?.data || jobStatus.data
+            
+            const normalizedStatus = (jobData.status || '').toUpperCase()
+            
+            if (normalizedStatus === 'SUCCEEDED' && jobData.result) {
+              let resultData = jobData.result
+              if (typeof resultData === 'string') {
+                resultData = JSON.parse(resultData)
+              }
+              
+              cachedSummaries[doc.id] = {
+                summary: resultData.summary || '',
+                bullets: Array.isArray(resultData.bullets) ? resultData.bullets : [],
+                keywords: Array.isArray(resultData.keywords) ? resultData.keywords : [],
+                targetAudience: resultData.targetAudience || '',
+                prerequisites: resultData.prerequisites || ''
+              }
+            }
+          } catch (err) {
+            console.warn(`Failed to load summary for doc ${doc.id}:`, err)
+          }
+        }
+      }
+      
+      if (Object.keys(cachedSummaries).length > 0) {
+        setDocumentSummaries(cachedSummaries)
+      }
+    } catch (err) {
+      console.error('Failed to load documents:', err)
+      setSyllabusDocuments([])
+    } finally {
+      setDocumentsLoading(false)
+    }
+  }
+
   useEffect(() => {
     if (selected) {
       console.log('[AcademicDashboard] Selected item:', selected)
@@ -190,6 +250,12 @@ const AcademicDashboard = () => {
         fetchCLODetails(cloIds)
       } else {
         setCloDetails({})
+      }
+      
+      // Load documents
+      const syllabusId = selected.entityId || selected.id
+      if (syllabusId) {
+        loadDocumentsForSyllabus(syllabusId)
       }
     }
   }, [selected])
@@ -536,6 +602,110 @@ const AcademicDashboard = () => {
                 )}
               </div>
 
+              {/* Tài liệu giảng dạy */}
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">📄 Tài liệu giảng dạy ({syllabusDocuments.length})</h3>
+                {documentsLoading ? (
+                  <div className="text-center py-4 text-gray-600">
+                    <p className="text-sm">Đang tải tài liệu...</p>
+                  </div>
+                ) : syllabusDocuments.length > 0 ? (
+                  <div className="space-y-3">
+                    {syllabusDocuments.map((doc) => (
+                      <div key={doc.id} className="bg-white p-4 rounded border border-gray-200 hover:border-blue-300 hover:bg-blue-50 transition-colors">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-gray-900 truncate">{doc.originalName || doc.title || doc.fileName || 'Unnamed Document'}</p>
+                            {doc.description && (
+                              <p className="text-sm text-gray-600 mt-1">{doc.description}</p>
+                            )}
+                            <div className="flex gap-4 mt-2 text-xs text-gray-600">
+                              {doc.fileSize && (
+                                <span>Kích thước: {(doc.fileSize / 1024 / 1024).toFixed(2)} MB</span>
+                              )}
+                              {doc.uploadedAt && (
+                                <span>Ngày tải: {new Date(doc.uploadedAt).toLocaleString('vi-VN')}</span>
+                              )}
+                              {doc.uploadedBy && (
+                                <span>Người tải: {doc.uploadedBy}</span>
+                              )}
+                            </div>
+
+                            {/* Inline Summary Display */}
+                            {documentSummaries[doc.id] && (
+                              <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded text-sm space-y-2">
+                                <div>
+                                  <p className="font-semibold text-blue-900 mb-1">📋 Tóm tắt:</p>
+                                  <p className="text-blue-800">{documentSummaries[doc.id].summary}</p>
+                                </div>
+
+                                {documentSummaries[doc.id].bullets && documentSummaries[doc.id].bullets.length > 0 && (
+                                  <div>
+                                    <p className="font-semibold text-blue-900 mb-1">📌 Nội dung chính:</p>
+                                    <ul className="list-disc list-inside text-blue-800 space-y-1">
+                                      {documentSummaries[doc.id].bullets.map((bullet, idx) => (
+                                        <li key={idx} className="text-xs">{bullet}</li>
+                                      ))}
+                                    </ul>
+                                  </div>
+                                )}
+
+                                {documentSummaries[doc.id].keywords && documentSummaries[doc.id].keywords.length > 0 && (
+                                  <div>
+                                    <p className="font-semibold text-blue-900 mb-1">🏷️ Từ khóa:</p>
+                                    <div className="flex flex-wrap gap-1">
+                                      {documentSummaries[doc.id].keywords.map((kw, idx) => (
+                                        <span key={idx} className="inline-block px-2 py-1 bg-blue-200 text-blue-900 text-xs rounded">
+                                          {kw}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {documentSummaries[doc.id].targetAudience && (
+                                  <div>
+                                    <p className="font-semibold text-blue-900 mb-1">👥 Đối tượng học:</p>
+                                    <p className="text-blue-800 text-xs">{documentSummaries[doc.id].targetAudience}</p>
+                                  </div>
+                                )}
+
+                                {documentSummaries[doc.id].prerequisites && (
+                                  <div>
+                                    <p className="font-semibold text-blue-900 mb-1">📚 Điều kiện tiên quyết:</p>
+                                    <p className="text-blue-800 text-xs">{documentSummaries[doc.id].prerequisites}</p>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="flex gap-2 flex-shrink-0 flex-col">
+                            {doc.aiIngestionJobId && (
+                              <button
+                                onClick={() => {
+                                  setSelectedDocumentForSummary(doc)
+                                  setShowDocumentSummaryModal(true)
+                                }}
+                                title="Xem tóm tắt tài liệu"
+                                className="px-3 py-1.5 bg-purple-600 text-white rounded hover:bg-purple-700 text-xs font-medium flex items-center gap-1 whitespace-nowrap"
+                              >
+                                <Zap size={14} />
+                                Xem tóm tắt
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-4 text-gray-500">
+                    <p className="text-sm italic">Chưa có tài liệu nào được tải lên</p>
+                  </div>
+                )}
+              </div>
+
               {/* Thông tin khác */}
               {(selected.summary || selected.credits) && (
                 <div className="bg-gray-50 border border-gray-200 rounded-lg p-6">
@@ -582,6 +752,17 @@ const AcademicDashboard = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Document Summary Modal */}
+      {showDocumentSummaryModal && selectedDocumentForSummary && (
+        <DocumentSummaryModal 
+          document={selectedDocumentForSummary}
+          onClose={() => {
+            setShowDocumentSummaryModal(false)
+            setSelectedDocumentForSummary(null)
+          }}
+        />
       )}
     </div>
   )

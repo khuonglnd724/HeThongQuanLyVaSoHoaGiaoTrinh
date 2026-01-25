@@ -21,8 +21,62 @@ export const academicAPI = {
   },
 
   /**
-   * Get CLOs by subject ID
+   * Get CLOs by subject ID with PLO mapping information
    */
+  getClosBySubjectWithPloMapping: async (subjectId) => {
+    try {
+      const res = await apiClient.get(`/api/v1/clo/subject/${subjectId}`)
+      const clos = res.data?.data || res.data || []
+      
+      // Enrich each CLO with PLO mapping information
+      const enrichedClos = await Promise.all(
+        clos.map(async (clo) => {
+          try {
+            // Get PLO mappings for this CLO
+            const mappingRes = await apiClient.get(`/api/v1/mapping/clo/${clo.id}`)
+            const mappings = mappingRes.data?.data || mappingRes.data || []
+            
+            // Extract PLO IDs from mappings
+            const ploIds = mappings.map(m => m.ploId || m.plo_id).filter(Boolean)
+            
+            // Fetch PLO details for each mapped PLO
+            const plos = await Promise.all(
+              ploIds.map(async (ploId) => {
+                try {
+                  const ploRes = await apiClient.get(`/api/v1/plo/${ploId}`)
+                  return ploRes.data?.data || ploRes.data || null
+                } catch (err) {
+                  console.warn(`Failed to load PLO ${ploId}:`, err)
+                  return null
+                }
+              })
+            )
+            
+            return {
+              ...clo,
+              mappedPlos: plos.filter(Boolean),
+              ploIds
+            }
+          } catch (mappingErr) {
+            console.warn(`Failed to load mappings for CLO ${clo.id}:`, mappingErr)
+            return {
+              ...clo,
+              mappedPlos: [],
+              ploIds: []
+            }
+          }
+        })
+      )
+      
+      return { ...res, data: { ...res.data, data: enrichedClos } }
+    } catch (err) {
+      console.error('getClosBySubjectWithPloMapping failed:', err)
+      throw err
+    }
+  },
+
+  /**
+   * Get CLOs by subject ID
   getClosBySubject: async (subjectId) => {
     try {
       const res = await apiClient.get(`/api/v1/clo/subject/${subjectId}`)

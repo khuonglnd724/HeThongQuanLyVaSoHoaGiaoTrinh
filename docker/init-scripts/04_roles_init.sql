@@ -112,6 +112,12 @@ ON CONFLICT (user_id) DO NOTHING;
 
 INSERT INTO user_roles (user_id, role_id) VALUES (4, 3) ON CONFLICT DO NOTHING;
 
+INSERT INTO users (user_id, username, email, password, full_name, phone_number, is_active, is_locked, created_at, updated_at, failed_attempts)
+VALUES (5, 'student1', 'student1@smd.edu.vn', '$2a$10$BnduqvTYEKLOt86RVyHCxOX.G.SXp2ae5QDmxiQsHfo2NHPS6dR4i', 'Lê Minh C', '0945678901', true, false, NOW(), NOW(), 0)
+ON CONFLICT (user_id) DO NOTHING;
+
+INSERT INTO user_roles (user_id, role_id) VALUES (5, 6) ON CONFLICT DO NOTHING;
+
 -- Final verification
 SELECT * FROM roles ORDER BY role_id;
 SELECT count(*) AS roles_count FROM roles;
