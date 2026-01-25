@@ -52,12 +52,21 @@ export default function PublicSyllabusDetailPage() {
 
   useEffect(() => {
     loadSyllabusDetail()
-  }, [loadSyllabusDetail])
+    // Check if already subscribed from localStorage
+    const subscribed = JSON.parse(localStorage.getItem('followedSyllabuses') || '[]')
+    setIsSubscribed(subscribed.includes(id))
+  }, [loadSyllabusDetail, id])
 
   const handleSubscribe = async () => {
     try {
       await subscribeSyllabus(id)
       setIsSubscribed(true)
+      // Save to localStorage
+      const subscribed = JSON.parse(localStorage.getItem('followedSyllabuses') || '[]')
+      if (!subscribed.includes(id)) {
+        subscribed.push(id)
+        localStorage.setItem('followedSyllabuses', JSON.stringify(subscribed))
+      }
     } catch (err) {
       alert('Lỗi: ' + err.message)
     }
@@ -67,6 +76,10 @@ export default function PublicSyllabusDetailPage() {
     try {
       await unsubscribeSyllabus(id)
       setIsSubscribed(false)
+      // Remove from localStorage
+      const subscribed = JSON.parse(localStorage.getItem('followedSyllabuses') || '[]')
+      const updated = subscribed.filter(sid => sid !== id)
+      localStorage.setItem('followedSyllabuses', JSON.stringify(updated))
     } catch (err) {
       alert('Lỗi: ' + err.message)
     }

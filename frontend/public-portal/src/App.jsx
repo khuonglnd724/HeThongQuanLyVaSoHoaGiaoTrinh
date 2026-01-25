@@ -5,7 +5,9 @@ import HomePage from './pages/HomePage'
 import SearchPage from './pages/SearchPage'
 import SyllabusDetailPage from './pages/SyllabusDetailPage'
 import Login from './pages/Login'
-import StudentDashboard from './pages/StudentDashboard'
+import StudentPage from './pages/StudentPage'
+import StudentSyllabusDetailPage from './pages/StudentSyllabusDetailPage'
+import StudentProfilePage from './pages/StudentProfilePage'
 import LecturerDashboard from './pages/LecturerDashboard'
 import AdminDashboard from './pages/AdminDashboard'
 import AcademicDashboard from './modules/academic/pages/AcademicDashboard'
@@ -19,6 +21,7 @@ import AdminPortalGuide from './modules/admin/pages/AdminPortalGuide'
 import AdminPortalLayout from './modules/admin/layout/AdminPortalLayout'
 import PublicSyllabusSearchPage from './modules/public/pages/PublicSyllabusSearchPage'
 import PublicSyllabusDetailPage from './modules/public/pages/PublicSyllabusDetailPage'
+import FollowedSyllabuses from './modules/student/pages/FollowedSyllabuses'
 
 const RequireRole = ({ allowedRoles, children }) => {
   const storedUser = (() => {
@@ -45,12 +48,13 @@ const RequireRole = ({ allowedRoles, children }) => {
 function App() {
   const location = useLocation()
   const isLoginPage = location.pathname === '/login'
+  const isStudentPage = location.pathname.startsWith('/student')
   const isLecturerPortal = location.pathname.startsWith('/lecturer/portal')
   const isAdminPortal = location.pathname.startsWith('/admin/portal')
 
   return (
     <div className="flex flex-col min-h-screen">
-      {!isLoginPage && !isLecturerPortal && !isAdminPortal && <Header />}
+      {!isLoginPage && !isStudentPage && !isLecturerPortal && !isAdminPortal && <Header />}
 
       <main className="flex-1">
         <Routes>
@@ -59,7 +63,13 @@ function App() {
           <Route path="/search" element={<SearchPage />} />
           <Route path="/syllabus/:id" element={<SyllabusDetailPage />} />
           <Route path="/login" element={<Login />} />
-          <Route path="/student/dashboard" element={<StudentDashboard />} />
+          
+          {/* Student Routes */}
+          <Route path="/student" element={<StudentPage />} />
+          <Route path="/student/profile" element={<StudentProfilePage />} />
+          <Route path="/student/followed" element={<FollowedSyllabuses />} />
+          <Route path="/student/syllabus/:id" element={<StudentSyllabusDetailPage />} />
+          
           <Route path="/lecturer/dashboard" element={<LecturerDashboard />} />
 
           <Route path="/admin/dashboard" element={<AdminDashboard />} />
@@ -107,7 +117,7 @@ function App() {
         </Routes>
       </main>
 
-      {!isLoginPage && !isLecturerPortal && !isAdminPortal && <Footer />}
+      {!isLoginPage && !isStudentPage && !isLecturerPortal && !isAdminPortal && <Footer />}
     </div>
   )
 }
