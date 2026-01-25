@@ -14,6 +14,7 @@ public class WorkflowMessage {
     private String fromState;
     private String toState;
     private String actionBy;
+    private String comment; // Rejection reason or other comment from workflow
 
     public UUID getWorkflowId() {
         return workflowId;
@@ -63,6 +64,14 @@ public class WorkflowMessage {
         this.actionBy = actionBy;
     }
 
+    public String getComment() {
+        return comment;
+    }
+
+    public void setComment(String comment) {
+        this.comment = comment;
+    }
+
     @Override
     public String toString() {
         return "WorkflowMessage{" +
@@ -72,6 +81,7 @@ public class WorkflowMessage {
                 ", fromState='" + fromState + '\'' +
                 ", toState='" + toState + '\'' +
                 ", actionBy='" + actionBy + '\'' +
+                ", comment='" + comment + '\'' +
                 '}';
     }
 }
