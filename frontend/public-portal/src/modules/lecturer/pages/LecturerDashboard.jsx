@@ -691,6 +691,9 @@ const LecturerDashboard = ({ user, onLogout }) => {
       const res = await apiClient.get(`/api/syllabuses/${syllabus.id}`)
       const fullData = res.data
       
+      console.log('[LecturerDashboard] openEditModal - Loaded full data:', fullData);
+      console.log('[LecturerDashboard] openEditModal - Full data ID:', fullData.id);
+      
       // Update form with complete data
       setFormData({
         subjectCode: fullData.subjectCode || syllabus.subjectCode || '',
@@ -709,12 +712,14 @@ const LecturerDashboard = ({ user, onLogout }) => {
       
       // Store full data for display
       setSelectedSyllabus(fullData)
+      
+      // Open the editor
+      setShowEditor(true)
+      setShowDetailModal(false)
     } catch (err) {
       console.error('Failed to load full syllabus data:', err)
       setSyllabusDocuments([])
     }
-    
-    setShowEditModal(true)
   }
 
   const openDetailModal = async (syllabus) => {
@@ -1235,10 +1240,13 @@ const LecturerDashboard = ({ user, onLogout }) => {
                               >
                                 <Eye size={16} />
                               </button>
-                              {(s.status === 'DRAFT' || s.status === 'REJECTED') && (
+                              {s.status === 'DRAFT' && (
                                 <>
                                   <button
-                                    onClick={() => { setSelectedSyllabus(s); setShowEditor(true); setShowDetailModal(false); }}
+                                    onClick={() => { 
+                                      console.log('[LecturerDashboard] Opening editor for syllabus:', s.id, s);
+                                      openEditModal(s);
+                                    }}
                                     className="text-green-600 hover:text-green-700 font-medium flex items-center gap-1"
                                     title="Chỉnh sửa"
                                   >
@@ -1259,6 +1267,18 @@ const LecturerDashboard = ({ user, onLogout }) => {
                                     <Trash2 size={16} />
                                   </button>
                                 </>
+                              )}
+                              {s.status === 'REJECTED' && (
+                                <button
+                                  onClick={() => { 
+                                    console.log('[LecturerDashboard] Opening editor for REJECTED syllabus:', s.id, s);
+                                    openEditModal(s);
+                                  }}
+                                  className="text-gray-600 hover:text-gray-700 font-medium flex items-center gap-1"
+                                  title="Chỉnh sửa"
+                                >
+                                  <Edit size={16} />
+                                </button>
                               )}
                             </div>
                           </td>
@@ -1449,7 +1469,16 @@ const LecturerDashboard = ({ user, onLogout }) => {
                 syllabusId={selectedSyllabus?.id}
                 rootId={selectedSyllabus?.rootSyllabusId || selectedSyllabus?.id}
                 user={currentUser}
-                onBack={() => { setShowEditor(false); setSelectedSyllabus(null); loadLecturerSyllabi(); }}
+                onBack={() => { 
+                  // IMPORTANT: Không set selectedSyllabus=null ngay để tránh nullify props
+                  // trong khi async operation vẫn chạy. Chỉ close editor.
+                  setShowEditor(false); 
+                  // Reload danh sách sau khi close
+                  setTimeout(() => {
+                    loadLecturerSyllabi();
+                    setSelectedSyllabus(null);
+                  }, 500);
+                }}
               />
             </div>
           </div>
@@ -1782,7 +1811,14 @@ const LecturerDashboard = ({ user, onLogout }) => {
             </div>
             <div className="sticky bottom-0 bg-gray-50 px-8 py-4 flex justify-end gap-4 border-t">
               <button onClick={() => {setShowDetailModal(false); setSelectedSyllabus(null); setSyllabusDocuments([])}} className="px-6 py-2 border rounded-lg hover:bg-gray-100">Đóng</button>
-              {(selectedSyllabus.status === 'DRAFT' || selectedSyllabus.status === 'REJECTED') && (
+              {selectedSyllabus.status === 'DRAFT' && (
+                <>
+                  <button onClick={() => handleDeleteSyllabus(selectedSyllabus.id)} className="px-6 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600">Xoá</button>
+                  <button onClick={() => handleSubmitForReview(selectedSyllabus.id)} className="px-6 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600">Gửi phê duyệt</button>
+                  <button onClick={() => {setShowDetailModal(false); openEditModal(selectedSyllabus)}} className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">Chỉnh sửa</button>
+                </>
+              )}
+              {selectedSyllabus.status === 'REJECTED' && (
                 <button onClick={() => {setShowDetailModal(false); openEditModal(selectedSyllabus)}} className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">Chỉnh sửa</button>
               )}
             </div>
