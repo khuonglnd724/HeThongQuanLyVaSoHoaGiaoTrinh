@@ -13,6 +13,8 @@ import com.smd.syllabus.repository.SyllabusRepository;
 import com.smd.syllabus.repository.SyllabusDocumentRepository;
 import com.smd.syllabus.domain.SyllabusDocument;
 import jakarta.persistence.EntityNotFoundException;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -78,6 +80,7 @@ public class SyllabusService {
     // =========================
 
     @Transactional
+    @CacheEvict(value = "syllabi", allEntries = true)
     public SyllabusResponse createDraft(CreateSyllabusRequest req, String userId) {
         String actor = requireUser(userId);
 
@@ -103,6 +106,7 @@ public class SyllabusService {
     }
 
     @Transactional
+    @CacheEvict(value = "syllabi", allEntries = true)
     public SyllabusResponse updateAsNewVersion(UUID rootId, UpdateSyllabusRequest req, String userId) {
         String actor = requireUser(userId);
 
@@ -173,6 +177,7 @@ public class SyllabusService {
     }
 
     @Transactional(readOnly = true)
+    @Cacheable(value = "syllabi", key = "'id_' + #id")
     public SyllabusResponse getById(UUID id) {
         Syllabus s = getOrThrow(id);
         SyllabusResponse response = SyllabusMapper.toResponse(s);
@@ -189,6 +194,7 @@ public class SyllabusService {
     }
 
     @Transactional(readOnly = true)
+    @Cacheable(value = "syllabi", key = "'versions_' + #rootId")
     public List<SyllabusResponse> listVersions(UUID rootId) {
         return syllabusRepository.findByRootIdOrderByVersionNoDesc(rootId)
                 .stream()
@@ -218,6 +224,7 @@ public class SyllabusService {
     // =========================
 
     @Transactional
+    @CacheEvict(value = "syllabi", allEntries = true)
     public SyllabusResponse submit(UUID id, String userId, String userRoles) {
         String actor = requireUser(userId);
         Syllabus s = getOrThrow(id);
@@ -269,6 +276,7 @@ public class SyllabusService {
     }
 
     @Transactional
+    @CacheEvict(value = "syllabi", allEntries = true)
     public SyllabusResponse reviewApprove(UUID id, String userId) {
         String actor = requireUser(userId);
         Syllabus s = getOrThrow(id);
@@ -304,6 +312,7 @@ public class SyllabusService {
     }
 
     @Transactional
+    @CacheEvict(value = "syllabi", allEntries = true)
     public SyllabusResponse approve(UUID id, String userId) {
         String actor = requireUser(userId);
         Syllabus s = getOrThrow(id);
@@ -364,6 +373,7 @@ public class SyllabusService {
     }
 
     @Transactional
+    @CacheEvict(value = "syllabi", allEntries = true)
     public SyllabusResponse reject(UUID id, String userId, String reason) {
         String actor = requireUser(userId);
         Syllabus s = getOrThrow(id);
