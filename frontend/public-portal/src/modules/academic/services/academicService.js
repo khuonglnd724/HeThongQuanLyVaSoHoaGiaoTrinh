@@ -3,32 +3,32 @@ import apiClient from '../../../services/api/apiClient';
 // Academic module API client aligned with academic-service backend
 const academicAPI = {
   // ============ SYLLABUS ============
-  getSyllabuses: () => apiClient.get('/api/academic/syllabus'),
-  getSyllabusById: (id) => apiClient.get(`/api/academic/syllabus/${id}`),
-  getSyllabusesBySubject: (subjectId) => apiClient.get(`/api/academic/syllabus/subject/${subjectId}`),
-  getSyllabusesByStatus: (status) => apiClient.get(`/api/academic/syllabus/status/${status}`),
+  getSyllabuses: () => apiClient.get('/api/v1/syllabus'),
+  getSyllabusById: (id) => apiClient.get(`/api/v1/syllabus/${id}`),
+  getSyllabusesBySubject: (subjectId) => apiClient.get(`/api/v1/syllabus/subject/${subjectId}`),
+  getSyllabusesByStatus: (status) => apiClient.get(`/api/v1/syllabus/status/${status}`),
   getSyllabusesByApprovalStatus: (approvalStatus) =>
-    apiClient.get(`/api/academic/syllabus/approval-status/${approvalStatus}`),
-  getSyllabusesByProgram: (programId) => apiClient.get(`/api/academic/syllabus/program/${programId}`),
-  createSyllabus: (data) => apiClient.post('/api/academic/syllabus', data),
-  updateSyllabus: (id, data) => apiClient.put(`/api/academic/syllabus/${id}`, data),
+    apiClient.get(`/api/v1/syllabus/approval-status/${approvalStatus}`),
+  getSyllabusesByProgram: (programId) => apiClient.get(`/api/v1/syllabus/program/${programId}`),
+  createSyllabus: (data) => apiClient.post('/api/v1/syllabus', data),
+  updateSyllabus: (id, data) => apiClient.put(`/api/v1/syllabus/${id}`, data),
   updateApprovalStatus: (id, approvalStatus, approvedBy, comments) =>
-    apiClient.patch(`/api/academic/syllabus/${id}/approve`, null, {
+    apiClient.patch(`/api/v1/syllabus/${id}/approve`, null, {
       params: { approvalStatus, approvedBy, comments },
     }),
-  deleteSyllabus: (id) => apiClient.delete(`/api/academic/syllabus/${id}`),
+  deleteSyllabus: (id) => apiClient.delete(`/api/v1/syllabus/${id}`),
 
   // Validation
-  validateForApproval: (id) => apiClient.get(`/api/academic/syllabus/${id}/validate-approval`),
-  validatePrerequisites: (id) => apiClient.get(`/api/academic/syllabus/${id}/validate-prerequisites`),
+  validateForApproval: (id) => apiClient.get(`/api/v1/syllabus/${id}/validate-approval`),
+  validatePrerequisites: (id) => apiClient.get(`/api/v1/syllabus/${id}/validate-prerequisites`),
 
   // Versioning
-  getVersionHistory: (id) => apiClient.get(`/api/academic/syllabus/${id}/versions`),
+  getVersionHistory: (id) => apiClient.get(`/api/v1/syllabus/${id}/versions`),
   getVersion: (id, versionNumber) =>
-    apiClient.get(`/api/academic/syllabus/${id}/versions/${versionNumber}`),
-  getLatestVersion: (id) => apiClient.get(`/api/academic/syllabus/${id}/versions/latest`),
+    apiClient.get(`/api/v1/syllabus/${id}/versions/${versionNumber}`),
+  getLatestVersion: (id) => apiClient.get(`/api/v1/syllabus/${id}/versions/latest`),
   compareVersions: (id, version1, version2) =>
-    apiClient.get(`/api/academic/syllabus/${id}/compare`, {
+    apiClient.get(`/api/v1/syllabus/${id}/compare`, {
       params: { version1, version2 },
     }),
 

@@ -56,6 +56,7 @@ public class SubjectService {
             .orElseThrow(() -> new RuntimeException("Subject not found with id: " + id));
         return mapToDto(subject);
     }
+
     public List<SubjectDto> getSubjectsByProgramId(Long programId) {
         log.debug("Fetching subjects for program id: {}", programId);
         return subjectRepository.findActiveSubjectsByProgramId(programId)
@@ -63,6 +64,7 @@ public class SubjectService {
             .map(this::mapToDto)
             .collect(Collectors.toList());
     }
+
     public List<SubjectDto> getSubjectsByProgramAndSemester(Long programId, Integer semester) {
         log.debug("Fetching subjects for program id: {} and semester: {}", programId, semester);
         return subjectRepository.findSubjectsByProgramAndSemester(programId, semester)
@@ -71,6 +73,7 @@ public class SubjectService {
             .map(this::mapToDto)
             .collect(Collectors.toList());
     }
+
     public List<SubjectDto> getAllSubjects() {
         log.debug("Fetching all subjects");
         return subjectRepository.findAll()
@@ -79,9 +82,19 @@ public class SubjectService {
             .map(this::mapToDto)
             .collect(Collectors.toList());
     }
+
     public List<SubjectDto> searchSubjectsByCode(String code) {
         log.debug("Searching subjects with code: {}", code);
         return subjectRepository.findBySubjectCodeContainingIgnoreCase(code)
+            .stream()
+            .filter(Subject::getIsActive)
+            .map(this::mapToDto)
+            .collect(Collectors.toList());
+    }
+
+    public List<SubjectDto> searchSubjectsByProgramName(String programName) {
+        log.debug("Searching subjects for program name: {}", programName);
+        return subjectRepository.findSubjectsByProgramName(programName)
             .stream()
             .filter(Subject::getIsActive)
             .map(this::mapToDto)

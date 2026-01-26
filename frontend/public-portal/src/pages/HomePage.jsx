@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { BookOpen, Search, Filter, ChevronRight, Star, Users, Clock, FileText } from 'lucide-react'
 import { Header, Footer } from '../shared/components/Layout'
-import syllabusService from '../services/syllabusService'
+import apiClient from '../services/api/apiClient'
 
 const HomePage = () => {
   const navigate = useNavigate()
@@ -23,8 +23,12 @@ const HomePage = () => {
 
   const loadFeaturedSyllabuses = async () => {
     try {
-      const data = await syllabusService.getPublishedSyllabuses(0, 8)
-      setSyllabuses(Array.isArray(data) ? data : data.content || [])
+      // Sử dụng Public Service API qua API Gateway
+      const response = await apiClient.get('/api/public/syllabuses', {
+        params: { status: 'PUBLISHED', page: 0, size: 8 }
+      })
+      const data = response.data
+      setSyllabuses(Array.isArray(data) ? data : data.content || data.data || [])
     } catch (err) {
       console.error('Error loading syllabuses:', err)
     } finally {
@@ -46,6 +50,9 @@ const HomePage = () => {
   }
 
   const filteredSyllabuses = syllabuses.slice(0, 6)
+  
+  // Đếm số giáo trình có status PUBLISHED
+  const publishedCount = syllabuses.filter(s => s.status === 'PUBLISHED').length
 
   return (
     <div className="min-h-screen bg-white">
@@ -69,10 +76,11 @@ const HomePage = () => {
       {/* Main Search Section */}
       <section className="max-w-6xl mx-auto px-6 py-16">
         {/* Search Bar */}
+        {/* 
         <div className="bg-white rounded-2xl shadow-2xl p-8 mb-8 -mt-20 relative z-10">
           <h2 className="text-2xl font-bold text-gray-900 mb-6">🔍 Tìm Kiếm Giáo Trình</h2>
           
-          {/* Main Search Input */}
+          {/* Main Search Input * /}
           <div className="flex gap-3 mb-6">
             <div className="flex-1 relative">
               <Search className="absolute left-4 top-4 text-gray-400" size={20} />
@@ -94,9 +102,9 @@ const HomePage = () => {
             </button>
           </div>
 
-          {/* Filters */}
+          {/* Filters * /}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            {/* Major Filter */}
+            {/* Major Filter * /}
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
                 📌 Chuyên Ngành
@@ -115,7 +123,7 @@ const HomePage = () => {
               </select>
             </div>
 
-            {/* Semester Filter */}
+            {/* Semester Filter * /}
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
                 🏫 Học Kỳ
@@ -134,7 +142,7 @@ const HomePage = () => {
               </select>
             </div>
 
-            {/* Academic Year Filter */}
+            {/* Academic Year Filter * /}
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
                 📅 Năm Học
@@ -153,7 +161,7 @@ const HomePage = () => {
               </select>
             </div>
 
-            {/* Advanced Search */}
+            {/* Advanced Search * /}
             <div className="flex items-end">
               <button
                 onClick={() => navigate('/public/search')}
@@ -165,7 +173,7 @@ const HomePage = () => {
             </div>
           </div>
         </div>
-
+*/}
         {/* Quick Stats */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-16">
           <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-6 border-l-4 border-blue-600">
@@ -173,7 +181,7 @@ const HomePage = () => {
               <FileText className="text-blue-600" size={32} />
               <div>
                 <p className="text-gray-600 text-sm font-medium">Giáo Trình Xuất Bản</p>
-                <p className="text-3xl font-bold text-blue-600">{syllabuses.length}+</p>
+                <p className="text-3xl font-bold text-blue-600">{publishedCount}+</p>
               </div>
             </div>
           </div>
@@ -244,10 +252,10 @@ const HomePage = () => {
                   {/* Card Body */}
                   <div className="p-6">
                     <p className="text-sm font-bold text-blue-600 mb-2 tracking-wider">
-                      {syllabus.subject_code}
+                      {syllabus.subjectCode}
                     </p>
                     <h3 className="text-lg font-bold text-gray-900 mb-3 line-clamp-2 group-hover:text-blue-600 transition">
-                      {syllabus.subject_name}
+                      {syllabus.subjectName}
                     </h3>
                     
                     <p className="text-sm text-gray-600 mb-4 line-clamp-2 leading-relaxed">
@@ -256,9 +264,9 @@ const HomePage = () => {
 
                     <div className="space-y-2 mb-4 text-sm text-gray-600">
                       <div className="flex items-center gap-2">
-                        <span className="text-xs">📅 v{syllabus.version_no}</span>
+                        <span className="text-xs">📅 v{syllabus.versionNo}</span>
                         <span className="text-xs">•</span>
-                        <span className="text-xs">{new Date(syllabus.created_at).toLocaleDateString('vi-VN')}</span>
+                        <span className="text-xs">{new Date(syllabus.createdAt).toLocaleDateString('vi-VN')}</span>
                       </div>
                     </div>
 

@@ -71,3 +71,34 @@ ON CONFLICT DO NOTHING;
 
 -- Assign ACADEMIC_AFFAIRS role
 INSERT INTO user_roles (user_id, role_id) VALUES (4, 3) ON CONFLICT DO NOTHING;
+-- Create sample student users  
+INSERT INTO users (user_id, username, email, password, full_name, phone_number, is_active, is_locked, created_at, updated_at, failed_attempts)
+VALUES 
+(5, 'student1', 'student1@smd.edu.vn', '$2a$10$XptfskLsT6KrGfFfX8yVpOaK2FLCwaMGrFRww5/HaZZCCpGwh3Wf2', 'Lê Văn C', '0945678901', true, false, NOW(), NOW(), 0),
+(6, 'rector', 'rector@smd.edu.vn', '$2a$10$XptfskLsT6KrGfFfX8yVpOaK2FLCwaMGrFRww5/HaZZCCpGwh3Wf2', 'Bùi Thị D', '0956789012', true, false, NOW(), NOW(), 0)
+ON CONFLICT DO NOTHING;
+
+-- Assign STUDENT role to student users
+INSERT INTO user_roles (user_id, role_id) VALUES (5, 6) ON CONFLICT DO NOTHING;
+
+-- Assign RECTOR role
+INSERT INTO user_roles (user_id, role_id) VALUES (6, 2) ON CONFLICT DO NOTHING;
+
+-- Reset sequences to start from the next available ID after initial data is loaded
+-- This ensures that newly created users via the application don't conflict with existing IDs
+-- The sequences were pre-created in schema.sql
+DO $$
+BEGIN
+    -- Reset user_id sequence to max(user_id) + 1
+    PERFORM SETVAL('user_id_seq', (SELECT COALESCE(MAX(user_id), 0) + 1 FROM users));
+    
+    -- Reset role_id sequence to max(role_id) + 1 (if roles are inserted)
+    PERFORM SETVAL('role_id_seq', (SELECT COALESCE(MAX(role_id), 0) + 1 FROM roles));
+    
+    -- Reset permission_id sequence to max(permission_id) + 1 (if permissions are inserted)
+    PERFORM SETVAL('permission_id_seq', (SELECT COALESCE(MAX(permission_id), 0) + 1 FROM permissions));
+    
+    RAISE NOTICE 'Sequences reset successfully. Next user_id will be: %', (SELECT COALESCE(MAX(user_id), 0) + 1 FROM users);
+EXCEPTION WHEN OTHERS THEN
+    RAISE WARNING 'Error resetting sequences: %', SQLERRM;
+END $$;

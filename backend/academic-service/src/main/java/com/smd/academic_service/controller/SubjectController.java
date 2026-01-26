@@ -53,6 +53,17 @@ public class SubjectController {
         List<SubjectDto> subjects = subjectService.getSubjectsByProgramId(programId);
         return ResponseEntity.ok(ApiResponse.success(subjects, "Subjects fetched successfully"));
     }
+
+    /**
+     * Search Subjects by Program Name
+     * GET /api/v1/subject/program/search?name=Công Nghệ Thông Tin
+     */
+    @GetMapping("/program/search")
+    public ResponseEntity<ApiResponse<List<SubjectDto>>> searchSubjectsByProgramName(@RequestParam String name) {
+        log.info("Searching subjects for program name: {}", name);
+        List<SubjectDto> subjects = subjectService.searchSubjectsByProgramName(name);
+        return ResponseEntity.ok(ApiResponse.success(subjects, "Subjects fetched successfully"));
+    }
     
     /**
      * Get Subjects by Program and Semester

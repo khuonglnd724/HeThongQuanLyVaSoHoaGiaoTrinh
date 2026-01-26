@@ -1,7 +1,7 @@
 // Public Syllabus Service - cho Student/Guest users
 // Ưu tiên dữ liệu thật từ academic-service
 
-const API_BASE = '/api/academic/syllabus'
+const API_BASE = '/api/v1/syllabus'
 
 // Mock data fallback (giữ lại nhưng ưu tiên dữ liệu thật)
 const MOCK_SYLLABUS_DETAIL = {
