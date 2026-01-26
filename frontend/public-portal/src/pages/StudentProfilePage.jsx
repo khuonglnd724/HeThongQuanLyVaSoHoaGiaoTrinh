@@ -221,6 +221,14 @@ const StudentProfilePage = () => {
                       <p className="font-semibold text-gray-900">Sinh viên</p>
                     </div>
                   </div>
+
+                  <div className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg">
+                    <BookOpen className="text-indigo-600" size={24} />
+                    <div>
+                      <p className="text-sm text-gray-600">Ngành</p>
+                      <p className="font-semibold text-gray-900">{user.major || 'Chưa cập nhật'}</p>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>

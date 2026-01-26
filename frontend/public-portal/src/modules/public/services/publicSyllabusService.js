@@ -1,7 +1,9 @@
 // Public Syllabus Service - cho Student/Guest users
-// Chỉ lấy PUBLISHED syllabi
+// Ưu tiên dữ liệu thật từ academic-service
 
-// Mock data từ syllabus_db
+const API_BASE = '/api/academic/syllabus'
+
+// Mock data fallback (giữ lại nhưng ưu tiên dữ liệu thật)
 const MOCK_SYLLABUS_DETAIL = {
   id: 'ba59f0be-bdf3-4ab1-8863-abbdce35348b',
   subject_code: 'CS-01',
@@ -46,51 +48,41 @@ const MOCK_RELATIONSHIPS = {
   parallel: []
 }
 
-export async function getPublishedSyllabi(page = 0, size = 10, searchTerm = '') {
+export async function getPublishedSyllabi() {
   try {
-    const query = new URLSearchParams({
-      page,
-      size,
-      status: 'PUBLISHED',
-      ...(searchTerm && { search: searchTerm })
-    })
-
-    const response = await fetch(`/api/syllabi/public?${query}`, {
+    const response = await fetch(`${API_BASE}/published`, {
       method: 'GET',
-      headers: {
-        'Content-Type': 'application/json'
-      }
+      headers: { 'Content-Type': 'application/json' }
     })
 
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}`)
     }
 
-    return await response.json()
+    const payload = await response.json()
+    // academic-service wraps in { success, data }
+    return Array.isArray(payload?.data) ? payload.data : payload
   } catch (error) {
     console.warn('Backend not available, using mock data:', error.message)
-    // Return mock data
     return [MOCK_SYLLABUS_DETAIL]
   }
 }
 
 export async function getSyllabusDetail(syllabusId) {
   try {
-    const response = await fetch(`/api/syllabi/${syllabusId}/public`, {
+    const response = await fetch(`${API_BASE}/${syllabusId}`, {
       method: 'GET',
-      headers: {
-        'Content-Type': 'application/json'
-      }
+      headers: { 'Content-Type': 'application/json' }
     })
 
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}`)
     }
 
-    return await response.json()
+    const payload = await response.json()
+    return payload?.data || payload
   } catch (error) {
     console.warn('Backend not available, using mock data:', error.message)
-    // Return mock data if ID matches
     if (syllabusId === 'ba59f0be-bdf3-4ab1-8863-abbdce35348b') {
       return MOCK_SYLLABUS_DETAIL
     }
@@ -98,67 +90,19 @@ export async function getSyllabusDetail(syllabusId) {
   }
 }
 
-export async function getCLOPLOMapping(syllabusId) {
-  try {
-    const response = await fetch(`/api/syllabi/${syllabusId}/clo-plo-mapping`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json'
-      }
-    })
-
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`)
-    }
-
-    return await response.json()
-  } catch (error) {
-    console.warn('Backend not available, using mock data:', error.message)
-    // Return mock CLO-PLO mapping
-    return MOCK_CLO_PLO
-  }
+// Backends chưa cung cấp mapping công khai -> trả rỗng để tránh 404
+export async function getCLOPLOMapping() {
+  return { clos: [], plos: [], mappings: [] }
 }
 
-export async function getAISummary(syllabusId) {
-  try {
-    const response = await fetch(`/api/syllabi/${syllabusId}/ai-summary`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json'
-      }
-    })
-
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`)
-    }
-
-    return await response.json()
-  } catch (error) {
-    console.warn('Backend not available, using mock data:', error.message)
-    // Return mock AI summary
-    return MOCK_AI_SUMMARY
-  }
+// Chưa có AI summary public -> trả null để UI ẩn box
+export async function getAISummary() {
+  return null
 }
 
-export async function getSubjectRelationships(subjectId) {
-  try {
-    const response = await fetch(`/api/subjects/${subjectId}/relationships`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json'
-      }
-    })
-
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`)
-    }
-
-    return await response.json()
-  } catch (error) {
-    console.warn('Backend not available, using mock data:', error.message)
-    // Return mock relationships
-    return MOCK_RELATIONSHIPS
-  }
+// Chưa có endpoint relationships public -> trả rỗng để tránh 404
+export async function getSubjectRelationships() {
+  return { prerequisites: [], corequisites: [], parallel: [] }
 }
 
 export async function subscribeSyllabus(syllabusId, email = '') {

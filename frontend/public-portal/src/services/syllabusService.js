@@ -22,11 +22,14 @@ const syllabusService = {
     }
   },
 
-  // Get all published syllabuses
-  getPublishedSyllabuses: async (page = 0, size = 50) => {
+  // Get all published syllabuses (with optional programName filter)
+  getPublishedSyllabuses: async (page = 0, size = 50, programName = null) => {
     try {
-      // Call backend API with auth token if available
-      const response = await axios.get(`${API_BASE}/published`, {
+      let url = `${API_BASE}/published`
+      if (programName) {
+        url += `?programName=${encodeURIComponent(programName)}`
+      }
+      const response = await axios.get(url, {
         headers: getAuthHeader()
       })
       // Backend returns { success: true, data: [...], message: "..." }

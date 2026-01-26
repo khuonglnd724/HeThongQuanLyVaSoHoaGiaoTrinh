@@ -90,6 +90,7 @@ public class UserServiceImpl implements UserService {
                 .roles(user.getRoles().stream()
                         .map(r -> r.getName().name())
                         .collect(Collectors.toSet()))
+                .major(user.getMajor())
                 .build();
     }
     
@@ -137,6 +138,7 @@ public class UserServiceImpl implements UserService {
                     .roles(user.getRoles().stream()
                             .map(r -> r.getName().name())
                             .collect(Collectors.toSet()))
+                    .major(user.getMajor())
                     .build();
                     
         } catch (Exception e) {

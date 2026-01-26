@@ -13,7 +13,6 @@ const LandingPage = ({ onSearchClick, onLoginClick }) => {
   const featureItems = [
     { title: 'Version Comparison', desc: 'Compare published syllabus versions side by side.' },
     { title: 'CLO–PLO Mapping', desc: 'Visualize course outcomes mapped to program outcomes.' },
-    { title: 'AI Summary', desc: 'Generate quick syllabus highlights with AI support.' },
     { title: 'Subject Relationship Tree', desc: 'See prerequisite and subsequent subject links.' }
   ]
 

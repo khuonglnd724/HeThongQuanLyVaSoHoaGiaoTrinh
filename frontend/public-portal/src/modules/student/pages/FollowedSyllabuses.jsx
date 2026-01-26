@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, BookOpen, Heart, Trash2, Clock, GraduationCap, BookMarked } from 'lucide-react'
-import { getSyllabusDetail } from '../../public/services/publicSyllabusService'
+import syllabusService from '../../../services/syllabusService'
 
 export default function FollowedSyllabuses({ user }) {
   const navigate = useNavigate()
@@ -12,11 +12,10 @@ export default function FollowedSyllabuses({ user }) {
 
   useEffect(() => {
     loadFollowedSyllabi()
-    // Get student major
     if (user?.major) {
       setStudentMajor(user.major)
     }
-  }, [])
+  }, [user?.major])
 
   const loadFollowedSyllabi = async () => {
     setLoading(true)
@@ -29,7 +28,8 @@ export default function FollowedSyllabuses({ user }) {
       const details = {}
       for (const id of followed) {
         try {
-          const data = await getSyllabusDetail(id)
+          // Use academic-service API so we get programName for filtering
+          const data = await syllabusService.getSyllabusById(id)
           details[id] = data
         } catch (err) {
           console.warn('Could not load details for', id)

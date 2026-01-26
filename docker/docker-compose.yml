@@ -101,6 +101,8 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/auth_db
       SPRING_DATASOURCE_USERNAME: postgres
       SPRING_DATASOURCE_PASSWORD: 123456
+      SPRING_REDIS_HOST: smd-redis
+      SPRING_REDIS_PORT: 6379
       EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE: http://discovery-server:8761/eureka
       SPRING_CONFIG_IMPORT: "optional:configserver:http://config-server:8888"
     depends_on:
@@ -127,6 +129,8 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/academic_db
       SPRING_DATASOURCE_USERNAME: postgres
       SPRING_DATASOURCE_PASSWORD: 123456
+      SPRING_REDIS_HOST: smd-redis
+      SPRING_REDIS_PORT: 6379
       EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE: http://discovery-server:8761/eureka
       SPRING_CONFIG_IMPORT: "optional:configserver:http://config-server:8888"
       SPRING_JPA_HIBERNATE_DDL_AUTO: update
@@ -155,6 +159,8 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/syllabus_db
       SPRING_DATASOURCE_USERNAME: postgres
       SPRING_DATASOURCE_PASSWORD: 123456
+      SPRING_REDIS_HOST: smd-redis
+      SPRING_REDIS_PORT: 6379
       SPRING_RABBITMQ_HOST: smd-rabbitmq
       EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE: http://discovery-server:8761/eureka
     depends_on:
@@ -214,6 +220,8 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/public_db
       SPRING_DATASOURCE_USERNAME: postgres
       SPRING_DATASOURCE_PASSWORD: 123456
+      SPRING_REDIS_HOST: smd-redis
+      SPRING_REDIS_PORT: 6379
       EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE: http://discovery-server:8761/eureka
       SPRING_CLOUD_COMPATIBILITY_VERIFIER_ENABLED: "false"
     depends_on:

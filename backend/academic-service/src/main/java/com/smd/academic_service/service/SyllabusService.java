@@ -119,6 +119,16 @@ public class SyllabusService {
             .collect(Collectors.toList());
     }
     
+    public List<SyllabusDto> getPublishedSyllabusesByProgramName(String programName) {
+        log.debug("Fetching published syllabuses for program: {}", programName);
+        // Get all published, then filter by programName in DTO
+        return syllabusRepository.findSyllabusesByStatus("Published")
+            .stream()
+            .map(this::mapToDto)
+            .filter(dto -> programName.equals(dto.getProgramName()))
+            .collect(Collectors.toList());
+    }
+    
     // Update
     @CacheEvict(value = {"syllabi", "subjects", "programs"}, allEntries = true)
     public SyllabusDto updateSyllabus(Long id, SyllabusDto syllabusDto, String updatedBy) {
