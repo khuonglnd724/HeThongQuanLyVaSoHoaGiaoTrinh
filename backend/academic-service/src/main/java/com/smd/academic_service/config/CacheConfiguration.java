@@ -23,6 +23,12 @@ public class CacheConfiguration {
     // Cache names
     public static final String PROGRAMS_CACHE = "programs";
     public static final String SUBJECTS_CACHE = "subjects";
+    public static final String SYLLABI_CACHE = "syllabi";
+    public static final String CLOS_CACHE = "clos";
+    public static final String PLOS_CACHE = "plos";
+    public static final String PROGRAM_STATS_CACHE = "programStats";
+    public static final String SUBJECT_STATS_CACHE = "subjectStats";
+    public static final String DEPARTMENT_STATS_CACHE = "departmentStats";
     
     @Bean
     public RedisCacheManager cacheManager(RedisConnectionFactory connectionFactory) {
@@ -42,11 +48,25 @@ public class CacheConfiguration {
         // Specific cache configurations
         Map<String, RedisCacheConfiguration> cacheConfigurations = new HashMap<>();
         
-        // Programs cache: 12 hours TTL
+        // Programs cache: 12 hours TTL (rarely changes)
         cacheConfigurations.put(PROGRAMS_CACHE, defaultConfig.entryTtl(Duration.ofHours(12)));
         
-        // Subjects cache: 24 hours TTL (rarely changes)
-        cacheConfigurations.put(SUBJECTS_CACHE, defaultConfig.entryTtl(Duration.ofHours(24)));
+        // Subjects cache: 6 hours TTL (changes moderately)
+        cacheConfigurations.put(SUBJECTS_CACHE, defaultConfig.entryTtl(Duration.ofHours(6)));
+        
+        // Syllabi cache: 2 hours TTL (changes frequently - approval workflow)
+        cacheConfigurations.put(SYLLABI_CACHE, defaultConfig.entryTtl(Duration.ofHours(2)));
+        
+        // CLOs cache: 4 hours TTL
+        cacheConfigurations.put(CLOS_CACHE, defaultConfig.entryTtl(Duration.ofHours(4)));
+        
+        // PLOs cache: 6 hours TTL
+        cacheConfigurations.put(PLOS_CACHE, defaultConfig.entryTtl(Duration.ofHours(6)));
+        
+        // Statistics caches: 30 minutes TTL (need fresh data for dashboards)
+        cacheConfigurations.put(PROGRAM_STATS_CACHE, defaultConfig.entryTtl(Duration.ofMinutes(30)));
+        cacheConfigurations.put(SUBJECT_STATS_CACHE, defaultConfig.entryTtl(Duration.ofMinutes(30)));
+        cacheConfigurations.put(DEPARTMENT_STATS_CACHE, defaultConfig.entryTtl(Duration.ofMinutes(30)));
         
         return RedisCacheManager.builder(connectionFactory)
                 .cacheDefaults(defaultConfig)

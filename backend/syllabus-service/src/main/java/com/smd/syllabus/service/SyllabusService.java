@@ -347,6 +347,7 @@ public class SyllabusService {
     }
 
     @Transactional
+    @CacheEvict(value = "syllabi", allEntries = true)
     public SyllabusResponse publish(UUID id, String userId) {
         String actor = requireUser(userId);
         Syllabus s = getOrThrow(id);
@@ -429,6 +430,7 @@ public class SyllabusService {
     }
 
     @Transactional
+    @CacheEvict(value = "syllabi", allEntries = true)
     public void delete(UUID id, String userId) {
         String actor = requireUser(userId);
         Syllabus s = getOrThrow(id);
