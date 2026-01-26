@@ -7,6 +7,8 @@ import com.smd.academic_service.repository.PloRepository;
 import com.smd.academic_service.repository.ProgramRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,6 +26,7 @@ public class PloService {
     private final ProgramRepository programRepository;
     
     // Create
+    @CacheEvict(value = {"plos", "programs"}, allEntries = true)
     public PloDto createPlo(PloDto ploDto, String createdBy) {
         log.info("Creating PLO with code: {}", ploDto.getPloCode());
         
@@ -48,6 +51,7 @@ public class PloService {
     }
     
     // Read
+    @Cacheable(value = "plos", key = "'id_' + #id")
     public PloDto getPloById(Long id) {
         log.debug("Fetching PLO with id: {}", id);
         Plo plo = ploRepository.findByIdAndIsActiveTrue(id)
@@ -55,6 +59,7 @@ public class PloService {
         return mapToDto(plo);
     }
     
+    @Cacheable(value = "plos", key = "'program_' + #programId")
     public List<PloDto> getPlosByProgramId(Long programId) {
         log.debug("Fetching PLOs for program id: {}", programId);
         return ploRepository.findActivePlosByProgramId(programId)
@@ -82,6 +87,7 @@ public class PloService {
     }
     
     // Update
+    @CacheEvict(value = {"plos", "programs"}, allEntries = true)
     public PloDto updatePlo(Long id, PloDto ploDto, String updatedBy) {
         log.info("Updating PLO with id: {}", id);
         
@@ -115,6 +121,7 @@ public class PloService {
     }
     
     // Delete (Soft delete)
+    @CacheEvict(value = {"plos", "programs"}, allEntries = true)
     public void deletePlo(Long id, String deletedBy) {
         log.info("Deleting PLO with id: {}", id);
         

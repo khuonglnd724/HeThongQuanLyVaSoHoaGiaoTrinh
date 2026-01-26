@@ -41,8 +41,8 @@ public class CacheConfiguration {
         // Specific cache configurations
         Map<String, RedisCacheConfiguration> cacheConfigurations = new HashMap<>();
         
-        // Syllabi cache: 6 hours TTL
-        cacheConfigurations.put(SYLLABI_CACHE, defaultConfig.entryTtl(Duration.ofHours(6)));
+        // Syllabi cache: 2 hours TTL (reduced from 6h for better cache invalidation with frequent status changes)
+        cacheConfigurations.put(SYLLABI_CACHE, defaultConfig.entryTtl(Duration.ofHours(2)));
         
         return RedisCacheManager.builder(connectionFactory)
                 .cacheDefaults(defaultConfig)
