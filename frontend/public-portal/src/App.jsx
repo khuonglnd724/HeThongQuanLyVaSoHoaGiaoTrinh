@@ -10,6 +10,7 @@ import StudentProfilePage from './pages/StudentProfilePage'
 import AdminDashboard from './pages/AdminDashboard'
 import AcademicDashboard from './modules/academic/pages/AcademicDashboard'
 import HODDashboard from './modules/academic/pages/HODDashboard'
+import RectorDashboard from './modules/academic/pages/RectorDashboard'
 import ProgramManagement from './modules/academic/pages/ProgramManagement'
 import SyllabusListPage from './modules/lecturer/pages/SyllabusListPage'
 import SyllabusEditorPage from './modules/lecturer/pages/SyllabusEditorPage'
@@ -87,6 +88,14 @@ function App() {
             element={
               <RequireRole allowedRoles={['ROLE_ACADEMIC_AFFAIRS', 'ROLE_RECTOR']}>
                 <AcademicDashboard />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/rector/dashboard"
+            element={
+              <RequireRole allowedRoles={['ROLE_RECTOR', 'ROLE_ADMIN']}>
+                <RectorDashboard />
               </RequireRole>
             }
           />

@@ -36,13 +36,6 @@ spring:
       indent-output: true
     default-property-inclusion: non_null
 
-  redis:
-    host: ${SPRING_REDIS_HOST:localhost}
-    port: ${SPRING_REDIS_PORT:6379}
-
-  cache:
-    type: redis
-
 logging:
   level:
     root: INFO
