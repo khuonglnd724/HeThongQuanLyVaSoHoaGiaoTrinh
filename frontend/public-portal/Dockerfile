@@ -7,7 +7,7 @@ WORKDIR /app
 COPY frontend/public-portal/package*.json ./
 
 # Install dependencies
-RUN npm ci
+RUN npm install
 
 # Copy source code (support building from repo root as context)
 COPY frontend/public-portal/. ./

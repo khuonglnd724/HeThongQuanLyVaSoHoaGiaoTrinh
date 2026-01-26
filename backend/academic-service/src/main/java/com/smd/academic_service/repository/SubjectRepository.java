@@ -31,4 +31,7 @@ public interface SubjectRepository extends JpaRepository<Subject, Long> {
     
     @Query("SELECT COUNT(s) FROM Subject s WHERE s.program.id = :programId AND s.isFoundational = true AND s.isActive = true")
     Long countFoundationalSubjectsByProgram(@Param("programId") Long programId);
+    
+    @Query("SELECT s FROM Subject s WHERE s.program.programName LIKE %:programName% AND s.isActive = true ORDER BY s.semester, s.subjectCode")
+    List<Subject> findSubjectsByProgramName(@Param("programName") String programName);
 }
