@@ -5,7 +5,6 @@ import com.smd.public_service.model.entity.Syllabus;
 import com.smd.public_service.service.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -41,7 +40,6 @@ public class SyllabusDetailController {
      * Lấy chi tiết giáo trình (read-only)
      */
     @GetMapping("/{id}")
-    @Cacheable(value = "syllabi", key = "#id")
     public ResponseEntity<SyllabusDetailDto> getSyllabusDetail(@PathVariable Long id) {
         log.info("Fetching syllabus detail for id: {}", id);
         
@@ -60,7 +58,6 @@ public class SyllabusDetailController {
      * Lấy cây môn học (mối quan hệ giữa các môn: prerequisites và dependents)
      */
     @GetMapping("/{id}/tree")
-    @Cacheable(value = "treeView", key = "#id")
     public ResponseEntity<?> getSubjectTree(@PathVariable Long id) {
         log.info("Fetching subject tree for syllabus id: {}", id);
         
@@ -85,7 +82,6 @@ public class SyllabusDetailController {
      * So sánh 2 phiên bản giáo trình
      */
     @GetMapping("/{id}/diff")
-    @Cacheable(value = "diff", key = "#id + '-' + #targetVersion")
     public ResponseEntity<?> getDiff(
             @PathVariable Long id,
             @RequestParam(value = "targetVersion", required = false) Integer targetVersion) {

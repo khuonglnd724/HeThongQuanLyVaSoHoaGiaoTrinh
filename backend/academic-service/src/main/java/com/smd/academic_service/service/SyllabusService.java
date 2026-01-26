@@ -7,8 +7,6 @@ import com.smd.academic_service.repository.SubjectRepository;
 import com.smd.academic_service.repository.SyllabusRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.cache.annotation.CacheEvict;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,7 +24,6 @@ public class SyllabusService {
     private final SyllabusVersionService syllabusVersionService;
     
     // Create
-    @CacheEvict(value = {"syllabi", "subjects", "programs"}, allEntries = true)
     public SyllabusDto createSyllabus(SyllabusDto syllabusDto, String createdBy) {
         log.info("Creating syllabus with code: {}", syllabusDto.getSyllabusCode());
         
@@ -60,7 +57,6 @@ public class SyllabusService {
     }
     
     // Read
-    @Cacheable(value = "syllabi", key = "'academic_id_' + #id")
     public SyllabusDto getSyllabusById(Long id) {
         log.debug("Fetching syllabus with id: {}", id);
         Syllabus syllabus = syllabusRepository.findByIdAndIsActiveTrue(id)
@@ -68,8 +64,6 @@ public class SyllabusService {
                 "Syllabus not found with id: " + id));
         return mapToDto(syllabus);
     }
-    
-    @Cacheable(value = "syllabi", key = "'academic_subject_' + #subjectId")
     public List<SyllabusDto> getSyllabusesBySubjectId(Long subjectId) {
         log.debug("Fetching syllabuses for subject id: {}", subjectId);
         return syllabusRepository.findActiveSyllabusesBySubjectId(subjectId)
@@ -120,7 +114,6 @@ public class SyllabusService {
     }
     
     // Update
-    @CacheEvict(value = {"syllabi", "subjects", "programs"}, allEntries = true)
     public SyllabusDto updateSyllabus(Long id, SyllabusDto syllabusDto, String updatedBy) {
         log.info("Updating syllabus with id: {}", id);
         
@@ -155,7 +148,6 @@ public class SyllabusService {
     }
     
     // Delete (Soft delete)
-    @CacheEvict(value = {"syllabi", "subjects", "programs"}, allEntries = true)
     public void deleteSyllabus(Long id, String deletedBy) {
         log.info("Deleting syllabus with id: {}", id);
         
@@ -174,7 +166,6 @@ public class SyllabusService {
     }
     
     // Update Approval Status
-    @CacheEvict(value = {"syllabi", "subjects", "programs"}, allEntries = true)
     public SyllabusDto updateApprovalStatus(Long id, String approvalStatus, Long approvedBy, String comments, String updatedBy) {
         log.info("Updating approval status of syllabus with id: {} to {}", id, approvalStatus);
         

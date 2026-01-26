@@ -9,8 +9,6 @@ import com.smd.academic_service.repository.CloRepository;
 import com.smd.academic_service.repository.PloRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.cache.annotation.CacheEvict;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,7 +26,6 @@ public class CloMappingService {
     private final PloRepository ploRepository;
     
     // Create Mapping
-    @CacheEvict(value = {"clos", "plos", "programs", "subjects"}, allEntries = true)
     public CloMappingDto createMapping(CloMappingDto mappingDto, String createdBy) {
         log.info("Creating mapping between CLO {} and PLO {}", mappingDto.getCloId(), mappingDto.getPloId());
         
@@ -102,7 +99,6 @@ public class CloMappingService {
     }
     
     // Update Mapping
-    @CacheEvict(value = {"clos", "plos", "programs", "subjects"}, allEntries = true)
     public CloMappingDto updateMapping(Long id, CloMappingDto mappingDto, String updatedBy) {
         log.info("Updating mapping with id: {}", id);
         
@@ -133,7 +129,6 @@ public class CloMappingService {
     }
     
     // Delete Mapping
-    @CacheEvict(value = {"clos", "plos", "programs", "subjects"}, allEntries = true)
     public void deleteMapping(Long id, String deletedBy) {
         log.info("Deleting mapping with id: {}", id);
         
