@@ -117,7 +117,8 @@ const Login = () => {
         username: response.username,
         role: primaryRole,
         roles: userRoles,
-        userId: response.userId
+        userId: response.userId,
+        major: response.major || response.programName || response.program || ''
       }
 
       console.log('[Login] User data prepared:', userData)

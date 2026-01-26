@@ -36,6 +36,17 @@ public class SyllabusController {
     private final ProgramService programService;
     
     /**
+     * Get all available Programs (for filter dropdown)
+     * GET /api/v1/syllabus/programs/all
+     */
+    @GetMapping("/programs/all")
+    public ResponseEntity<ApiResponse<List<ProgramDto>>> getAllPrograms() {
+        log.info("Fetching all programs for filter dropdown");
+        List<ProgramDto> programs = programService.getAllPrograms();
+        return ResponseEntity.ok(ApiResponse.success(programs, "All programs fetched successfully"));
+    }
+
+    /**
      * Create new Syllabus
      * POST /api/v1/syllabus
      */
@@ -116,12 +127,19 @@ public class SyllabusController {
     
     /**
      * Get published Syllabuses (for public/students)
-     * GET /api/v1/syllabus/published
+     * GET /api/v1/syllabus/published?programName=xyz (optional filter)
      */
     @GetMapping("/published")
-    public ResponseEntity<ApiResponse<List<SyllabusDto>>> getPublishedSyllabuses() {
-        log.info("Fetching published syllabuses");
-        List<SyllabusDto> syllabuses = syllabusService.getPublishedSyllabuses();
+    public ResponseEntity<ApiResponse<List<SyllabusDto>>> getPublishedSyllabuses(
+        @RequestParam(required = false) String programName) {
+        log.info("Fetching published syllabuses" + (programName != null ? " for program: " + programName : ""));
+        List<SyllabusDto> syllabuses;
+        if (programName != null && !programName.isEmpty()) {
+            // Filter by program name
+            syllabuses = syllabusService.getPublishedSyllabusesByProgramName(programName);
+        } else {
+            syllabuses = syllabusService.getPublishedSyllabuses();
+        }
         return ResponseEntity.ok(ApiResponse.success(syllabuses, "Published syllabuses fetched successfully"));
     }
     
@@ -250,16 +268,6 @@ public class SyllabusController {
         SyllabusVersionComparisonDto comparison = syllabusVersionService.compareVersions(id, version1, version2);
         return ResponseEntity.ok(ApiResponse.success(comparison, "Version comparison completed"));
     }
-
-    /**
-     * Get all available Programs (for filter dropdown)
-     * GET /api/v1/syllabus/programs/all
-     */
-    @GetMapping("/programs/all")
-    public ResponseEntity<ApiResponse<List<ProgramDto>>> getAllPrograms() {
-        log.info("Fetching all programs for filter dropdown");
-        List<ProgramDto> programs = programService.getAllPrograms();
-        return ResponseEntity.ok(ApiResponse.success(programs, "All programs fetched successfully"));
-    }
 }
+
 

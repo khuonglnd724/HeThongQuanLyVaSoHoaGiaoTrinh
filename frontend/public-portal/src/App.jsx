@@ -2,13 +2,11 @@ import React from 'react'
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { Header, Footer } from './shared/components/Layout'
 import HomePage from './pages/HomePage'
-import SearchPage from './pages/SearchPage'
 import SyllabusDetailPage from './pages/SyllabusDetailPage'
 import Login from './pages/Login'
 import StudentPage from './pages/StudentPage'
 import StudentSyllabusDetailPage from './pages/StudentSyllabusDetailPage'
 import StudentProfilePage from './pages/StudentProfilePage'
-import LecturerDashboard from './pages/LecturerDashboard'
 import AdminDashboard from './pages/AdminDashboard'
 import AcademicDashboard from './modules/academic/pages/AcademicDashboard'
 import HODDashboard from './modules/academic/pages/HODDashboard'
@@ -17,6 +15,7 @@ import SyllabusListPage from './modules/lecturer/pages/SyllabusListPage'
 import SyllabusEditorPage from './modules/lecturer/pages/SyllabusEditorPage'
 import SyllabusComparePage from './modules/lecturer/pages/SyllabusComparePage'
 import LecturerPortalGuide from './modules/lecturer/pages/LecturerPortalGuide'
+import LecturerPortalLayout from './modules/lecturer/layout/LecturerPortalLayout'
 import AdminPortalGuide from './modules/admin/pages/AdminPortalGuide'
 import AdminPortalLayout from './modules/admin/layout/AdminPortalLayout'
 import PublicSyllabusSearchPage from './modules/public/pages/PublicSyllabusSearchPage'
@@ -49,18 +48,20 @@ function App() {
   const location = useLocation()
   const isLoginPage = location.pathname === '/login'
   const isStudentPage = location.pathname.startsWith('/student')
+  const isLecturerDashboard = location.pathname === '/lecturer/dashboard'
   const isLecturerPortal = location.pathname.startsWith('/lecturer/portal')
   const isAdminPortal = location.pathname.startsWith('/admin/portal')
+  const isAcademicPortal = location.pathname.startsWith('/academic')
 
   return (
     <div className="flex flex-col min-h-screen">
-      {!isLoginPage && !isStudentPage && !isLecturerPortal && !isAdminPortal && <Header />}
+      {!isLoginPage && !isStudentPage && !isLecturerDashboard && !isLecturerPortal && !isAdminPortal && !isAcademicPortal && <Header />}
 
       <main className="flex-1">
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/home" element={<HomePage />} />
-          <Route path="/search" element={<SearchPage />} />
+          <Route path="/search" element={<Navigate to="/public/search" replace />} />
           <Route path="/syllabus/:id" element={<SyllabusDetailPage />} />
           <Route path="/login" element={<Login />} />
           
@@ -70,7 +71,7 @@ function App() {
           <Route path="/student/followed" element={<FollowedSyllabuses />} />
           <Route path="/student/syllabus/:id" element={<StudentSyllabusDetailPage />} />
           
-          <Route path="/lecturer/dashboard" element={<LecturerDashboard />} />
+          <Route path="/lecturer/dashboard" element={<LecturerPortalLayout />} />
 
           <Route path="/admin/dashboard" element={<AdminDashboard />} />
           <Route
@@ -117,7 +118,7 @@ function App() {
         </Routes>
       </main>
 
-      {!isLoginPage && !isStudentPage && !isLecturerPortal && !isAdminPortal && <Footer />}
+      {!isLoginPage && !isStudentPage && !isLecturerDashboard && !isLecturerPortal && !isAdminPortal && !isAcademicPortal && <Footer />}
     </div>
   )
 }

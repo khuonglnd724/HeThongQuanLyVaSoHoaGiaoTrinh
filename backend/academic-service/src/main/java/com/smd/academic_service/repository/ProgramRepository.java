@@ -24,5 +24,7 @@ public interface ProgramRepository extends JpaRepository<Program, Long> {
     
     List<Program> findByProgramNameContainingIgnoreCase(String programName);
     
+    Optional<Program> findByProgramNameAndIsActiveTrue(String programName);
+    
     Long countByDepartmentIdAndIsActiveTrue(Long departmentId);
 }

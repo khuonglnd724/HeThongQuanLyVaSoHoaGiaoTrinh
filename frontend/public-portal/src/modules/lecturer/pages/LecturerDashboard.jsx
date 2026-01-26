@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { BookOpen, LogOut, FileText, Plus, Edit, Eye, Trash2, Upload, CheckCircle, Clock, XCircle, Zap, Loader } from 'lucide-react'
 import apiClient from '../../../services/api/apiClient'
 import syllabusServiceV2 from '../services/syllabusServiceV2'
@@ -1324,35 +1325,24 @@ const LecturerDashboard = ({ user, onLogout }) => {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-indigo-50 to-white">
-      {/* Header */}
-      <div className="bg-white shadow-md border-b border-gray-200">
-        <div className="container mx-auto px-6 py-6 flex justify-between items-center">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">👨‍🏫 Dashboard Giảng Viên</h1>
-            <p className="text-gray-600 mt-1">
-              Xin chào, <span className="font-semibold">{currentUser?.name || currentUser?.fullName || 'Lecturer'}</span>
-            </p>
+      {/* Toast */}
+      {toast.visible && (
+        <div className="fixed top-6 right-6 z-50">
+          <div className={`max-w-sm px-4 py-3 rounded-lg shadow-lg text-white ${toast.type === 'error' ? 'bg-red-600' : toast.type === 'success' ? 'bg-green-600' : toast.type === 'warning' ? 'bg-yellow-600 text-black' : 'bg-indigo-600'}`}>
+            {toast.message}
           </div>
-          <button
-            onClick={onLogout}
-            className="flex items-center gap-2 bg-red-600 text-white px-6 py-2 rounded-lg hover:bg-red-700 transition font-medium"
-          >
-            <LogOut size={18} />
-            Đăng xuất
-          </button>
         </div>
-          {/* Toast */}
-          {toast.visible && (
-            <div className="fixed top-6 right-6 z-50">
-              <div className={`max-w-sm px-4 py-3 rounded-lg shadow-lg text-white ${toast.type === 'error' ? 'bg-red-600' : toast.type === 'success' ? 'bg-green-600' : toast.type === 'warning' ? 'bg-yellow-600 text-black' : 'bg-indigo-600'}`}>
-                {toast.message}
-              </div>
-            </div>
-          )}
-      </div>
+      )}
 
       {/* Main Content */}
       <div className="container mx-auto px-6 py-12">
+
+        {/* Greeting */}
+        <div className="mb-8">
+          <p className="text-gray-600 text-lg">
+            Xin chào, <span className="font-semibold text-indigo-600">{currentUser?.name || currentUser?.fullName || 'Giảng viên'}</span>
+          </p>
+        </div>
 
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
@@ -1451,9 +1441,6 @@ const LecturerDashboard = ({ user, onLogout }) => {
                     <div className="text-center py-12 text-gray-500">
                       <div className="mb-2 font-semibold">Bạn chưa có giáo trình nào</div>
                       <div className="mb-4 text-sm">Bắt đầu tạo giáo trình mới để quản lý tài liệu và phiên bản.</div>
-                      <div className="flex justify-center">
-                        <button onClick={openCreateModal} className="bg-indigo-600 text-white px-5 py-2 rounded-lg hover:bg-indigo-700">Tạo giáo trình mới</button>
-                      </div>
                     </div>
                   ) : (
                     <table className="w-full">

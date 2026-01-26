@@ -1,4 +1,4 @@
-package com.smd.auth_service.dto;
+ package com.smd.auth_service.dto;
 
 import jakarta.validation.constraints.*;
 import lombok.AllArgsConstructor;

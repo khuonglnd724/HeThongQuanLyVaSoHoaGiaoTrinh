@@ -12,7 +12,7 @@ export default function PublicSyllabusSearchPage({ user }) {
   const [loading, setLoading] = useState(false)
   const [searchTerm, setSearchTerm] = useState(searchParams.get('keyword') || '')
   const [selectedMajor, setSelectedMajor] = useState(() => {
-    // If user is student with major, auto-select their major
+    // If user is student with major, FORCE their major (cannot see others)
     if (user?.major && user?.roles?.includes('ROLE_STUDENT')) {
       return user.major
     }
@@ -43,7 +43,9 @@ export default function PublicSyllabusSearchPage({ user }) {
     setLoading(true)
     setError(null)
     try {
-      const response = await syllabusService.getPublishedSyllabuses(0, 50)
+      // If user is student with major, pass programName to backend for server-side filter
+      const programFilter = (user?.major && user?.roles?.includes('ROLE_STUDENT')) ? user.major : null
+      const response = await syllabusService.getPublishedSyllabuses(0, 50, programFilter)
       // Handle both array and object response
       setSyllabi(Array.isArray(response) ? response : (response?.data || []))
     } catch (err) {
@@ -52,7 +54,7 @@ export default function PublicSyllabusSearchPage({ user }) {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [user?.major, user?.roles])
 
   useEffect(() => {
     fetchPrograms()
@@ -65,7 +67,14 @@ export default function PublicSyllabusSearchPage({ user }) {
         item.subjectCode?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         item.subjectName?.toLowerCase().includes(searchTerm.toLowerCase())
       
-      const matchesMajor = selectedMajor === 'all' || item.programName === selectedMajor
+      // STRICT: Students can ONLY see syllabi from their major
+      let matchesMajor
+      if (user?.major && user?.roles?.includes('ROLE_STUDENT')) {
+        matchesMajor = item.programName === user.major
+      } else {
+        matchesMajor = selectedMajor === 'all' || item.programName === selectedMajor
+      }
+      
       const matchesSemester = selectedSemester === 'all' || parseInt(item.semester) === parseInt(selectedSemester)
       const matchesYear = selectedYear === 'all' || item.academicYear === selectedYear
       

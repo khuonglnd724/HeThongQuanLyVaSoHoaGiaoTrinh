@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { Eye, Zap, Loader, CheckCircle } from 'lucide-react'
 import syllabusServiceV2 from '../../modules/lecturer/services/syllabusServiceV2'
-import aiService from '../../modules/lecturer/services/aiService'
 import apiClient from '../../services/api/apiClient'
 import DocumentSummaryModal from '../../modules/lecturer/components/DocumentSummaryModal'
 
@@ -197,11 +196,13 @@ const SyllabusDetailModal = ({
                     <span className="text-sm text-gray-600">Tên môn học:</span>
                     <div className="font-semibold text-gray-900">{syllabusDetailData.subjectName}</div>
                   </div>
-                  {syllabusDetailData.programInfo && (
+                  {(syllabusDetailData.programInfo || syllabusDetailData.programName) && (
                     <div className="col-span-2">
                       <span className="text-sm text-gray-600">Chương trình đào tạo:</span>
                       <div className="font-semibold text-gray-900">
-                        {syllabusDetailData.programInfo.programCode} - {syllabusDetailData.programInfo.programName}
+                        {syllabusDetailData.programInfo
+                          ? `${syllabusDetailData.programInfo.programCode} - ${syllabusDetailData.programInfo.programName}`
+                          : syllabusDetailData.programName}
                       </div>
                     </div>
                   )}
