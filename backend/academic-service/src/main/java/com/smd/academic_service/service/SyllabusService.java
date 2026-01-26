@@ -106,6 +106,14 @@ public class SyllabusService {
             .collect(Collectors.toList());
     }
     
+    public List<SyllabusDto> getPublishedSyllabuses() {
+        log.debug("Fetching published syllabuses");
+        return syllabusRepository.findSyllabusesByStatus("Published")
+            .stream()
+            .map(this::mapToDto)
+            .collect(Collectors.toList());
+    }
+    
     // Update
     public SyllabusDto updateSyllabus(Long id, SyllabusDto syllabusDto, String updatedBy) {
         log.info("Updating syllabus with id: {}", id);
@@ -195,6 +203,10 @@ public class SyllabusService {
             .academicYear(syllabus.getAcademicYear())
             .semester(syllabus.getSemester())
             .subjectId(syllabus.getSubject().getId())
+            .subjectName(syllabus.getSubject().getSubjectName())
+            .subjectCode(syllabus.getSubject().getSubjectCode())
+            .programId(syllabus.getSubject().getProgram() != null ? syllabus.getSubject().getProgram().getId() : null)
+            .programName(syllabus.getSubject().getProgram() != null ? syllabus.getSubject().getProgram().getProgramName() : null)
             .content(syllabus.getContent())
             .learningObjectives(syllabus.getLearningObjectives())
             .teachingMethods(syllabus.getTeachingMethods())

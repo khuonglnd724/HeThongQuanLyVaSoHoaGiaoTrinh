@@ -6,12 +6,13 @@ export default function UserManagement() {
   const [users, setUsers] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [programs, setPrograms] = useState([])
   const [formData, setFormData] = useState({ 
     RECTOR: { email: '', name: '', phone: '', password: '', confirmPassword: '' },
     LECTURER: { email: '', name: '', phone: '', password: '', confirmPassword: '' }, 
     HOD: { email: '', name: '', phone: '', password: '', confirmPassword: '' }, 
     ACADEMIC: { email: '', name: '', phone: '', password: '', confirmPassword: '' }, 
-    STUDENT: { email: '', name: '', phone: '', password: '', confirmPassword: '' } 
+    STUDENT: { email: '', name: '', phone: '', password: '', confirmPassword: '', major: '' } 
   })
   const [showPassword, setShowPassword] = useState({ RECTOR: false, LECTURER: false, HOD: false, ACADEMIC: false, STUDENT: false })
   const [searchTerm, setSearchTerm] = useState('')
@@ -26,10 +27,55 @@ export default function UserManagement() {
   const [csvImporting, setCsvImporting] = useState(false)
   const [csvResults, setCsvResults] = useState(null)
 
-  // Lấy danh sách người dùng
+  // Lấy danh sách người dùng và programs
   useEffect(() => {
     fetchUsers()
+    fetchPrograms()
   }, [])
+
+  const fetchPrograms = async () => {
+    try {
+      const token = localStorage.getItem('token')
+      // Try multiple endpoints
+      let response = await fetch('/api/academic/programs', {
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+      })
+      
+      // If /api/academic/programs doesn't work, try /api/programs
+      if (!response.ok) {
+        response = await fetch('/api/programs', {
+          headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+        })
+      }
+      
+      if (response.ok) {
+        const data = await response.json()
+        const programsList = Array.isArray(data) ? data : data.content || []
+        console.log('[UserManagement] Programs loaded:', programsList)
+        setPrograms(programsList)
+      } else {
+        console.warn('[UserManagement] Failed to load programs:', response.status)
+        // Fallback mock programs từ academic_db
+        setPrograms([
+          { id: 1, programName: 'Công nghệ Thông tin', programCode: 'IT2024' },
+          { id: 2, programName: 'Kỹ thuật Phần mềm', programCode: 'SE2024' },
+          { id: 3, programName: 'Khoa học Dữ liệu', programCode: 'DS2024' },
+          { id: 4, programName: 'Khoa học Máy tính', programCode: 'CS2024' },
+          { id: 5, programName: 'Hệ thống Thông tin', programCode: 'IS2024' }
+        ])
+      }
+    } catch (err) {
+      console.warn('[UserManagement] Error loading programs:', err)
+      // Fallback mock programs từ academic_db
+      setPrograms([
+        { id: 1, programName: 'Công nghệ Thông tin', programCode: 'IT2024' },
+        { id: 2, programName: 'Kỹ thuật Phần mềm', programCode: 'SE2024' },
+        { id: 3, programName: 'Khoa học Dữ liệu', programCode: 'DS2024' },
+        { id: 4, programName: 'Khoa học Máy tính', programCode: 'CS2024' },
+        { id: 5, programName: 'Hệ thống Thông tin', programCode: 'IS2024' }
+      ])
+    }
+  }
 
   const fetchUsers = async () => {
     try {
@@ -130,30 +176,34 @@ export default function UserManagement() {
         role: role
       })
       
-      // Map role to roleIds (database role IDs)
-      // From auth_db: ROLE_RECTOR=2, ROLE_HOD=4, ROLE_ACADEMIC_AFFAIRS=3, ROLE_LECTURER=5, ROLE_STUDENT=6
-      const roleIdMap = {
-        'RECTOR': [2],        // ROLE_RECTOR
-        'LECTURER': [5],      // ROLE_LECTURER
-        'HOD': [4],           // ROLE_HOD
-        'ACADEMIC': [3],      // ROLE_ACADEMIC_AFFAIRS
-        'STUDENT': [6]        // ROLE_STUDENT
+      // Map role to role names for API
+      const roleMap = {
+        'RECTOR': 'ROLE_RECTOR',
+        'LECTURER': 'ROLE_LECTURER',
+        'HOD': 'ROLE_HOD',
+        'ACADEMIC': 'ROLE_ACADEMIC_AFFAIRS',
+        'STUDENT': 'ROLE_STUDENT'
       }
-      const roleIds = roleIdMap[role] || []
+      const roleName = roleMap[role]
       
-      if (roleIds.length === 0) {
+      if (!roleName) {
         alert('Vai trò không hợp lệ')
         return
       }
       
-      // Send to API with correct format per RegisterRequest
+      // Send to API - try with roles array instead of roleIds
       const payload = {
-        username: roleFormData.email.split('@')[0], // Generate username from email
+        username: roleFormData.email.split('@')[0] + (roleFormData.email.split('@')[0].length < 3 ? Math.random().toString(36).substring(2, 5) : ''), // Generate username from email with random suffix if too short
         email: roleFormData.email,
         fullName: roleFormData.name,
         password: roleFormData.password,
         phoneNumber: roleFormData.phone || '', // Include phone number
-        roleIds: roleIds
+        roles: [roleName]  // Use role names instead of IDs
+      }
+      
+      // Add major for students if provided (backend must support it)
+      if (role === 'STUDENT' && roleFormData.major) {
+        payload.major = roleFormData.major
       }
       
       console.log('[UserManagement] API Payload:', payload)
@@ -170,16 +220,32 @@ export default function UserManagement() {
       console.log('[UserManagement] Response status:', response.status)
       
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        console.error('[UserManagement] Error response:', errorData)
-        throw new Error(errorData.message || `Lỗi: ${response.status}`)
+        let errorMessage = `HTTP ${response.status}`
+        try {
+          // Try to read as text first
+          const responseText = await response.text()
+          console.error('[UserManagement] Full response text:', responseText)
+          
+          // Try to parse as JSON
+          if (responseText && responseText.trim().startsWith('{')) {
+            const errorData = JSON.parse(responseText)
+            errorMessage = errorData.message || errorData.error || errorData.detail || JSON.stringify(errorData)
+          } else {
+            // If not JSON, use plain text (might be HTML error page)
+            errorMessage = responseText.substring(0, 200) || `HTTP ${response.status} - Bad Request`
+          }
+        } catch (parseErr) {
+          console.error('[UserManagement] Could not parse error response:', parseErr)
+          errorMessage = `HTTP ${response.status} - Bad Request`
+        }
+        throw new Error(errorMessage)
       }
       
       const result = await response.json()
       console.log('[UserManagement] User created successfully:', result)
       
       alert(`✅ Tạo tài khoản thành công!\nEmail: ${roleFormData.email}\nTên: ${roleFormData.name}\nVai trò: ${role}`)
-      setFormData({ ...formData, [role]: { email: '', name: '', phone: '', password: '', confirmPassword: '' } })
+      setFormData({ ...formData, [role]: { email: '', name: '', phone: '', password: '', confirmPassword: '', ...(role === 'STUDENT' && { major: '' }) } })
       fetchUsers() // Refresh danh sách
     } catch (err) {
       console.error('[UserManagement] Create user error:', err)
@@ -236,6 +302,7 @@ export default function UserManagement() {
       fullName: user.fullName || '',
       phoneNumber: user.phoneNumber || '',
       roles: user.roles || [],
+      major: user.major || '',
       password: '',
       confirmPassword: ''
     })
@@ -278,6 +345,15 @@ export default function UserManagement() {
         email: editFormData.email,
         fullName: editFormData.fullName,
         phoneNumber: editFormData.phoneNumber || ''
+      }
+
+      // Add major for student users
+      const isStudent = Array.isArray(selectedUser.roles) && selectedUser.roles.some(r => 
+        (typeof r === 'string' ? r.toUpperCase().includes('STUDENT') : false) || 
+        (typeof r === 'object' && r.roleName && r.roleName.includes('STUDENT'))
+      )
+      if (isStudent && editFormData.major) {
+        payload.major = editFormData.major
       }
 
       // Add password if user wants to change it
@@ -626,6 +702,23 @@ export default function UserManagement() {
                         </button>
                       </div>
                     </div>
+                    {role.value === 'STUDENT' && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Ngành</label>
+                        <select
+                          value={formData[role.value].major || ''}
+                          onChange={(e) => setFormData({ ...formData, [role.value]: { ...formData[role.value], major: e.target.value } })}
+                          className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        >
+                          <option value="">-- Chọn ngành --</option>
+                          {programs.map(program => (
+                            <option key={program.id || program.programName} value={program.programName}>
+                              {program.programName}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
                     <button
                       onClick={() => handleCreateUser(role.value)}
                       type="button"
@@ -846,6 +939,12 @@ export default function UserManagement() {
                     {selectedUser.isLocked === true ? 'Đã khóa' : selectedUser.isActive === false ? 'Vô hiệu' : 'Hoạt động'}
                   </span>
                 </div>
+                {selectedUser.major && (
+                  <div>
+                    <p className="text-sm text-gray-600">Ngành:</p>
+                    <p className="font-medium text-gray-900">{selectedUser.major}</p>
+                  </div>
+                )}
                 <div>
                   <p className="text-sm text-gray-600">Ngày tạo:</p>
                   <p className="font-medium text-gray-900">{selectedUser.createdAt ? new Date(selectedUser.createdAt).toLocaleDateString('vi-VN') : 'N/A'}</p>
@@ -923,6 +1022,26 @@ export default function UserManagement() {
                   {getRoleLabel(editFormData.roles)} (Không thể thay đổi vai trò)
                 </p>
               </div>
+              {Array.isArray(editFormData.roles) && editFormData.roles.some(r => 
+                (typeof r === 'string' ? r.toUpperCase().includes('STUDENT') : false) || 
+                (typeof r === 'object' && r.roleName && r.roleName.includes('STUDENT'))
+              ) && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Ngành</label>
+                  <select
+                    value={editFormData.major || ''}
+                    onChange={(e) => setEditFormData({ ...editFormData, major: e.target.value })}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">-- Chọn ngành --</option>
+                    {programs.map(program => (
+                      <option key={program.id || program.programName} value={program.programName}>
+                        {program.programName}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
               <div className="border-t pt-4">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   <input

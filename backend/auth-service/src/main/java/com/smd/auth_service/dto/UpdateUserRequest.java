@@ -23,6 +23,8 @@ public class UpdateUserRequest {
     
     private String phoneNumber;
     
+    private String major;
+    
     // Password is optional for updates - only required if user wants to change it
     @Size(min = 6, max = 40, message = "Password must be between 6 and 40 characters")
     private String password;

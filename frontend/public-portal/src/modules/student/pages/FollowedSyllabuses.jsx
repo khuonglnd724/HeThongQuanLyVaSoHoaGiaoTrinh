@@ -3,14 +3,19 @@ import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, BookOpen, Heart, Trash2, Clock, GraduationCap, BookMarked } from 'lucide-react'
 import { getSyllabusDetail } from '../../public/services/publicSyllabusService'
 
-export default function FollowedSyllabuses() {
+export default function FollowedSyllabuses({ user }) {
   const navigate = useNavigate()
   const [followedSyllabi, setFollowedSyllabi] = useState([])
   const [loading, setLoading] = useState(true)
   const [syllabusDetails, setSyllabusDetails] = useState({})
+  const [studentMajor, setStudentMajor] = useState(null)
 
   useEffect(() => {
     loadFollowedSyllabi()
+    // Get student major
+    if (user?.major) {
+      setStudentMajor(user.major)
+    }
   }, [])
 
   const loadFollowedSyllabi = async () => {
@@ -137,6 +142,11 @@ export default function FollowedSyllabuses() {
               {followedSyllabi.map((id) => {
                 const syllabus = syllabusDetails[id]
                 if (!syllabus) return null
+                
+                // Filter by student's major - only show if major matches or major is not set
+                if (studentMajor && syllabus.programName && syllabus.programName !== studentMajor) {
+                  return null
+                }
 
                 return (
                   <div
@@ -147,7 +157,7 @@ export default function FollowedSyllabuses() {
                     <div className="bg-gradient-to-r from-blue-500 to-blue-600 text-white p-4">
                       <div className="flex items-start justify-between gap-2 mb-2">
                         <span className="inline-block bg-blue-700 text-white px-3 py-1 rounded-full text-xs font-semibold">
-                          {syllabus.subject_code}
+                          {syllabus.subjectCode}
                         </span>
                         <button
                           onClick={() => handleRemove(id)}
@@ -158,33 +168,33 @@ export default function FollowedSyllabuses() {
                         </button>
                       </div>
                       <h3 className="text-lg font-bold text-white group-hover:text-blue-100 transition">
-                        {syllabus.subject_name}
+                        {syllabus.subjectName}
                       </h3>
                     </div>
 
                     {/* Card Body */}
                     <div className="p-4">
                       <p className="text-gray-600 text-sm mb-4 line-clamp-2">
-                        {syllabus.summary || 'Không có mô tả'}
+                        {syllabus.content || 'Không có mô tả'}
                       </p>
 
                       {/* Info Grid */}
                       <div className="space-y-2 mb-4 pb-4 border-b border-gray-200">
                         <div className="flex items-center justify-between text-sm">
-                          <span className="text-gray-600">Tín chỉ:</span>
-                          <span className="font-semibold text-gray-900">{syllabus.credits}</span>
-                        </div>
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="text-gray-600">Học kỳ:</span>
+                          <span className="text-gray-600">Kỳ:</span>
                           <span className="font-semibold text-gray-900">{syllabus.semester}</span>
                         </div>
                         <div className="flex items-center justify-between text-sm">
                           <span className="text-gray-600">Năm học:</span>
-                          <span className="font-semibold text-gray-900">{syllabus.academic_year}</span>
+                          <span className="font-semibold text-gray-900">{syllabus.academicYear}</span>
                         </div>
                         <div className="flex items-center justify-between text-sm">
-                          <span className="text-gray-600">Chuyên ngành:</span>
-                          <span className="font-semibold text-gray-900 text-right">{syllabus.major}</span>
+                          <span className="text-gray-600">Mã:</span>
+                          <span className="font-semibold text-gray-900">{syllabus.syllabusCode}</span>
+                        </div>
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-gray-600">Ngành:</span>
+                          <span className="font-semibold text-gray-900 text-right">{syllabus.programName}</span>
                         </div>
                       </div>
 

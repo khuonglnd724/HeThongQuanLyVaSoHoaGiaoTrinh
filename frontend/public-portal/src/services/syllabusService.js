@@ -1,67 +1,67 @@
 import axios from 'axios'
 
-const API_BASE = '/api/syllabus'
+const API_BASE = '/api/academic/syllabus'
 
-// Mock data - từ database syllabus_db
-const MOCK_SYLLABUSES = [
-  {
-    id: 'ba59f0be-bdf3-4ab1-8863-abbdce35348b',
-    subject_code: 'CS-01',
-    subject_name: 'Lập trình',
-    summary: 'Giáo trình về lập trình cơ bản và nâng cao với các ứng dụng thực tế',
-    credits: 3,
-    semester: 'Kỳ I',
-    academic_year: '2024-2025',
-    major: 'Công Nghệ Thông Tin',
-    status: 'PUBLISHED',
-    version_no: 1,
-    created_at: '2026-01-25T04:42:47.183413Z',
-    created_by: 'lecturer1@smd.edu.vn'
-  }
-]
+const getAuthHeader = () => {
+  const token = localStorage.getItem('token')
+  return token ? { Authorization: `Bearer ${token}` } : {}
+}
 
 const syllabusService = {
-  // Get all published syllabuses
-  getPublishedSyllabuses: async (page = 0, size = 10) => {
+  // Get all available programs for filter dropdown
+  getAllPrograms: async () => {
     try {
-      // Try to get from backend first
-      const response = await axios.get(`${API_BASE}/published`, {
-        params: { page, size }
+      const response = await axios.get(`${API_BASE}/programs/all`, {
+        headers: getAuthHeader()
       })
-      return response.data
+      const data = response.data?.data || response.data
+      return Array.isArray(data) ? data : []
     } catch (error) {
-      console.warn('Backend endpoint not available, using mock data:', error.message)
-      // Fallback to mock data
-      return MOCK_SYLLABUSES
+      console.error('Error fetching programs:', error.message)
+      return []
+    }
+  },
+
+  // Get all published syllabuses
+  getPublishedSyllabuses: async (page = 0, size = 50) => {
+    try {
+      // Call backend API with auth token if available
+      const response = await axios.get(`${API_BASE}/published`, {
+        headers: getAuthHeader()
+      })
+      // Backend returns { success: true, data: [...], message: "..." }
+      const data = response.data?.data || response.data
+      return Array.isArray(data) ? data : [data]
+    } catch (error) {
+      console.error('Error fetching published syllabuses:', error.message)
+      throw error
     }
   },
 
   // Get syllabus by ID
   getSyllabusById: async (id) => {
     try {
-      // Try to get from backend first
-      const response = await axios.get(`${API_BASE}/${id}`)
-      return response.data
+      const response = await axios.get(`${API_BASE}/${id}`, {
+        headers: getAuthHeader()
+      })
+      return response.data?.data || response.data
     } catch (error) {
-      console.warn('Backend endpoint not available, using mock data:', error.message)
-      // Fallback to mock data
-      const syllabus = MOCK_SYLLABUSES.find(s => s.id === id)
-      if (syllabus) {
-        return { data: syllabus }
-      }
-      throw new Error('Syllabus not found')
+      console.error('Error fetching syllabus:', error.message)
+      throw error
     }
   },
 
   // Get syllabuses by subject
   getSyllabusesbySubject: async (subject) => {
     try {
-      const response = await axios.get(`${API_BASE}/subject/${subject}`)
-      return response.data
+      const response = await axios.get(`${API_BASE}/subject/${subject}`, {
+        headers: getAuthHeader()
+      })
+      const data = response.data?.data || response.data
+      return Array.isArray(data) ? data : [data]
     } catch (error) {
-      console.warn('Backend endpoint not available, using mock data:', error.message)
-      // Fallback to mock data
-      return MOCK_SYLLABUSES.filter(s => s.subject_code?.includes(subject))
+      console.error('Error fetching syllabuses by subject:', error.message)
+      throw error
     }
   },
 
@@ -69,44 +69,26 @@ const syllabusService = {
   searchSyllabuses: async (keyword, filters = {}) => {
     try {
       const response = await axios.get(`${API_BASE}/search`, {
-        params: { keyword, ...filters }
+        params: { keyword, ...filters },
+        headers: getAuthHeader()
       })
-      return response.data
+      const data = response.data?.data || response.data
+      return Array.isArray(data) ? data : [data]
     } catch (error) {
-      console.warn('Backend endpoint not available, using mock data:', error.message)
-      // Fallback to mock data with search
-      let results = [...MOCK_SYLLABUSES]
-      
-      if (keyword) {
-        results = results.filter(s =>
-          s.subject_code?.toLowerCase().includes(keyword.toLowerCase()) ||
-          s.subject_name?.toLowerCase().includes(keyword.toLowerCase()) ||
-          s.summary?.toLowerCase().includes(keyword.toLowerCase())
-        )
-      }
-      
-      if (filters.major) {
-        results = results.filter(s => s.major === filters.major)
-      }
-      if (filters.semester) {
-        results = results.filter(s => s.semester === filters.semester)
-      }
-      if (filters.academic_year) {
-        results = results.filter(s => s.academic_year === filters.academic_year)
-      }
-      
-      return results
+      console.error('Error searching syllabuses:', error.message)
+      throw error
     }
   },
 
   // Get syllabus documents
   getSyllabusDocuments: async (syllabusId) => {
     try {
-      const response = await axios.get(`${API_BASE}/${syllabusId}/documents`)
-      return response.data
+      const response = await axios.get(`${API_BASE}/${syllabusId}/documents`, {
+        headers: getAuthHeader()
+      })
+      return response.data?.data || response.data || []
     } catch (error) {
-      console.warn('Backend endpoint not available:', error.message)
-      // Fallback - mock documents
+      console.warn('Error fetching syllabus documents:', error.message)
       return []
     }
   }

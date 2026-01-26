@@ -5,11 +5,13 @@ import com.smd.academic_service.model.dto.SyllabusDto;
 import com.smd.academic_service.model.dto.ApprovalValidationResult;
 import com.smd.academic_service.model.dto.SyllabusVersionDto;
 import com.smd.academic_service.model.dto.SyllabusVersionComparisonDto;
+import com.smd.academic_service.model.dto.ProgramDto;
 import com.smd.academic_service.model.entity.Syllabus;
 import com.smd.academic_service.service.SyllabusService;
 import com.smd.academic_service.service.ApprovalValidationService;
 import com.smd.academic_service.service.SyllabusVersionService;
 import com.smd.academic_service.service.PrerequisiteValidatorService;
+import com.smd.academic_service.service.ProgramService;
 import com.smd.academic_service.repository.SyllabusRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -31,6 +33,7 @@ public class SyllabusController {
     private final SyllabusVersionService syllabusVersionService;
     private final PrerequisiteValidatorService prerequisiteValidatorService;
     private final SyllabusRepository syllabusRepository;
+    private final ProgramService programService;
     
     /**
      * Create new Syllabus
@@ -109,6 +112,17 @@ public class SyllabusController {
         log.info("Fetching all syllabuses");
         List<SyllabusDto> syllabuses = syllabusService.getAllSyllabuses();
         return ResponseEntity.ok(ApiResponse.success(syllabuses, "All syllabuses fetched successfully"));
+    }
+    
+    /**
+     * Get published Syllabuses (for public/students)
+     * GET /api/v1/syllabus/published
+     */
+    @GetMapping("/published")
+    public ResponseEntity<ApiResponse<List<SyllabusDto>>> getPublishedSyllabuses() {
+        log.info("Fetching published syllabuses");
+        List<SyllabusDto> syllabuses = syllabusService.getPublishedSyllabuses();
+        return ResponseEntity.ok(ApiResponse.success(syllabuses, "Published syllabuses fetched successfully"));
     }
     
     /**
@@ -235,6 +249,17 @@ public class SyllabusController {
         log.info("Comparing versions {} and {} for syllabus id: {}", version1, version2, id);
         SyllabusVersionComparisonDto comparison = syllabusVersionService.compareVersions(id, version1, version2);
         return ResponseEntity.ok(ApiResponse.success(comparison, "Version comparison completed"));
+    }
+
+    /**
+     * Get all available Programs (for filter dropdown)
+     * GET /api/v1/syllabus/programs/all
+     */
+    @GetMapping("/programs/all")
+    public ResponseEntity<ApiResponse<List<ProgramDto>>> getAllPrograms() {
+        log.info("Fetching all programs for filter dropdown");
+        List<ProgramDto> programs = programService.getAllPrograms();
+        return ResponseEntity.ok(ApiResponse.success(programs, "All programs fetched successfully"));
     }
 }
 
