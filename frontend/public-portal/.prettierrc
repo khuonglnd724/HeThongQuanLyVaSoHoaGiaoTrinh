@@ -1,0 +1,4 @@
+{
+  "*.jsx": ["source.fixAll.eslint"],
+  "*.js": ["source.fixAll.eslint"]
+}

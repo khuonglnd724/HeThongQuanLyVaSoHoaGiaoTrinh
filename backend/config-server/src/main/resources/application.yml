@@ -1,0 +1,29 @@
+server:
+  port: 8888
+
+spring:
+  application:
+    name: config-server
+  profiles:
+    active: native
+  
+  cloud:
+    config:
+      server:
+        # Native profile - read config from classpath or file system
+        native:
+          # Search local config repository folder at project root (absolute path for reliability)
+          search-locations: file:D:/h_Nam_3/hocki1nam2025_2026_nam3/XDPM_HuongDoiTuong/ProjectCK/smd-microservices/config-repo,classpath:/config
+        # Git profile - uncomment to use Git repository
+        # git:
+        #   uri: https://github.com/your-org/config-repo
+        #   default-label: main
+        #   search-paths: '{application}'
+
+# Eureka Client Configuration (optional - if you want to register config-server)
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka/
+    register-with-eureka: false
+    fetch-registry: false

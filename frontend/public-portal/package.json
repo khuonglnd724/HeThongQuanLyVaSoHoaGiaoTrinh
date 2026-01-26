@@ -1,0 +1,47 @@
+{
+  "name": "public-portal",
+  "version": "1.0.0",
+  "description": "Public Portal for Students - Syllabus Search & Management",
+  "private": true,
+  "dependencies": {
+    "@reduxjs/toolkit": "^1.9.7",
+    "@tailwindcss/forms": "^0.5.6",
+    "ajv": "^6.12.6",
+    "axios": "^1.6.0",
+    "date-fns": "^2.30.0",
+    "html2pdf.js": "^0.10.1",
+    "http-proxy-middleware": "^3.0.5",
+    "lucide-react": "^0.292.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-redux": "^8.1.3",
+    "react-router-dom": "^6.20.0"
+  },
+  "devDependencies": {
+    "autoprefixer": "^10.4.16",
+    "postcss": "^8.4.32",
+    "react-scripts": "5.0.1",
+    "tailwindcss": "^3.4.0"
+  },
+  "scripts": {
+    "start": "react-scripts start",
+    "build": "react-scripts build",
+    "test": "react-scripts test",
+    "eject": "react-scripts eject"
+  },
+  "eslintConfig": {
+    "extends": "react-app"
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  }
+}

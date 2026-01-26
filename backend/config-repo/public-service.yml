@@ -1,0 +1,21 @@
+server:
+  port: 8082
+spring:
+  application:
+    name: public-service
+  cloud:
+    compatibility-verifier:
+      enabled: false
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka/
+    region: default
+    avoid-url-based-aws-ec2-metadata-service: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus

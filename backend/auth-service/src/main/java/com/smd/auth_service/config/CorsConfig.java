@@ -1,0 +1,65 @@
+package com.smd.auth_service.config;
+
+import java.util.Arrays;
+
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+
+/**
+ * CORS Configuration - DISABLED
+ * 
+ * CORS is handled by API Gateway (port 8080)
+ * This service runs behind the gateway, so no need for CORS here
+ * Keeping this configuration would cause duplicate CORS headers
+ */
+// @Configuration  // COMMENTED OUT - CORS handled by API Gateway
+public class CorsConfig {
+
+    // @Bean  // DISABLED - API Gateway handles CORS
+    CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration configuration = new CorsConfiguration();
+        
+        // Allow requests from frontend
+        configuration.setAllowedOrigins(Arrays.asList(
+            "http://localhost:3000",      // Frontend dev server (port 3000)
+            "http://localhost:3001",      // Frontend dev server (port 3001)
+            "http://localhost:3002",      // Admin system
+            "http://localhost:5174",      // Academic portal (Vite)
+            "http://localhost:9000",      // Frontend Python server
+            "http://localhost:80",         // Frontend via nginx
+            "http://localhost",            // Direct localhost
+            "http://127.0.0.1:3000",
+            "http://127.0.0.1:3001",
+            "http://127.0.0.1:3002",
+            "http://127.0.0.1:5174",
+            "http://127.0.0.1:9000",
+            "http://127.0.0.1",
+            "http://localhost:8080"        // Via API Gateway
+        ));
+        
+        // Allow methods
+        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
+        
+        // Allow headers
+        configuration.setAllowedHeaders(Arrays.asList("*"));
+        configuration.setExposedHeaders(Arrays.asList(
+            "Authorization",
+            "Content-Type",
+            "X-Requested-With"
+        ));
+        
+        // Allow credentials
+        configuration.setAllowCredentials(true);
+        
+        // Max age
+        configuration.setMaxAge(3600L);
+        
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", configuration);
+        
+        return source;
+    }
+}

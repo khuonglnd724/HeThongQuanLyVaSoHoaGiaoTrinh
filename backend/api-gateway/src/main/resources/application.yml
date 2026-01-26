@@ -1,0 +1,155 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: api-gateway
+  webflux:
+    base-path: /
+  http:
+    client:
+      connectTimeout: 120000
+      readTimeout: 120000
+  
+  cloud:
+    gateway:
+      # Gateway routes configuration will be added here
+      routes:
+        - id: auth-service
+          uri: lb://auth-service
+          predicates:
+            - Path=/api/auth/**,/api/users/**,/api/admin/**,/api/roles/**,/api/system/**,/api/services/**
+        
+        - id: academic-service
+          uri: lb://academic-service
+          predicates:
+            - Path=/api/academic/**,/api/v1/**
+          filters:
+            - RewritePath=/api/academic(?<segment>/?.*), /api/v1${segment}
+        
+        - id: syllabus-service
+          uri: lb://syllabus-service
+          predicates:
+            - Path=/api/syllabuses/**,/api/syllabuses,/api/syllabus/**,/api/syllabus,/api/issues/**,/api/notifications/**,/api/review-comments/**,/api/syllabus/documents/**
+        
+        - id: workflow-service
+          uri: lb://workflow-service
+          predicates:
+            - Path=/api/workflow/**,/api/workflows/**
+        
+        - id: public-service
+          uri: lb://public-service
+          predicates:
+            - Path=/api/public/**
+        
+        - id: student-service-fallback
+          uri: lb://academic-service
+          predicates:
+            - Path=/api/student/**
+          filters:
+            - RewritePath=/api/student(?<segment>/?.*), /api/v1/student${segment}
+        
+        - id: ai-service
+          uri: http://ai-service:8000
+          predicates:
+            - Path=/api/ai/**,/ai/**
+          filters:
+            - RewritePath=/api/ai(?<segment>/?.*), /ai${segment}
+
+      httpclient:
+        connect-timeout: 120000
+        response-timeout: 120000ms
+        pool:
+          type: ELASTIC
+          max-idle-time: 120s
+        websocket:
+          max-frame-payload-length: 100000
+
+      # Enable CORS globally
+      globalcors:
+        add-to-simple-url-handler-mapping: true
+        cors-configurations:
+          '[/**]':
+            allowedOriginPatterns: "*"
+            allowedMethods:
+              - "GET"
+              - "POST"
+              - "PUT"
+              - "DELETE"
+              - "OPTIONS"
+              - "PATCH"
+            allowedHeaders: "*"
+            exposedHeaders:
+              - "Authorization"
+              - "Content-Type"
+            allowCredentials: true
+            maxAge: 3600
+
+security:
+  jwt:
+    enabled: true
+    secret: smdMicroservicesSecretKeyForJWTTokenGenerationAndValidation2024SuperSecureKeyWithEnoughBytesForHS512HS512HS512
+    whitelist:
+      - /api/auth/**
+      - /api/ai/**
+      - /api/workflows/**
+      - /api/public/**
+      - /api/academic/syllabus/**
+      - /api/academic/syllabus/programs/all
+      - /actuator/prometheus
+      - /actuator/health
+      - /
+      - /api/public/**
+      - /api/academic/syllabus/**
+      - /actuator/prometheus
+      - /actuator/health
+      - /
+
+# Management endpoints
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: always
+      probes:
+        enabled: true
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    urls:
+      - name: Gateway
+        url: /v3/api-docs
+
+# Hystrix Configuration - Override default 1s timeout
+hystrix:
+  command:
+    default:
+      execution:
+        timeout:
+          enabled: false
+        isolation:
+          thread:
+            timeoutInMilliseconds: 120000
+
+# Eureka Client Configuration
+eureka:
+  client:
+    service-url:
+      defaultZone: http://discovery-server:8761/eureka/
+    region: default
+    avoid-url-based-aws-ec2-metadata-service: true
+  instance:
+    prefer-ip-address: true
+
+# Config Server Configuration
+spring.config.import: optional:configserver:http://config-server:8888
