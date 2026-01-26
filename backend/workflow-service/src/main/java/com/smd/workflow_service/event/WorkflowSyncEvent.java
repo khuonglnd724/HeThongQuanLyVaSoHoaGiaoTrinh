@@ -14,6 +14,7 @@ public class WorkflowSyncEvent {
     private WorkflowState fromState;
     private WorkflowState toState;
     private String actionBy;
+    private String comment; // Rejection reason or other comment
 
     public WorkflowSyncEvent() {
     }
@@ -25,13 +26,15 @@ public class WorkflowSyncEvent {
             @JsonProperty("entityType") String entityType,
             @JsonProperty("fromState") WorkflowState fromState,
             @JsonProperty("toState") WorkflowState toState,
-            @JsonProperty("actionBy") String actionBy) {
+            @JsonProperty("actionBy") String actionBy,
+            @JsonProperty("comment") String comment) {
         this.workflowId = workflowId;
         this.entityId = entityId;
         this.entityType = entityType;
         this.fromState = fromState;
         this.toState = toState;
         this.actionBy = actionBy;
+        this.comment = comment;
     }
 
     public UUID getWorkflowId() {
@@ -82,6 +85,14 @@ public class WorkflowSyncEvent {
         this.actionBy = actionBy;
     }
 
+    public String getComment() {
+        return comment;
+    }
+
+    public void setComment(String comment) {
+        this.comment = comment;
+    }
+
     @Override
     public String toString() {
         return "WorkflowSyncEvent{" +
@@ -91,6 +102,7 @@ public class WorkflowSyncEvent {
                 ", fromState=" + fromState +
                 ", toState=" + toState +
                 ", actionBy='" + actionBy + '\'' +
+                ", comment='" + comment + '\'' +
                 '}';
     }
 }

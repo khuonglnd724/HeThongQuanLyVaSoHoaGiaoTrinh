@@ -373,18 +373,10 @@ const SyllabusListPage = ({ user }) => {
                         setShowDetailModal(false)
                         setShowEditor(true)
                       }}
-                      className="flex-1 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 font-medium flex items-center justify-center gap-2"
+                      className="flex-1 px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 font-medium flex items-center justify-center gap-2"
                     >
                       <Edit2 size={18} />
-                      Sửa và gửi lại
-                    </button>
-                    <button
-                      onClick={() => handleSubmit(selectedSyllabus.id)}
-                      disabled={submitting}
-                      className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 font-medium flex items-center justify-center gap-2"
-                    >
-                      <Send size={18} />
-                      {submitting ? 'Đang gửi...' : 'Gửi lại'}
+                      Chỉnh sửa
                     </button>
                   </>
                 )}
@@ -447,7 +439,7 @@ const SyllabusListPage = ({ user }) => {
                 syllabusId={selectedSyllabus?.id}
                 rootId={selectedSyllabus?.rootSyllabusId || selectedSyllabus?.id}
                 user={user}
-                onBack={() => { setShowEditor(false); loadSyllabi(); setSelectedSyllabus(null); }}
+                onBack={() => { setShowEditor(false); loadSyllabi(); }}
               />
             </div>
           </div>
