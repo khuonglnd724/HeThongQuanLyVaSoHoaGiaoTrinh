@@ -3,6 +3,8 @@ export { default as AcademicLayout } from './layouts/AcademicLayout';
 
 // Pages
 export { default as AcademicDashboard } from './pages/AcademicDashboard';
+export { default as HODDashboard } from './pages/HODDashboard';
+export { default as RectorDashboard } from './pages/RectorDashboard';
 export { default as SyllabusApproval } from './pages/SyllabusApproval';
 export { default as AcademicCalendarMgmt } from './pages/AcademicCalendarMgmt';
 export { default as DepartmentManagement } from './pages/DepartmentManagement';

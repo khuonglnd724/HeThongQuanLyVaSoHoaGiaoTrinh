@@ -11,8 +11,6 @@ import com.smd.academic_service.repository.SubjectRepository;
 import com.smd.academic_service.repository.SyllabusRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.cache.annotation.CacheEvict;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,7 +30,6 @@ public class CloService {
     private final CloSyllabusRepository cloSyllabusRepository;
     
     // Create
-    @CacheEvict(value = {"clos", "subjects", "programs"}, allEntries = true)
     public CloDto createClo(CloDto cloDto, String createdBy) {
         log.info("Creating CLO with code: {}", cloDto.getCloCode());
         
@@ -71,15 +68,12 @@ public class CloService {
     }
     
     // Read
-    @Cacheable(value = "clos", key = "'id_' + #id")
     public CloDto getCloById(Long id) {
         log.debug("Fetching CLO with id: {}", id);
         Clo clo = cloRepository.findByIdAndIsActiveTrue(id)
             .orElseThrow(() -> new RuntimeException("CLO not found with id: " + id));
         return mapToDto(clo);
     }
-    
-    @Cacheable(value = "clos", key = "'subject_' + #subjectId")
     public List<CloDto> getClosBySubjectId(Long subjectId) {
         log.debug("Fetching CLOs for subject id: {}", subjectId);
         return cloRepository.findActiveClosBySubjectId(subjectId)
@@ -112,8 +106,6 @@ public class CloService {
             .map(this::mapToDto)
             .collect(Collectors.toList());
     }
-
-    @CacheEvict(value = {"clos", "subjects", "programs"}, allEntries = true)
     public CloDto assignCloToSubject(Long cloId, Long subjectId, String updatedBy) {
         log.info("Assigning CLO {} to subject {}", cloId, subjectId);
 
@@ -143,7 +135,6 @@ public class CloService {
     }
     
     // Update
-    @CacheEvict(value = {"clos", "subjects", "programs"}, allEntries = true)
     public CloDto updateClo(Long id, CloDto cloDto, String updatedBy) {
         log.info("Updating CLO with id: {}", id);
         
@@ -180,7 +171,6 @@ public class CloService {
     }
     
     // Delete (Soft delete)
-    @CacheEvict(value = {"clos", "subjects", "programs"}, allEntries = true)
     public void deleteClo(Long id, String deletedBy) {
         log.info("Deleting CLO with id: {}", id);
         
@@ -218,7 +208,6 @@ public class CloService {
      * Link một danh sách CLO vào một Syllabus (từ syllabus_db)
      * Tạo các bản ghi trong bảng clo_syllabus
      */
-    @CacheEvict(value = {"clos", "subjects", "programs", "syllabi"}, allEntries = true)
     public void linkClosToSyllabus(String syllabusId, List<Long> cloIds, String createdBy) {
         log.info("Linking {} CLOs to syllabus {}", cloIds.size(), syllabusId);
         
@@ -269,7 +258,6 @@ public class CloService {
     /**
      * Xóa tất cả link của một Syllabus
      */
-    @CacheEvict(value = {"clos", "subjects", "programs", "syllabi"}, allEntries = true)
     public void unlinkAllClosFromSyllabus(String syllabusId) {
         log.info("Unlinking all CLOs from syllabus {}", syllabusId);
         cloSyllabusRepository.deleteBySyllabusId(syllabusId);
