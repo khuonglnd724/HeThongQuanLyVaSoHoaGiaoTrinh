@@ -7,6 +7,8 @@ import com.smd.academic_service.repository.ProgramRepository;
 import com.smd.academic_service.repository.SubjectRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,6 +25,7 @@ public class SubjectService {
     private final ProgramRepository programRepository;
     
     // Create
+    @CacheEvict(value = "subjects", allEntries = true)
     public SubjectDto createSubject(SubjectDto subjectDto, String createdBy) {
         log.info("Creating subject with code: {}", subjectDto.getSubjectCode());
         
@@ -50,6 +53,7 @@ public class SubjectService {
     }
     
     // Read
+    @Cacheable(value = "subjects", key = "'id_' + #id")
     public SubjectDto getSubjectById(Long id) {
         log.debug("Fetching subject with id: {}", id);
         Subject subject = subjectRepository.findByIdAndIsActiveTrue(id)
@@ -57,6 +61,7 @@ public class SubjectService {
         return mapToDto(subject);
     }
     
+    @Cacheable(value = "subjects", key = "'prog_' + #programId")
     public List<SubjectDto> getSubjectsByProgramId(Long programId) {
         log.debug("Fetching subjects for program id: {}", programId);
         return subjectRepository.findActiveSubjectsByProgramId(programId)
@@ -65,6 +70,7 @@ public class SubjectService {
             .collect(Collectors.toList());
     }
     
+    @Cacheable(value = "subjects", key = "'prog_sem_' + #programId + '_' + #semester")
     public List<SubjectDto> getSubjectsByProgramAndSemester(Long programId, Integer semester) {
         log.debug("Fetching subjects for program id: {} and semester: {}", programId, semester);
         return subjectRepository.findSubjectsByProgramAndSemester(programId, semester)
@@ -74,6 +80,7 @@ public class SubjectService {
             .collect(Collectors.toList());
     }
     
+    @Cacheable(value = "subjects", key = "'all'")
     public List<SubjectDto> getAllSubjects() {
         log.debug("Fetching all subjects");
         return subjectRepository.findAll()
@@ -83,6 +90,7 @@ public class SubjectService {
             .collect(Collectors.toList());
     }
     
+    @Cacheable(value = "subjects", key = "'search_' + #code")
     public List<SubjectDto> searchSubjectsByCode(String code) {
         log.debug("Searching subjects with code: {}", code);
         return subjectRepository.findBySubjectCodeContainingIgnoreCase(code)
@@ -93,6 +101,7 @@ public class SubjectService {
     }
     
     // Update
+    @CacheEvict(value = "subjects", allEntries = true)
     public SubjectDto updateSubject(Long id, SubjectDto subjectDto, String updatedBy) {
         log.info("Updating subject with id: {}", id);
         
@@ -135,6 +144,7 @@ public class SubjectService {
     }
     
     // Delete (Soft delete)
+    @CacheEvict(value = "subjects", allEntries = true)
     public void deleteSubject(Long id, String deletedBy) {
         log.info("Deleting subject with id: {}", id);
         
