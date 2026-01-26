@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react'
-import { Eye, Zap, Loader, CheckCircle } from 'lucide-react'
+import { Eye, Zap, Loader, CheckCircle, Upload } from 'lucide-react'
 import syllabusServiceV2 from '../../modules/lecturer/services/syllabusServiceV2'
 import apiClient from '../../services/api/apiClient'
+import aiService from '../../modules/lecturer/services/aiService'
 import DocumentSummaryModal from '../../modules/lecturer/components/DocumentSummaryModal'
 
 // CLO Details Display Component
@@ -147,19 +148,56 @@ const SyllabusDetailModal = ({
   handleCheckCLOPLOConsistency,
   handleViewCLOCheckHistory,
   handleClearCLOCheckHistory,
+  handleViewPreviousCLOCheckResult,
   handleViewDocument,
   generateDocumentSummary,
+  handleQuickAddDocument,
   setShowDocumentSummaryModal,
   setSelectedDocumentForSummary,
   showToast,
 }) => {
   const [showDocumentSummaryModal, setLocalShowDocumentSummaryModal] = useState(false)
   const [selectedDocumentForSummary, setLocalSelectedDocumentForSummary] = useState(null)
+  const [showCLOCheckResultModal, setShowCLOCheckResultModal] = useState(false)
+  const [cloCheckResultData, setCloCheckResultData] = useState(null)
 
   const handleClose = () => {
     setLocalShowDocumentSummaryModal(false)
     setLocalSelectedDocumentForSummary(null)
     onClose()
+  }
+
+  // Fetch and display CLO-PLO check result
+  const handleViewCLOCheckResult = async () => {
+    if (!syllabusDetailData?.id) return
+    
+    const history = cloCheckHistory[syllabusDetailData.id]
+    if (!history || !history.jobId) {
+      return
+    }
+
+    try {
+      // Try to fetch latest result from jobId
+      const jobStatus = await aiService.getJobStatus(history.jobId)
+      const jobData = jobStatus.data?.data || jobStatus.data
+
+      let resultData = history.result // fallback to cached result
+      
+      if (jobData?.status === 'SUCCEEDED' && jobData?.result) {
+        resultData = jobData.result
+        if (typeof resultData === 'string') {
+          resultData = JSON.parse(resultData)
+        }
+      }
+
+      setCloCheckResultData(resultData)
+      setShowCLOCheckResultModal(true)
+    } catch (err) {
+      console.warn('Failed to fetch latest CLO check result:', err)
+      // Use cached result
+      setCloCheckResultData(history.result)
+      setShowCLOCheckResultModal(true)
+    }
   }
 
   if (!isOpen) return null
@@ -593,17 +631,19 @@ const SyllabusDetailModal = ({
 
         <div className="sticky bottom-0 bg-gray-50 px-8 py-4 flex justify-between items-center border-t">
           <div className="flex items-center gap-2">
-            {cloCheckHistory && cloCheckHistory[syllabusDetailData?.id] && (
+            {syllabusDetailData && cloCheckHistory && cloCheckHistory[syllabusDetailData?.id] && (
               <div className="flex items-center gap-2">
                 <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
                   ✓ Đã check: {cloCheckHistory[syllabusDetailData?.id].timestamp}
                 </span>
                 <button
-                  onClick={() => handleViewCLOCheckHistory(syllabusDetailData?.id)}
-                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm flex items-center gap-2"
+                  onClick={handleViewCLOCheckResult}
+                  disabled={cloCheckLoading}
+                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm flex items-center gap-2 disabled:bg-gray-400"
+                  title="Xem kết quả kiểm tra CLO-PLO"
                 >
                   <Eye size={14} />
-                  Xem kết quả lần trước
+                  {cloCheckLoading ? 'Đang tải...' : 'Xem kết quả'}
                 </button>
                 <button
                   onClick={() => handleClearCLOCheckHistory(syllabusDetailData?.id)}
@@ -617,7 +657,7 @@ const SyllabusDetailModal = ({
           </div>
           <div className="flex gap-2">
             <button 
-              onClick={handleCheckCLOPLOConsistency}
+              onClick={() => handleCheckCLOPLOConsistency(syllabusDetailData)}
               disabled={cloCheckLoading}
               className="px-6 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 disabled:bg-gray-400 flex items-center gap-2"
             >
@@ -651,6 +691,133 @@ const SyllabusDetailModal = ({
               setLocalSelectedDocumentForSummary(null)
             }}
           />
+        )}
+
+        {/* CLO-PLO Check Result Modal */}
+        {showCLOCheckResultModal && cloCheckResultData && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[70] p-4">
+            <div className="bg-white rounded-xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+              <div className="sticky top-0 bg-white border-b px-8 py-6 flex justify-between items-center">
+                <h2 className="text-2xl font-bold text-gray-900">Kết quả kiểm tra CLO-PLO</h2>
+                <button 
+                  onClick={() => setShowCLOCheckResultModal(false)} 
+                  className="text-gray-500 hover:text-gray-700 text-2xl font-light"
+                >
+                  ×
+                </button>
+              </div>
+
+              <div className="p-8 space-y-6">
+                {/* Tổng quan kết quả từ overallAssessment */}
+                <div className="bg-gradient-to-r from-slate-50 to-gray-50 border-l-4 border-blue-600 rounded-lg p-6">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-3">Đánh giá tổng quan</h3>
+                  <div className="space-y-2">
+                    <p className="text-gray-700">
+                      Điểm kiểm tra: <span className="font-bold text-xl text-blue-600">{cloCheckResultData?.overallAssessment?.score?.toFixed(1) || 'N/A'}/10</span>
+                    </p>
+                    <p className="text-gray-700">
+                      Trạng thái: <span className="font-semibold text-gray-800">{cloCheckResultData?.overallAssessment?.status || 'N/A'}</span>
+                    </p>
+                    {cloCheckResultData?.overallAssessment?.keyStrengths && cloCheckResultData.overallAssessment.keyStrengths.length > 0 && (
+                      <div className="mt-4 pt-4 border-t">
+                        <p className="text-sm font-semibold text-gray-900 mb-2">Điểm mạnh:</p>
+                        <ul className="text-sm text-gray-700 space-y-1">
+                          {cloCheckResultData.overallAssessment.keyStrengths.map((strength, idx) => (
+                            <li key={idx} className="flex gap-2">
+                              <span className="text-blue-600">•</span>
+                              <span>{strength}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Phân tích mapping */}
+                {cloCheckResultData?.mappingAnalysis && (
+                  <div className="border border-gray-200 rounded-lg p-6">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Phân tích Mapping</h3>
+                    <div className="grid grid-cols-2 gap-4 mb-4">
+                      <div className="bg-slate-50 p-4 rounded border border-gray-200">
+                        <p className="text-xs text-gray-600 mb-1">Tổng số CLO</p>
+                        <p className="text-3xl font-bold text-gray-900">{cloCheckResultData.mappingAnalysis.totalClos || 0}</p>
+                      </div>
+                      <div className="bg-slate-50 p-4 rounded border border-gray-200">
+                        <p className="text-xs text-gray-600 mb-1">PLO được cover</p>
+                        <p className="text-3xl font-bold text-gray-900">{cloCheckResultData.mappingAnalysis.coveredPlos || 0}</p>
+                      </div>
+                    </div>
+                    
+                    {cloCheckResultData.mappingAnalysis.unmappedClos && cloCheckResultData.mappingAnalysis.unmappedClos.length > 0 && (
+                      <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded">
+                        <p className="text-sm font-semibold text-red-900 mb-1">CLO chưa mapping:</p>
+                        <p className="text-sm text-red-800">{cloCheckResultData.mappingAnalysis.unmappedClos.join(', ')}</p>
+                      </div>
+                    )}
+                    
+                    {cloCheckResultData.mappingAnalysis.uncoveredPlos && cloCheckResultData.mappingAnalysis.uncoveredPlos.length > 0 && (
+                      <div className="p-3 bg-orange-50 border border-orange-200 rounded">
+                        <p className="text-sm font-semibold text-orange-900 mb-1">PLO chưa cover:</p>
+                        <p className="text-sm text-orange-800">{cloCheckResultData.mappingAnalysis.uncoveredPlos.join(', ')}</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Các vấn đề phát hiện */}
+                {cloCheckResultData?.issues && cloCheckResultData.issues.length > 0 && (
+                  <div className="border border-gray-200 rounded-lg p-6">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                      Các vấn đề phát hiện ({cloCheckResultData.issues.length})
+                    </h3>
+                    <div className="space-y-3">
+                      {cloCheckResultData.issues.map((issue, idx) => (
+                        <div
+                          key={idx}
+                          className={`p-4 rounded-lg border-l-4 ${
+                            issue.severity === 'critical'
+                              ? 'bg-red-50 border-red-500'
+                              : issue.severity === 'major'
+                              ? 'bg-orange-50 border-orange-500'
+                              : 'bg-yellow-50 border-yellow-500'
+                          }`}
+                        >
+                          <div className="font-semibold text-gray-900 mb-2">
+                            {issue.severity === 'critical'
+                              ? 'Mức độ: Nghiêm trọng'
+                              : issue.severity === 'major'
+                              ? 'Mức độ: Cao'
+                              : 'Mức độ: Trung bình'}
+                          </div>
+                          <p className="text-sm text-gray-700 mb-2"><strong>Vấn đề:</strong> {issue.problem}</p>
+                          {issue.why && <p className="text-sm text-gray-700 mb-2"><strong>Nguyên nhân:</strong> {issue.why}</p>}
+                          {issue.impact && <p className="text-sm text-gray-700 mb-2"><strong>Tác động:</strong> {issue.impact}</p>}
+                          {issue.recommendation && <p className="text-sm text-gray-700 mb-2"><strong>Khuyến nghị:</strong> {issue.recommendation}</p>}
+                          {issue.howToFix && (
+                            <div className="mt-2 p-3 bg-white rounded border border-gray-200">
+                              <strong className="text-sm">Hướng dẫn sửa:</strong>
+                              <div className="mt-2 text-xs text-gray-700 whitespace-pre-wrap">{issue.howToFix}</div>
+                            </div>
+                          )}
+                          <p className="text-xs text-gray-500 mt-2">Ưu tiên: {issue.priority}/3</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="sticky bottom-0 bg-gray-50 px-8 py-4 flex justify-end gap-2 border-t">
+                <button
+                  onClick={() => setShowCLOCheckResultModal(false)}
+                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                >
+                  Đóng
+                </button>
+              </div>
+            </div>
+          </div>
         )}
       </div>
     </div>

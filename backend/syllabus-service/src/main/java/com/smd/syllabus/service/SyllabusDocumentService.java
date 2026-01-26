@@ -90,7 +90,8 @@ public class SyllabusDocumentService {
         document.setOriginalName(originalName);
         document.setFileType(mapFileType(extension));
         document.setFileSize(file.getSize());
-        document.setFilePath(filePath.toString());
+        // Store only filename, not full path (for Docker volume compatibility)
+        document.setFilePath(uniqueFileName);
         document.setMimeType(file.getContentType());
         document.setUploadedBy(uploadedBy);
         document.setSyllabusVersion(syllabus.getVersionNo());
@@ -144,9 +145,31 @@ public class SyllabusDocumentService {
         SyllabusDocument document = documentRepository.findByIdAndDeletedFalse(documentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Document not found with id: " + documentId));
 
-        Path filePath = Paths.get(document.getFilePath());
+        // Extract just the filename from filePath (handles old data with full paths)
+        String storedPath = document.getFilePath();
+        String fileName;
+        
+        if (storedPath.contains("/") || storedPath.contains("\\")) {
+            // Old data with path - extract filename only
+            Path oldPath = Paths.get(storedPath);
+            fileName = oldPath.getFileName().toString();
+            LOGGER.info("Extracted filename from old path format: {} -> {}", storedPath, fileName);
+        } else {
+            // New data - already just filename
+            fileName = storedPath;
+        }
+        
+        // Always resolve file path from upload directory
+        Path uploadPath = Paths.get(uploadDirectory);
+        Path filePath = uploadPath.resolve(fileName);
+        
+        LOGGER.info("Attempting to download file: documentId={}, uploadDir={}, storedPath={}, fileName={}, resolvedPath={}", 
+            documentId, uploadDirectory, storedPath, fileName, filePath);
+        
         if (!Files.exists(filePath)) {
-            throw new ResourceNotFoundException("File not found on disk: " + document.getFileName());
+            LOGGER.error("File not found on disk: documentId={}, path={}, uploadDir={}", 
+                documentId, filePath, uploadDirectory);
+            throw new ResourceNotFoundException("File not found on disk: " + fileName);
         }
 
         return Files.readAllBytes(filePath);

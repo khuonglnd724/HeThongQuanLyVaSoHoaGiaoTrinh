@@ -198,6 +198,76 @@ const syllabusApprovalService = {
       console.error('Error in revise:', error)
       throw error
     }
+  },
+
+  // Get APPROVED syllabuses (ready for publishing)
+  getApproved: async (params = {}) => {
+    try {
+      const response = await apiClient.get('/api/syllabuses', {
+        params: { ...params, status: 'APPROVED', size: params.size || 100 }
+      })
+      console.log('[syllabusApprovalService] getApproved response:', response.data)
+      return response
+    } catch (error) {
+      console.error('Error fetching approved syllabuses:', error)
+      throw error
+    }
+  },
+
+  // Get DRAFT syllabuses
+  getDraft: async (params = {}) => {
+    try {
+      const response = await apiClient.get('/api/syllabuses', {
+        params: { ...params, status: 'DRAFT', size: params.size || 100 }
+      })
+      console.log('[syllabusApprovalService] getDraft response:', response.data)
+      return response
+    } catch (error) {
+      console.error('Error fetching draft syllabuses:', error)
+      throw error
+    }
+  },
+
+  // Get REVIEW syllabuses (pending review)
+  getReview: async (params = {}) => {
+    try {
+      const response = await apiClient.get('/api/syllabuses', {
+        params: { ...params, status: 'REVIEW', size: params.size || 100 }
+      })
+      console.log('[syllabusApprovalService] getReview response:', response.data)
+      return response
+    } catch (error) {
+      console.error('Error fetching review syllabuses:', error)
+      throw error
+    }
+  },
+
+  // Get REJECTED syllabuses
+  getRejected: async (params = {}) => {
+    try {
+      const response = await apiClient.get('/api/syllabuses', {
+        params: { ...params, status: 'REJECTED', size: params.size || 100 }
+      })
+      console.log('[syllabusApprovalService] getRejected response:', response.data)
+      return response
+    } catch (error) {
+      console.error('Error fetching rejected syllabuses:', error)
+      throw error
+    }
+  },
+
+  // Get all syllabuses (no status filter)
+  getAll: async (params = {}) => {
+    try {
+      const response = await apiClient.get('/api/syllabuses', {
+        params: { ...params, size: params.size || 100 }
+      })
+      console.log('[syllabusApprovalService] getAll response:', response.data)
+      return response
+    } catch (error) {
+      console.error('Error fetching all syllabuses:', error)
+      throw error
+    }
   }
 }
 

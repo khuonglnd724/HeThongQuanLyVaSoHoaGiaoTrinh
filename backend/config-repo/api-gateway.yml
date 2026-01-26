@@ -132,3 +132,7 @@ security:
       - /actuator/prometheus
       - /actuator/health
       - /
+      # Public endpoints for guest users (no authentication required)
+      - /api/v1/program
+      - /api/syllabuses/public**
+      - /api/syllabuses/public/**

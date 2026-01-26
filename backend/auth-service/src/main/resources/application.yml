@@ -14,10 +14,15 @@ spring:
     username: postgres
     password: 123456
     driver-class-name: org.postgresql.Driver
+    # Initialize database with schema.sql first, then data.sql
+    initialization-mode: always
+    # Important: Load schema.sql before data.sql to ensure sequences exist
+    schema-locations: classpath:schema.sql
+    data-locations: classpath:data.sql
 
   jpa:
     hibernate:
-      ddl-auto: update
+      ddl-auto: validate
     show-sql: true
     properties:
       hibernate:

@@ -643,7 +643,7 @@ const SyllabusEditorPage = ({ syllabusId: initialSyllabusId, rootId, user, onBac
             {[
               { id: 'basic', label: 'Thông tin cơ bản' },
               { id: 'clos', label: 'Chuẩn đầu ra (CLO)' },
-              { id: 'files', label: 'Tệp bài giảng' }
+              ...(mode !== 'edit' ? [{ id: 'files', label: 'Tệp bài giảng' }] : [])
             ].map(tab => (
               <button
                 key={tab.id}

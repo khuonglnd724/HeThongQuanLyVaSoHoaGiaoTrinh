@@ -154,6 +154,8 @@ services:
     container_name: syllabus-service
     ports:
       - "8085:8085"
+    volumes:
+      - syllabus-uploads:/app/uploads
     environment:
       JAVA_OPTS: "-Xmx256m -Xms256m"
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/syllabus_db
@@ -163,6 +165,7 @@ services:
       SPRING_REDIS_PORT: 6379
       SPRING_RABBITMQ_HOST: smd-rabbitmq
       EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE: http://discovery-server:8761/eureka
+      SMD_FILE_UPLOAD_DIRECTORY: /app/uploads/syllabus-documents
     depends_on:
       postgres:
         condition: service_healthy
@@ -224,11 +227,18 @@ services:
       SPRING_REDIS_PORT: 6379
       EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE: http://discovery-server:8761/eureka
       SPRING_CLOUD_COMPATIBILITY_VERIFIER_ENABLED: "false"
+      # Service URLs for inter-service communication in Docker
+      SERVICES_ACADEMIC_SERVICE_URL: http://academic-service:8082
+      SERVICES_SYLLABUS_SERVICE_URL: http://syllabus-service:8085
     depends_on:
       postgres:
         condition: service_healthy
       discovery-server:
         condition: service_healthy
+      academic-service:
+        condition: service_started
+      syllabus-service:
+        condition: service_started
     networks:
       - smd-network
 
@@ -517,6 +527,8 @@ volumes:
   grafana_data:
     driver: local
   loki_data:
+    driver: local
+  syllabus-uploads:
     driver: local
   transformers_cache:
     driver: local

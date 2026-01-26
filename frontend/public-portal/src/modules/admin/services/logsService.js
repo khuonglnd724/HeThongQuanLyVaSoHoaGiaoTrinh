@@ -1,4 +1,4 @@
-import apiClient from '@/services/api/apiClient';
+import apiClient from '../../../services/api/apiClient';
 
 const logsAPI = {
   getLogs: (filter) => apiClient.get('/api/admin/system/logs', { params: filter }),

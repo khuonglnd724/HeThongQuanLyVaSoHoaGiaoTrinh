@@ -222,22 +222,35 @@ const LecturerDashboard = ({ user, onLogout }) => {
   const [showDocumentSummaryModal, setShowDocumentSummaryModal] = useState(false) // Show/hide document summary modal
   const [selectedDocumentForSummary, setSelectedDocumentForSummary] = useState(null) // Document được chọn để view summary
   
-  // CLO-PLO Check state
-  const [showCLOCheckModal, setShowCLOCheckModal] = useState(false)
+  // Upload Document Modal state
+  const [showUploadModal, setShowUploadModal] = useState(false)
+  const [selectedSyllabusForUpload, setSelectedSyllabusForUpload] = useState(null)
+  const [uploadFile, setUploadFile] = useState(null)
+  const [uploadTitle, setUploadTitle] = useState('')
+  const [uploadDescription, setUploadDescription] = useState('')
+  const [uploading, setUploading] = useState(false)
+  
+  // CLO-PLO Check state - only keep cloCheckLoading for SyllabusDetailModal
   const [cloCheckLoading, setCloCheckLoading] = useState(false)
-  const [cloCheckJobId, setCloCheckJobId] = useState(null)
-  const [cloCheckResult, setCloCheckResult] = useState(null)
-  const [cloCheckSyllabusId, setCloCheckSyllabusId] = useState(null)
-  const [cloCheckHistory, setCloCheckHistory] = useState({}) // Lưu lịch sử: {syllabusId: {jobId, result, timestamp}}
+  const [cloCheckHistory, setCloCheckHistory] = useState({}) // For storing job results
   
   // Load history from localStorage on mount
   useEffect(() => {
-    const saved = localStorage.getItem('cloCheckHistory')
-    if (saved) {
+    const savedCloHistory = localStorage.getItem('cloCheckHistory')
+    if (savedCloHistory) {
       try {
-        setCloCheckHistory(JSON.parse(saved))
+        setCloCheckHistory(JSON.parse(savedCloHistory))
       } catch (e) {
         console.warn('Failed to load CLO check history:', e)
+      }
+    }
+
+    const savedDocSummaries = localStorage.getItem('documentSummaries')
+    if (savedDocSummaries) {
+      try {
+        setDocumentSummaries(JSON.parse(savedDocSummaries))
+      } catch (e) {
+        console.warn('Failed to load document summaries:', e)
       }
     }
   }, [])
@@ -246,6 +259,11 @@ const LecturerDashboard = ({ user, onLogout }) => {
   useEffect(() => {
     localStorage.setItem('cloCheckHistory', JSON.stringify(cloCheckHistory))
   }, [cloCheckHistory])
+
+  // Save document summaries to localStorage when it changes
+  useEffect(() => {
+    localStorage.setItem('documentSummaries', JSON.stringify(documentSummaries))
+  }, [documentSummaries])
   
   // Create/Edit form (simplified - only basic fields, content will be added later)
   const [formData, setFormData] = useState({
@@ -1138,8 +1156,6 @@ const LecturerDashboard = ({ user, onLogout }) => {
       }
 
       console.log(`[LecturerDashboard] Job ID: ${jobId}, polling for result...`)
-      setCloCheckJobId(jobId)
-      setCloCheckSyllabusId(syllabusDetailData.id)
       
       // Poll for result with intelligent backoff
       const maxWaitTime = 300000 // 5 minutes
@@ -1192,11 +1208,8 @@ const LecturerDashboard = ({ user, onLogout }) => {
       if (typeof resultData === 'string') {
         resultData = JSON.parse(resultData)
       }
-
-      setCloCheckResult(resultData)
-      setShowCLOCheckModal(true)
       
-      // Save to history for later access
+      // Save to history for later access - don't show modal here
       setCloCheckHistory(prev => ({
         ...prev,
         [syllabusDetailData.id]: {
@@ -1207,25 +1220,16 @@ const LecturerDashboard = ({ user, onLogout }) => {
         }
       }))
       
-      showToast('✅ Kiểm tra CLO-PLO thành công!', 'success')
+      showToast('Kiểm tra CLO-PLO thành công! Xem kết quả trong chi tiết giáo trình.', 'success')
     } catch (err) {
       console.error('Error checking CLO-PLO consistency:', err)
-      showToast(`❌ Lỗi: ${err.message}`, 'error')
-      setCloCheckResult(null)
+      showToast(`Lỗi: ${err.message}`, 'error')
     } finally {
       setCloCheckLoading(false)
     }
   }
 
-  const handleViewCLOCheckHistory = (syllabusId) => {
-    const history = cloCheckHistory[syllabusId]
-    if (history && history.result) {
-      setCloCheckResult(history.result)
-      setCloCheckJobId(history.jobId)
-      setCloCheckSyllabusId(syllabusId)
-      setShowCLOCheckModal(true)
-    }
-  }
+  // handleViewCLOCheckHistory removed - SyllabusDetailModal now handles CLO-PLO result display
 
   const handleClearCLOCheckHistory = (syllabusId) => {
     setCloCheckHistory(prev => {
@@ -1294,6 +1298,158 @@ const LecturerDashboard = ({ user, onLogout }) => {
     } catch (err) {
       console.error('Add document error:', err)
       showToast(err?.response?.data?.message || 'Thêm tài liệu thất bại', 'error')
+    }
+  }
+
+  // Upload document directly to a syllabus (without version change)
+  const handleQuickAddDocument = async (file, title, description) => {
+    if (!syllabusDetailData) {
+      showToast('Vui lòng chọn giáo trình', 'warning')
+      return
+    }
+
+    try {
+      // Upload document
+      const res = await syllabusServiceV2.uploadDocument(
+        syllabusDetailData.id,
+        file,
+        title,
+        description,
+        currentUser?.userId || currentUser?.id
+      )
+      console.log('Upload document response:', res?.data)
+      
+      // Also ingest into AI service for RAG
+      try {
+        await aiService.ingestDocument(file, syllabusDetailData.id, syllabusDetailData.subjectName || '')
+        console.log('Document ingested into AI service')
+      } catch (aiErr) {
+        console.warn('Failed to ingest document into AI service:', aiErr)
+      }
+      
+      showToast('✅ Thêm tài liệu thành công (không thay đổi phiên bản)', 'success')
+      
+      // Reload documents
+      await handleViewSyllabusDetail(syllabusDetailData)
+      return true
+    } catch (err) {
+      console.error('Quick add document error:', err)
+      showToast(err?.response?.data?.message || 'Thêm tài liệu thất bại', 'error')
+      return false
+    }
+  }
+
+  // Upload Document Modal Handlers
+  const handleOpenUploadModal = async (syllabus) => {
+    setSelectedSyllabusForUpload(syllabus)
+    setUploadFile(null)
+    setUploadTitle('')
+    setUploadDescription('')
+    
+    // Load existing documents for this syllabus
+    try {
+      console.log('[LecturerDashboard] Loading documents for syllabus:', syllabus.id)
+      const res = await syllabusServiceV2.getDocumentsBySyllabus(syllabus.id)
+      console.log('[LecturerDashboard] Documents response:', res)
+      
+      // Handle different response structures
+      const docs = res?.data?.data || res?.data || res || []
+      const docsArray = Array.isArray(docs) ? docs : []
+      
+      console.log('[LecturerDashboard] Documents loaded:', docsArray.length, docsArray)
+      setSyllabusDetailDocuments(docsArray)
+    } catch (err) {
+      console.warn('Failed to load documents:', err)
+      setSyllabusDetailDocuments([])
+    }
+    
+    setShowUploadModal(true)
+  }
+
+  const handleCloseUploadModal = () => {
+    setShowUploadModal(false)
+    setSelectedSyllabusForUpload(null)
+    setUploadFile(null)
+    setUploadTitle('')
+    setUploadDescription('')
+    setUploading(false)
+  }
+
+  const handleDeleteDocument = async (documentId) => {
+    if (!window.confirm('Bạn chắc chắn muốn xoá tài liệu này?')) {
+      return
+    }
+    
+    try {
+      const userId = currentUser?.id || currentUser?.userId
+      await syllabusServiceV2.deleteDocument(documentId, userId)
+      showToast('✅ Xoá tài liệu thành công', 'success')
+      
+      // Reload documents
+      if (selectedSyllabusForUpload) {
+        const res = await syllabusServiceV2.getDocumentsBySyllabus(selectedSyllabusForUpload.id)
+        setSyllabusDetailDocuments(res.data?.data || res.data || [])
+      }
+    } catch (err) {
+      console.error('Delete document error:', err)
+      showToast(err?.response?.data?.message || 'Xoá tài liệu thất bại', 'error')
+    }
+  }
+
+  const handleSubmitUpload = async () => {
+    if (!uploadFile) {
+      showToast('Vui lòng chọn tệp', 'warning')
+      return
+    }
+    if (!selectedSyllabusForUpload) {
+      showToast('Vui lòng chọn giáo trình', 'warning')
+      return
+    }
+
+    setUploading(true)
+    try {
+      // Use filename as title if title is empty
+      const finalTitle = uploadTitle.trim() || uploadFile.name
+      
+      // Upload document
+      const res = await syllabusServiceV2.uploadDocument(
+        selectedSyllabusForUpload.id,
+        uploadFile,
+        finalTitle,
+        uploadDescription,
+        currentUser?.userId || currentUser?.id
+      )
+      console.log('Upload document response:', res?.data)
+      
+      showToast('✅ Thêm tài liệu thành công (không thay đổi phiên bản)', 'success')
+      
+      // Reset form but keep modal open to show updated documents
+      setUploadFile(null)
+      setUploadTitle('')
+      setUploadDescription('')
+      
+      // Reload documents in modal
+      if (selectedSyllabusForUpload) {
+        try {
+          const docsRes = await syllabusServiceV2.getDocumentsBySyllabus(selectedSyllabusForUpload.id)
+          setSyllabusDetailDocuments(docsRes.data?.data || docsRes.data || [])
+        } catch (docErr) {
+          console.warn('Failed to reload documents:', docErr)
+          setSyllabusDetailDocuments([])
+        }
+      }
+      
+      // Reload syllabus list
+      try {
+        await loadLecturerSyllabi()
+      } catch (syllErr) {
+        console.warn('Failed to reload syllabus list:', syllErr)
+      }
+    } catch (err) {
+      console.error('Upload document error:', err)
+      showToast(err?.response?.data?.message || 'Thêm tài liệu thất bại', 'error')
+    } finally {
+      setUploading(false)
     }
   }
 
@@ -1473,6 +1629,13 @@ const LecturerDashboard = ({ user, onLogout }) => {
                               >
                                 <Eye size={16} />
                               </button>
+                              <button
+                                onClick={() => handleOpenUploadModal(s)}
+                                className="text-green-600 hover:text-green-700 font-medium flex items-center gap-1"
+                                title="Thêm bài giảng"
+                              >
+                                <Upload size={16} />
+                              </button>
                               {s.status === 'DRAFT' && (
                                 <>
                                   <button
@@ -1535,8 +1698,7 @@ const LecturerDashboard = ({ user, onLogout }) => {
             <div className="p-8">
               <div className="flex items-center justify-between mb-4">
                 <div>
-                  <h3 className="text-lg font-semibold">Danh sách cần duyệt (HoD)</h3>
-                  <p className="text-sm text-gray-600">Nhấn duyệt / từ chối / yêu cầu chỉnh sửa.</p>
+                  <h3 className="text-lg font-semibold">Danh sách cần duyệt </h3>
                 </div>
                 <button
                   onClick={() => loadReviewQueue(true)}
@@ -1556,7 +1718,7 @@ const LecturerDashboard = ({ user, onLogout }) => {
               {reviewLoading ? (
                 <div className="text-gray-600">Đang tải danh sách cần duyệt...</div>
               ) : reviewItems.length === 0 ? (
-                <div className="text-gray-500">Không có giáo trình nào đang chờ HoD duyệt.</div>
+                <div className="text-gray-500">Không có giáo trình nào đang chờ duyệt.</div>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full table-fixed">
@@ -2133,7 +2295,6 @@ const LecturerDashboard = ({ user, onLogout }) => {
         onClose={() => {
           setShowSyllabusDetailModal(false)
           setSyllabusDetailData(null)
-          setCloCheckResult(null)
         }}
         syllabusDetailData={syllabusDetailData}
         syllabusDetailLoading={syllabusDetailLoading}
@@ -2145,10 +2306,10 @@ const LecturerDashboard = ({ user, onLogout }) => {
         cloCheckHistory={cloCheckHistory}
         handleViewSyllabusDetail={handleViewSyllabusDetail}
         handleCheckCLOPLOConsistency={handleCheckCLOPLOConsistency}
-        handleViewCLOCheckHistory={handleViewCLOCheckHistory}
         handleClearCLOCheckHistory={handleClearCLOCheckHistory}
         handleViewDocument={handleViewDocument}
         generateDocumentSummary={generateDocumentSummary}
+        handleQuickAddDocument={handleQuickAddDocument}
         setShowDocumentSummaryModal={setShowDocumentSummaryModal}
         setSelectedDocumentForSummary={setSelectedDocumentForSummary}
         showToast={showToast}
@@ -2165,132 +2326,121 @@ const LecturerDashboard = ({ user, onLogout }) => {
         />
       )}
 
-      {/* CLO-PLO Check Modal */}
-      {showCLOCheckModal && cloCheckResult && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="sticky top-0 bg-white border-b px-8 py-6 flex justify-between items-center">
-              <h2 className="text-2xl font-bold text-gray-900">Kết quả kiểm tra CLO-PLO</h2>
-              <button 
-                onClick={() => setShowCLOCheckModal(false)} 
-                className="text-gray-500 hover:text-gray-700 text-2xl font-light"
+      {/* Upload Document Modal */}
+      {showUploadModal && selectedSyllabusForUpload && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-lg max-w-md w-full mx-4">
+            <div className="flex items-center justify-between p-6 border-b border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-900">Thêm bài giảng</h3>
+              <button
+                onClick={handleCloseUploadModal}
+                className="text-gray-400 hover:text-gray-600 transition"
               >
-                ×
+                ✕
               </button>
             </div>
 
-            <div className="p-8 space-y-6">
-              {/* Tổng quan kết quả từ overallAssessment */}
-              <div className="bg-gradient-to-r from-slate-50 to-gray-50 border-l-4 border-blue-600 rounded-lg p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-3">Đánh giá tổng quan</h3>
-                <div className="space-y-2">
-                  <p className="text-gray-700">
-                    Điểm kiểm tra: <span className="font-bold text-xl text-blue-600">{cloCheckResult?.overallAssessment?.score?.toFixed(1) || 'N/A'}/10</span>
-                  </p>
-                  <p className="text-gray-700">
-                    Trạng thái: <span className="font-semibold text-gray-800">{cloCheckResult?.overallAssessment?.status || 'N/A'}</span>
-                  </p>
-                  {cloCheckResult?.overallAssessment?.keyStrengths && cloCheckResult.overallAssessment.keyStrengths.length > 0 && (
-                    <div className="mt-4 pt-4 border-t">
-                      <p className="text-sm font-semibold text-gray-900 mb-2">Điểm mạnh:</p>
-                      <ul className="text-sm text-gray-700 space-y-1">
-                        {cloCheckResult.overallAssessment.keyStrengths.map((strength, idx) => (
-                          <li key={idx} className="flex gap-2">
-                            <span className="text-blue-600">•</span>
-                            <span>{strength}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                </div>
+            <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
+              {/* Syllabus Info */}
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 sticky top-0">
+                <p className="text-sm text-gray-600">Giáo trình:</p>
+                <p className="font-medium text-gray-900">
+                  {selectedSyllabusForUpload.subjectCode} - {selectedSyllabusForUpload.subjectName}
+                </p>
               </div>
 
-              {/* Phân tích mapping */}
-              {cloCheckResult?.mappingAnalysis && (
-                <div className="border border-gray-200 rounded-lg p-6">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Phân tích Mapping</h3>
-                  <div className="grid grid-cols-2 gap-4 mb-4">
-                    <div className="bg-slate-50 p-4 rounded border border-gray-200">
-                      <p className="text-xs text-gray-600 mb-1">Tổng số CLO</p>
-                      <p className="text-3xl font-bold text-gray-900">{cloCheckResult.mappingAnalysis.totalClos || 0}</p>
-                    </div>
-                    <div className="bg-slate-50 p-4 rounded border border-gray-200">
-                      <p className="text-xs text-gray-600 mb-1">PLO được cover</p>
-                      <p className="text-3xl font-bold text-gray-900">{cloCheckResult.mappingAnalysis.coveredPlos || 0}</p>
-                    </div>
-                  </div>
-                  
-                  {cloCheckResult.mappingAnalysis.unmappedClos && cloCheckResult.mappingAnalysis.unmappedClos.length > 0 && (
-                    <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded">
-                      <p className="text-sm font-semibold text-red-900 mb-1">CLO chưa mapping:</p>
-                      <p className="text-sm text-red-800">{cloCheckResult.mappingAnalysis.unmappedClos.join(', ')}</p>
-                    </div>
-                  )}
-                  
-                  {cloCheckResult.mappingAnalysis.uncoveredPlos && cloCheckResult.mappingAnalysis.uncoveredPlos.length > 0 && (
-                    <div className="p-3 bg-orange-50 border border-orange-200 rounded">
-                      <p className="text-sm font-semibold text-orange-900 mb-1">PLO chưa cover:</p>
-                      <p className="text-sm text-orange-800">{cloCheckResult.mappingAnalysis.uncoveredPlos.join(', ')}</p>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Các vấn đề phát hiện */}
-              {cloCheckResult?.issues && cloCheckResult.issues.length > 0 && (
-                <div className="border border-gray-200 rounded-lg p-6">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                    Các vấn đề phát hiện ({cloCheckResult.issues.length})
-                  </h3>
-                  <div className="space-y-3">
-                    {cloCheckResult.issues.map((issue, idx) => (
-                      <div
-                        key={idx}
-                        className={`p-4 rounded-lg border-l-4 ${
-                          issue.severity === 'critical'
-                            ? 'bg-red-50 border-red-500'
-                            : issue.severity === 'major'
-                            ? 'bg-orange-50 border-orange-500'
-                            : 'bg-yellow-50 border-yellow-500'
-                        }`}
-                      >
-                        <div className="font-semibold text-gray-900 mb-2">
-                          {issue.severity === 'critical'
-                            ? 'Mức độ: Nghiêm trọng'
-                            : issue.severity === 'major'
-                            ? 'Mức độ: Cao'
-                            : 'Mức độ: Trung bình'}
+              {/* Existing Documents */}
+              {syllabusDetailDocuments && syllabusDetailDocuments.length > 0 && (
+                <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                  <h4 className="text-sm font-semibold text-gray-900 mb-3">Tài liệu hiện có ({syllabusDetailDocuments.length})</h4>
+                  <div className="space-y-2 max-h-48 overflow-y-auto">
+                    {syllabusDetailDocuments.map((doc) => (
+                      <div key={doc.id} className="flex items-start justify-between bg-white p-3 rounded border border-gray-200 hover:bg-gray-50 transition">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-gray-900 truncate">{doc.title || doc.originalName || doc.fileName}</p>
+                          {doc.description && <p className="text-xs text-gray-600 mt-1 line-clamp-2">{doc.description}</p>}
+                          <p className="text-xs text-gray-500 mt-1">Tải lên {doc.uploadedAt ? new Date(doc.uploadedAt).toLocaleDateString('vi-VN') : 'N/A'}</p>
                         </div>
-                        <p className="text-sm text-gray-700 mb-2"><strong>Vấn đề:</strong> {issue.problem}</p>
-                        {issue.why && <p className="text-sm text-gray-700 mb-2"><strong>Nguyên nhân:</strong> {issue.why}</p>}
-                        {issue.impact && <p className="text-sm text-gray-700 mb-2"><strong>Tác động:</strong> {issue.impact}</p>}
-                        {issue.recommendation && <p className="text-sm text-gray-700 mb-2"><strong>Khuyến nghị:</strong> {issue.recommendation}</p>}
-                        {issue.howToFix && (
-                          <div className="mt-2 p-3 bg-white rounded border border-gray-200">
-                            <strong className="text-sm">Hướng dẫn sửa:</strong>
-                            <div className="mt-2 text-xs text-gray-700 whitespace-pre-wrap">{issue.howToFix}</div>
-                          </div>
-                        )}
-                        <p className="text-xs text-gray-500 mt-2">Ưu tiên: {issue.priority}/3</p>
+                        <button
+                          onClick={() => handleDeleteDocument(doc.id)}
+                          className="ml-2 text-red-600 hover:text-red-700 font-medium text-xs whitespace-nowrap flex-shrink-0"
+                          title="Xoá tài liệu"
+                        >
+                          🗑️ Xoá
+                        </button>
                       </div>
                     ))}
                   </div>
                 </div>
               )}
+
+              <div className="border-t border-gray-200 pt-4">
+                <h4 className="text-sm font-semibold text-gray-900 mb-3">Thêm tài liệu mới</h4>
+              </div>
+
+              {/* File Input */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Chọn tệp <span className="text-red-500">*</span>
+                </label>
+                <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center hover:border-blue-400 transition cursor-pointer"
+                  onClick={() => {
+                    const input = document.getElementById('file-upload-input')
+                    if (input) input.click()
+                  }}
+                >
+                  {uploadFile ? (
+                    <div className="text-sm text-gray-700">
+                      <p className="font-medium">📎 {uploadFile.name}</p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        {(uploadFile.size / 1024 / 1024).toFixed(2)} MB
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="text-sm text-gray-500">
+                      <p className="font-medium">Kéo thả hoặc nhấn để chọn tệp</p>
+                      <p className="text-xs mt-1">Hỗ trợ PDF, Word, PowerPoint, etc.</p>
+                    </div>
+                  )}
+                </div>
+                <input
+                  id="file-upload-input"
+                  type="file"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0]
+                    if (file) {
+                      setUploadFile(file)
+                    }
+                  }}
+                  className="hidden"
+                  disabled={uploading}
+                />
+              </div>
             </div>
 
-            <div className="sticky bottom-0 bg-gray-50 px-8 py-4 flex justify-end gap-2 border-t">
+            {/* Footer */}
+            <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-200">
               <button
-                onClick={() => setShowCLOCheckModal(false)}
-                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                onClick={handleCloseUploadModal}
+                disabled={uploading}
+                className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition disabled:opacity-50"
               >
-                Đóng
+                Huỷ
+              </button>
+              <button
+                onClick={handleSubmitUpload}
+                disabled={uploading || !uploadFile}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition disabled:opacity-50 flex items-center gap-2"
+              >
+                {uploading && <Loader size={16} className="animate-spin" />}
+                {uploading ? 'Đang tải...' : 'Thêm'}
               </button>
             </div>
           </div>
         </div>
       )}
+
+      {/* CLO-PLO Check Modal removed - now displayed in SyllabusDetailModal */}
     </div>
   )
 }

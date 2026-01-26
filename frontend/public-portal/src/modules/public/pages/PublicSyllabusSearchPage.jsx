@@ -3,82 +3,203 @@ import { BookOpen, Search, Filter, X, ChevronRight, Calendar, User, BookMarked, 
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import syllabusService from '../../../services/syllabusService'
 
-export default function PublicSyllabusSearchPage({ user }) {
+export default function PublicSyllabusSearchPage() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   
+  // Get user from localStorage instead of props
+  const [localUser, setLocalUser] = useState(null)
   const [syllabi, setSyllabi] = useState([])
-  const [programs, setPrograms] = useState([])
   const [loading, setLoading] = useState(false)
   const [searchTerm, setSearchTerm] = useState(searchParams.get('keyword') || '')
-  const [selectedMajor, setSelectedMajor] = useState(() => {
-    // If user is student with major, FORCE their major (cannot see others)
-    if (user?.major && user?.roles?.includes('ROLE_STUDENT')) {
-      return user.major
-    }
-    return searchParams.get('major') || 'all'
-  })
-  const [selectedSemester, setSelectedSemester] = useState(searchParams.get('semester') || 'all')
-  const [selectedYear, setSelectedYear] = useState(searchParams.get('year') || 'all')
   const [sortBy, setSortBy] = useState('latest')
   const [showMobileFilters, setShowMobileFilters] = useState(false)
   const [error, setError] = useState(null)
+  const [programs, setPrograms] = useState([])
+  const [selectedProgram, setSelectedProgram] = useState('')
+  const [isStudent, setIsStudent] = useState(false)
 
-  // Filter data - Load from backend instead of hardcode
-  const semesters = [1, 2, 3] // semester numbers from backend
-  const academicYears = ['2024-2025', '2023-2024', '2022-2023']
-
-  // Fetch all programs for dropdown
-  const fetchPrograms = useCallback(async () => {
-    try {
-      const response = await syllabusService.getAllPrograms()
-      setPrograms(response)
-    } catch (err) {
-      console.error('Error loading programs:', err)
-      setPrograms([])
+  useEffect(() => {
+    // Load user from localStorage on mount
+    const userData = localStorage.getItem('user')
+    if (userData) {
+      try {
+        const user = JSON.parse(userData)
+        setLocalUser(user)
+        // Check if user is a student (support both 'STUDENT' and 'ROLE_STUDENT')
+        const studentRole = user.roles?.some(r => r === 'STUDENT' || r === 'ROLE_STUDENT') 
+                         || user.role === 'STUDENT' 
+                         || user.role === 'ROLE_STUDENT'
+        setIsStudent(studentRole)
+        console.log('👤 User loaded from localStorage:', user)
+        console.log('🎓 Is student:', studentRole)
+      } catch (e) {
+        console.error('Error parsing user data:', e)
+      }
+    } else {
+      // Guest user - fetch all programs for filter
+      fetchPrograms()
     }
   }, [])
 
-  const fetchSyllabi = useCallback(async () => {
+  const fetchPrograms = useCallback(async () => {
+    try {
+      console.log('📚 Fetching all programs for guest filter')
+      // Call public-service (no auth required)
+      const response = await fetch('/api/public/programs')
+      
+      if (response.ok) {
+        const data = await response.json()
+        const programsArray = Array.isArray(data) ? data : (data.data || [])
+        setPrograms(programsArray)
+        console.log('✅ Programs loaded:', programsArray)
+      }
+    } catch (err) {
+      console.error('❌ Error fetching programs:', err)
+    }
+  }, [])
+
+  const fetchSyllabi = useCallback(async (user, programFilter = null) => {
     setLoading(true)
     setError(null)
     try {
-      // If user is student with major, pass programName to backend for server-side filter
-      const programFilter = (user?.major && user?.roles?.includes('ROLE_STUDENT')) ? user.major : null
-      const response = await syllabusService.getPublishedSyllabuses(0, 50, programFilter)
-      // Handle both array and object response
-      setSyllabi(Array.isArray(response) ? response : (response?.data || []))
+      const token = localStorage.getItem('token')
+      const headers = token ? { 'Authorization': `Bearer ${token}` } : {}
+      
+      // Check if user is student (support both 'STUDENT' and 'ROLE_STUDENT')
+      const userIsStudent = user && (
+        user.roles?.some(r => r === 'STUDENT' || r === 'ROLE_STUDENT') 
+        || user.role === 'STUDENT' 
+        || user.role === 'ROLE_STUDENT'
+      )
+      
+      if (userIsStudent) {
+        // STUDENT: Fetch APPROVED + PUBLIC syllabuses for their program
+        console.log('🎓 Student user - fetching APPROVED + PUBLIC syllabuses')
+        
+        const programName = user?.major
+        console.log('🎓 User program name:', programName)
+        
+        if (!programName) {
+          console.warn('⚠️ Student has no program name')
+          setSyllabi([])
+          setError('Không thể xác định ngành học của bạn. Vui lòng đăng nhập lại.')
+          return
+        }
+        
+        // Fetch subjects of the program
+        console.log('📚 Fetching subjects for program:', programName)
+        const subjectsUrl = `/api/v1/subject/program/search?name=${encodeURIComponent(programName)}`
+        
+        const subjectsResponse = await fetch(subjectsUrl, { headers })
+        
+        if (!subjectsResponse.ok) {
+          console.warn(`⚠️ Failed to fetch subjects for program: ${subjectsResponse.status}`)
+          setSyllabi([])
+          return
+        }
+        
+        const subjectsData = await subjectsResponse.json()
+        console.log('✅ Subjects loaded:', subjectsData)
+        
+        const subjects = subjectsData.data || subjectsData
+        const subjectCodes = Array.isArray(subjects) 
+          ? subjects.map(s => s.subjectCode || s.code).filter(Boolean)
+          : []
+        
+        console.log('📋 Subject codes:', subjectCodes)
+        
+        if (subjectCodes.length === 0) {
+          console.warn('No subjects found for program')
+          setSyllabi([])
+          return
+        }
+        
+        // Fetch APPROVED + PUBLISHED syllabuses for these subjects
+        console.log('🔍 Fetching APPROVED + PUBLISHED syllabuses for subjects:', subjectCodes)
+        const syllabusesResponse = await fetch(
+          `/api/syllabuses/student-syllabuses?${subjectCodes.map(code => `subjectCodes=${encodeURIComponent(code)}`).join('&')}`,
+          { headers }
+        )
+        
+        if (!syllabusesResponse.ok) {
+          throw new Error(`Failed to fetch syllabuses: ${syllabusesResponse.status}`)
+        }
+        
+        const syllabusesData = await syllabusesResponse.json()
+        console.log('✅ APPROVED + PUBLISHED syllabuses loaded:', syllabusesData)
+        
+        const syllabusesArray = Array.isArray(syllabusesData) ? syllabusesData : (syllabusesData.data || [])
+        setSyllabi(syllabusesArray)
+        console.log('📊 Total syllabuses:', syllabusesArray.length)
+        
+      } else {
+        // GUEST or NON-STUDENT: Fetch PUBLIC syllabuses only
+        console.log('👤 Guest/non-student user - fetching PUBLIC syllabuses')
+        
+        let url = '/api/public/syllabuses'
+        
+        // Add program filter if selected (for guest users)
+        if (programFilter) {
+          // Fetch subjects of selected program via public-service
+          console.log('📚 Fetching subjects for selected program:', programFilter)
+          const subjectsUrl = `/api/public/subjects/by-program?programName=${encodeURIComponent(programFilter)}`
+          
+          const subjectsResponse = await fetch(subjectsUrl)
+          
+          if (subjectsResponse.ok) {
+            const subjectsData = await subjectsResponse.json()
+            const subjects = subjectsData.data || subjectsData
+            const subjectCodes = Array.isArray(subjects) 
+              ? subjects.map(s => s.subjectCode || s.code).filter(Boolean)
+              : []
+            
+            if (subjectCodes.length > 0) {
+              // Filter by subject codes
+              url += `?${subjectCodes.map(code => `subjectCodes=${encodeURIComponent(code)}`).join('&')}`
+            }
+          }
+        }
+        
+        console.log('🔍 Fetching from:', url)
+        const syllabusesResponse = await fetch(url)
+        
+        if (!syllabusesResponse.ok) {
+          throw new Error(`Failed to fetch syllabuses: ${syllabusesResponse.status}`)
+        }
+        
+        const syllabusesData = await syllabusesResponse.json()
+        console.log('✅ PUBLIC syllabuses loaded:', syllabusesData)
+        
+        const syllabusesArray = Array.isArray(syllabusesData) ? syllabusesData : (syllabusesData.data || [])
+        setSyllabi(syllabusesArray)
+        console.log('📊 Total syllabuses:', syllabusesArray.length)
+      }
+      
     } catch (err) {
+      console.error('❌ Error fetching syllabuses:', {
+        message: err.message,
+        status: err.response?.status,
+        data: err.response?.data,
+        url: err.config?.url
+      })
       setError('Không thể tải danh sách giáo trình. Vui lòng thử lại.')
-      console.error(err)
     } finally {
       setLoading(false)
     }
-  }, [user?.major, user?.roles])
+  }, [])
 
   useEffect(() => {
-    fetchPrograms()
-    fetchSyllabi()
-  }, [fetchPrograms, fetchSyllabi])
+    fetchSyllabi(localUser, selectedProgram)
+  }, [localUser, selectedProgram, fetchSyllabi])
 
   const filteredAndSortedSyllabi = useMemo(() => {
     let filtered = syllabi.filter(item => {
       const matchesSearch = !searchTerm || 
-        item.subjectCode?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.subjectName?.toLowerCase().includes(searchTerm.toLowerCase())
+        item.code?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        item.title?.toLowerCase().includes(searchTerm.toLowerCase())
       
-      // STRICT: Students can ONLY see syllabi from their major
-      let matchesMajor
-      if (user?.major && user?.roles?.includes('ROLE_STUDENT')) {
-        matchesMajor = item.programName === user.major
-      } else {
-        matchesMajor = selectedMajor === 'all' || item.programName === selectedMajor
-      }
-      
-      const matchesSemester = selectedSemester === 'all' || parseInt(item.semester) === parseInt(selectedSemester)
-      const matchesYear = selectedYear === 'all' || item.academicYear === selectedYear
-      
-      return matchesSearch && matchesMajor && matchesSemester && matchesYear
+      return matchesSearch
     })
 
     // Sort
@@ -91,7 +212,7 @@ export default function PublicSyllabusSearchPage({ user }) {
     }
 
     return filtered
-  }, [syllabi, searchTerm, selectedMajor, selectedSemester, selectedYear, sortBy])
+  }, [syllabi, searchTerm, sortBy])
 
   const handleSearch = (e) => {
     e.preventDefault()
@@ -100,9 +221,9 @@ export default function PublicSyllabusSearchPage({ user }) {
 
   const clearFilters = () => {
     setSearchTerm('')
-    setSelectedMajor('all')
-    setSelectedSemester('all')
-    setSelectedYear('all')
+    if (!localUser) {
+      setSelectedProgram('')
+    }
   }
 
   const FilterSidebar = () => (
@@ -111,67 +232,11 @@ export default function PublicSyllabusSearchPage({ user }) {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Filter className="text-blue-600" size={20} />
-          <h3 className="font-semibold text-gray-900">Bộ lọc</h3>
+          <h3 className="font-semibold text-gray-900">{!localUser ? 'Bộ lọc & Sắp xếp' : 'Sắp xếp'}</h3>
         </div>
-        <button
-          onClick={clearFilters}
-          className="text-sm text-blue-600 hover:text-blue-800"
-        >
-          Xóa bộ lọc
-        </button>
       </div>
 
-      {/* Major Filter */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          Chuyên Ngành {user?.major && user?.roles?.includes('ROLE_STUDENT') && <span className="text-xs text-gray-500">(Ngành của bạn)</span>}
-        </label>
-        <select
-          value={selectedMajor}
-          onChange={(e) => setSelectedMajor(e.target.value)}
-          disabled={user?.major && user?.roles?.includes('ROLE_STUDENT')}
-          className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${user?.major && user?.roles?.includes('ROLE_STUDENT') ? 'bg-gray-100 cursor-not-allowed' : ''}`}
-        >
-          <option value={user?.major || 'all'}>{user?.major ? `${user.major} (Ngành của bạn)` : 'Tất cả'}</option>
-          {!user?.major && programs.map((program) => (
-            <option key={program.id} value={program.programName}>{program.programName}</option>
-          ))}
-        </select>
-      </div>
-
-      {/* Semester Filter */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          Học Kỳ
-        </label>
-        <select
-          value={selectedSemester}
-          onChange={(e) => setSelectedSemester(e.target.value)}
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-        >
-          <option value="all">Tất cả</option>
-          {semesters.map((semester) => (
-            <option key={semester} value={semester}>Kỳ {semester}</option>
-          ))}
-        </select>
-      </div>
-
-      {/* Academic Year Filter */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          Năm Học
-        </label>
-        <select
-          value={selectedYear}
-          onChange={(e) => setSelectedYear(e.target.value)}
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-        >
-          <option value="all">Tất cả</option>
-          {academicYears.map((year) => (
-            <option key={year} value={year}>{year}</option>
-          ))}
-        </select>
-      </div>
+      
 
       {/* Sort Options */}
       <div>
@@ -204,7 +269,10 @@ export default function PublicSyllabusSearchPage({ user }) {
         </div>
       </div>
 
-      {/* Search Bar - Sticky */}
+      {/* ============================================================
+          TODO: Search Bar - Sticky
+          Thanh tìm kiếm cố định với các nút lọc và tìm kiếm
+          
       <div className="bg-white border-b border-gray-200 sticky top-0 z-20 shadow-md">
         <div className="container mx-auto px-6 py-4">
           <form onSubmit={handleSearch} className="flex gap-3">
@@ -235,6 +303,7 @@ export default function PublicSyllabusSearchPage({ user }) {
           </form>
         </div>
       </div>
+      ============================================================ */}
 
       {/* Mobile Filter Drawer */}
       {showMobileFilters && (
@@ -310,42 +379,24 @@ export default function PublicSyllabusSearchPage({ user }) {
                         <div className="flex-1">
                           <div className="flex items-center gap-3 mb-2">
                             <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-semibold">
-                              {syllabus.subjectCode || 'N/A'}
+                              {syllabus.code || syllabus.subjectCode || 'N/A'}
                             </span>
                             <span className="px-3 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium">
-                              ✓ Đã xuất bản
+                              ✓ Đã phê duyệt
                             </span>
                           </div>
                           <h3 className="text-xl font-bold text-gray-900 mb-2">
-                            {syllabus.subjectName || 'Tên môn học'}
+                            {syllabus.title || syllabus.subjectName || 'Tên môn học'}
                           </h3>
                         </div>
                       </div>
 
                       {/* Summary */}
                       <p className="text-gray-700 mb-4 line-clamp-2">
-                        {syllabus.summary || 'Không có mô tả'}
+                        {syllabus.snippet || syllabus.summary || 'Không có mô tả'}
                       </p>
 
-                      {/* Info Grid */}
-                      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-                        <div className="flex items-center gap-2 text-sm text-gray-600">
-                          <BookMarked size={16} className="text-blue-600" />
-                          <span><strong>Kỳ:</strong> {syllabus.semester || 'N/A'}</span>
-                        </div>
-                        <div className="flex items-center gap-2 text-sm text-gray-600">
-                          <Calendar size={16} className="text-orange-600" />
-                          <span><strong>Năm:</strong> {syllabus.academicYear || 'N/A'}</span>
-                        </div>
-                        <div className="flex items-center gap-2 text-sm text-gray-600">
-                          <GraduationCap size={16} className="text-purple-600" />
-                          <span><strong>Ngành:</strong> {syllabus.programName || 'N/A'}</span>
-                        </div>
-                        <div className="flex items-center gap-2 text-sm text-gray-600">
-                          <User size={16} className="text-green-600" />
-                          <span><strong>Mã:</strong> {syllabus.syllabusCode || 'N/A'}</span>
-                        </div>
-                      </div>
+
 
                       {/* Action Button */}
                       <button

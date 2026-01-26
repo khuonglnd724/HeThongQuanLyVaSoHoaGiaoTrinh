@@ -164,4 +164,39 @@ public class SyllabusController {
         syllabusService.delete(id, userId);
         return ResponseEntity.ok().build();
     }
+
+    /**
+     * Get APPROVED syllabuses by Subject Codes (for Public Portal)
+     * GET /api/syllabuses/approved-by-subjects?subjectCodes=CS101,CS102,CS103
+     * Returns syllabuses with APPROVED status for the given subject codes
+     */
+    @GetMapping("/approved-by-subjects")
+    public ResponseEntity<List<SyllabusResponse>> getApprovedSyllabusesBySubjects(
+            @RequestParam(value = "subjectCodes") List<String> subjectCodes) {
+        return ResponseEntity.ok(syllabusService.getApprovedSyllabusesBySubjectCodes(subjectCodes));
+    }
+
+    /**
+     * Get APPROVED and PUBLISHED syllabuses by Subject Codes (for Student Portal)
+     * GET /api/syllabuses/student-syllabuses?subjectCodes=CS101,CS102,CS103
+     * Returns syllabuses with APPROVED or PUBLISHED status for the given subject codes
+     * Students can see both approved and published syllabuses of their program
+     */
+    @GetMapping("/student-syllabuses")
+    public ResponseEntity<List<SyllabusResponse>> getStudentSyllabusesBySubjects(
+            @RequestParam(value = "subjectCodes") List<String> subjectCodes) {
+        return ResponseEntity.ok(syllabusService.getApprovedAndPublishedSyllabusesBySubjectCodes(subjectCodes));
+    }
+
+    /**
+     * Get PUBLIC syllabuses (for guest/non-student users)
+     * GET /api/syllabuses/public
+     * GET /api/syllabuses/public?subjectCodes=CS101,CS102 (with filter)
+     * Returns syllabuses with PUBLISHED status (publicly accessible)
+     */
+    @GetMapping("/public")
+    public ResponseEntity<List<SyllabusResponse>> getPublicSyllabuses(
+            @RequestParam(value = "subjectCodes", required = false) List<String> subjectCodes) {
+        return ResponseEntity.ok(syllabusService.getPublicSyllabuses(subjectCodes));
+    }
 }

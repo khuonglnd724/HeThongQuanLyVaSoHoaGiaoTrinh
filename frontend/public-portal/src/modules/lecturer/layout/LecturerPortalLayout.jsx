@@ -57,12 +57,6 @@ export default function LecturerPortalLayout() {
       icon: Home,
       onClick: () => navigate('/lecturer/dashboard')
     },
-    {
-      id: 'syllabi',
-      label: 'Quản lý Giáo trình',
-      icon: FileText,
-      onClick: () => navigate('/lecturer/portal/syllabi')
-    }
   ]
 
   if (!user) {
