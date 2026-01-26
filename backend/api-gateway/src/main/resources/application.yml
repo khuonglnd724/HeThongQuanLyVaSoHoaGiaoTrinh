@@ -94,6 +94,13 @@ security:
       - /api/ai/**
       - /api/workflows/**
       - /api/public/**
+      - /api/academic/syllabus/**
+      - /api/academic/syllabus/programs/all
+      - /actuator/prometheus
+      - /actuator/health
+      - /
+      - /api/public/**
+      - /api/academic/syllabus/**
       - /actuator/prometheus
       - /actuator/health
       - /

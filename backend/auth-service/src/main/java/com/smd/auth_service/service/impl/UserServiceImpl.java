@@ -68,6 +68,7 @@ public class UserServiceImpl implements UserService {
                 .password(passwordEncoder.encode(request.getPassword()))
                 .fullName(request.getFullName())
                 .phoneNumber(request.getPhoneNumber())
+                .major(request.getMajor())
                 .isActive(true)
                 .isLocked(false)
                 .failedAttempts(0)
@@ -197,7 +198,20 @@ public class UserServiceImpl implements UserService {
         
         // Get roles from request, default to ROLE_STUDENT if not provided
         Set<Role> roles = new HashSet<>();
-        if (request.getRoleIds() != null && !request.getRoleIds().isEmpty()) {
+        if (request.getRoles() != null && !request.getRoles().isEmpty()) {
+            // Handle role names from frontend
+            for (String roleName : request.getRoles()) {
+                try {
+                    ERole eRole = ERole.valueOf(roleName);
+                    Role role = roleRepository.findByName(eRole)
+                            .orElseThrow(() -> new ResourceNotFoundException("Role not found: " + roleName));
+                    roles.add(role);
+                } catch (IllegalArgumentException e) {
+                    throw new BadRequestException("Invalid role: " + roleName);
+                }
+            }
+        } else if (request.getRoleIds() != null && !request.getRoleIds().isEmpty()) {
+            // Handle role IDs for backward compatibility
             for (Long roleId : request.getRoleIds()) {
                 Role role = roleRepository.findById(roleId)
                         .orElseThrow(() -> new ResourceNotFoundException("Role not found with id: " + roleId));
@@ -215,6 +229,7 @@ public class UserServiceImpl implements UserService {
                 .password(passwordEncoder.encode(request.getPassword()))
                 .fullName(request.getFullName())
                 .phoneNumber(request.getPhoneNumber())
+                .major(request.getMajor())
                 .isActive(true)
                 .isLocked(false)
                 .failedAttempts(0)
@@ -240,6 +255,7 @@ public class UserServiceImpl implements UserService {
         
         user.setFullName(request.getFullName());
         user.setPhoneNumber(request.getPhoneNumber());
+        user.setMajor(request.getMajor());
         
         // Update password only if provided
         if (request.getPassword() != null && !request.getPassword().isEmpty()) {
@@ -342,6 +358,7 @@ public class UserServiceImpl implements UserService {
                 .email(user.getEmail())
                 .fullName(user.getFullName())
                 .phoneNumber(user.getPhoneNumber())
+                .major(user.getMajor())
                 .password(user.getPassword())
                 .isActive(user.getIsActive())
                 .isLocked(user.getIsLocked())

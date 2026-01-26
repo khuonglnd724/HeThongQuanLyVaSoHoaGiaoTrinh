@@ -3,24 +3,41 @@ import { BookOpen, Search, Filter, X, ChevronRight, Calendar, User, BookMarked, 
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import syllabusService from '../../../services/syllabusService'
 
-export default function PublicSyllabusSearchPage() {
+export default function PublicSyllabusSearchPage({ user }) {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   
   const [syllabi, setSyllabi] = useState([])
+  const [programs, setPrograms] = useState([])
   const [loading, setLoading] = useState(false)
   const [searchTerm, setSearchTerm] = useState(searchParams.get('keyword') || '')
-  const [selectedMajor, setSelectedMajor] = useState(searchParams.get('major') || 'all')
+  const [selectedMajor, setSelectedMajor] = useState(() => {
+    // If user is student with major, auto-select their major
+    if (user?.major && user?.roles?.includes('ROLE_STUDENT')) {
+      return user.major
+    }
+    return searchParams.get('major') || 'all'
+  })
   const [selectedSemester, setSelectedSemester] = useState(searchParams.get('semester') || 'all')
   const [selectedYear, setSelectedYear] = useState(searchParams.get('year') || 'all')
   const [sortBy, setSortBy] = useState('latest')
   const [showMobileFilters, setShowMobileFilters] = useState(false)
   const [error, setError] = useState(null)
 
-  // Filter data
-  const majors = ['Công Nghệ Thông Tin', 'Kinh Tế', 'Kỹ Thuật', 'Quản Lý Kinh Doanh']
-  const semesters = ['Kỳ I', 'Kỳ II', 'Hè']
+  // Filter data - Load from backend instead of hardcode
+  const semesters = [1, 2, 3] // semester numbers from backend
   const academicYears = ['2024-2025', '2023-2024', '2022-2023']
+
+  // Fetch all programs for dropdown
+  const fetchPrograms = useCallback(async () => {
+    try {
+      const response = await syllabusService.getAllPrograms()
+      setPrograms(response)
+    } catch (err) {
+      console.error('Error loading programs:', err)
+      setPrograms([])
+    }
+  }, [])
 
   const fetchSyllabi = useCallback(async () => {
     setLoading(true)
@@ -38,29 +55,30 @@ export default function PublicSyllabusSearchPage() {
   }, [])
 
   useEffect(() => {
+    fetchPrograms()
     fetchSyllabi()
-  }, [fetchSyllabi])
+  }, [fetchPrograms, fetchSyllabi])
 
   const filteredAndSortedSyllabi = useMemo(() => {
     let filtered = syllabi.filter(item => {
       const matchesSearch = !searchTerm || 
-        item.subject_code?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.subject_name?.toLowerCase().includes(searchTerm.toLowerCase())
+        item.subjectCode?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        item.subjectName?.toLowerCase().includes(searchTerm.toLowerCase())
       
-      const matchesMajor = selectedMajor === 'all' || item.major === selectedMajor
-      const matchesSemester = selectedSemester === 'all' || item.semester === selectedSemester
-      const matchesYear = selectedYear === 'all' || item.academic_year === selectedYear
+      const matchesMajor = selectedMajor === 'all' || item.programName === selectedMajor
+      const matchesSemester = selectedSemester === 'all' || parseInt(item.semester) === parseInt(selectedSemester)
+      const matchesYear = selectedYear === 'all' || item.academicYear === selectedYear
       
       return matchesSearch && matchesMajor && matchesSemester && matchesYear
     })
 
     // Sort
     if (sortBy === 'latest') {
-      filtered.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+      filtered.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
     } else if (sortBy === 'oldest') {
-      filtered.sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
+      filtered.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt))
     } else if (sortBy === 'alphabetical') {
-      filtered.sort((a, b) => (a.subject_name || '').localeCompare(b.subject_name || ''))
+      filtered.sort((a, b) => (a.subjectName || '').localeCompare(b.subjectName || ''))
     }
 
     return filtered
@@ -97,16 +115,17 @@ export default function PublicSyllabusSearchPage() {
       {/* Major Filter */}
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-2">
-          Chuyên Ngành
+          Chuyên Ngành {user?.major && user?.roles?.includes('ROLE_STUDENT') && <span className="text-xs text-gray-500">(Ngành của bạn)</span>}
         </label>
         <select
           value={selectedMajor}
           onChange={(e) => setSelectedMajor(e.target.value)}
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          disabled={user?.major && user?.roles?.includes('ROLE_STUDENT')}
+          className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${user?.major && user?.roles?.includes('ROLE_STUDENT') ? 'bg-gray-100 cursor-not-allowed' : ''}`}
         >
-          <option value="all">Tất cả</option>
-          {majors.map((major) => (
-            <option key={major} value={major}>{major}</option>
+          <option value={user?.major || 'all'}>{user?.major ? `${user.major} (Ngành của bạn)` : 'Tất cả'}</option>
+          {!user?.major && programs.map((program) => (
+            <option key={program.id} value={program.programName}>{program.programName}</option>
           ))}
         </select>
       </div>
@@ -123,7 +142,7 @@ export default function PublicSyllabusSearchPage() {
         >
           <option value="all">Tất cả</option>
           {semesters.map((semester) => (
-            <option key={semester} value={semester}>{semester}</option>
+            <option key={semester} value={semester}>Kỳ {semester}</option>
           ))}
         </select>
       </div>
@@ -282,14 +301,14 @@ export default function PublicSyllabusSearchPage() {
                         <div className="flex-1">
                           <div className="flex items-center gap-3 mb-2">
                             <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-semibold">
-                              {syllabus.subject_code || 'N/A'}
+                              {syllabus.subjectCode || 'N/A'}
                             </span>
                             <span className="px-3 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium">
                               ✓ Đã xuất bản
                             </span>
                           </div>
                           <h3 className="text-xl font-bold text-gray-900 mb-2">
-                            {syllabus.subject_name || 'Tên môn học'}
+                            {syllabus.subjectName || 'Tên môn học'}
                           </h3>
                         </div>
                       </div>
@@ -303,19 +322,19 @@ export default function PublicSyllabusSearchPage() {
                       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
                         <div className="flex items-center gap-2 text-sm text-gray-600">
                           <BookMarked size={16} className="text-blue-600" />
-                          <span><strong>Tín chỉ:</strong> {syllabus.credits || 3}</span>
-                        </div>
-                        <div className="flex items-center gap-2 text-sm text-gray-600">
-                          <User size={16} className="text-green-600" />
-                          <span><strong>GV:</strong> {syllabus.created_by || 'N/A'}</span>
-                        </div>
-                        <div className="flex items-center gap-2 text-sm text-gray-600">
-                          <GraduationCap size={16} className="text-purple-600" />
-                          <span><strong>Học kỳ:</strong> {syllabus.semester || 'N/A'}</span>
+                          <span><strong>Kỳ:</strong> {syllabus.semester || 'N/A'}</span>
                         </div>
                         <div className="flex items-center gap-2 text-sm text-gray-600">
                           <Calendar size={16} className="text-orange-600" />
-                          <span><strong>Năm:</strong> {syllabus.academic_year || 'N/A'}</span>
+                          <span><strong>Năm:</strong> {syllabus.academicYear || 'N/A'}</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-sm text-gray-600">
+                          <GraduationCap size={16} className="text-purple-600" />
+                          <span><strong>Ngành:</strong> {syllabus.programName || 'N/A'}</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-sm text-gray-600">
+                          <User size={16} className="text-green-600" />
+                          <span><strong>Mã:</strong> {syllabus.syllabusCode || 'N/A'}</span>
                         </div>
                       </div>
 

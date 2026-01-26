@@ -55,7 +55,7 @@ services:
       dockerfile: Dockerfile
     container_name: smd-discovery-server
     ports:
-      - "8761:8761"
+      - "127.0.0.1:18761:8761"
     environment:
       - SERVER_PORT=8761
     networks:
@@ -75,7 +75,7 @@ services:
       dockerfile: Dockerfile
     container_name: smd-config-server
     ports:
-      - "8888:8888"
+      - "127.0.0.1:18888:8888"
     environment:
       - SERVER_PORT=8888
     networks:

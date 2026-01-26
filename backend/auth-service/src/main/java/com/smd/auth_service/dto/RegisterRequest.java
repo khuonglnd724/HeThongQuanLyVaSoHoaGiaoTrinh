@@ -31,5 +31,9 @@ public class RegisterRequest {
     
     private String phoneNumber;
     
+    private String major;
+    
     private List<Long> roleIds;
+    
+    private List<String> roles; // Support role names from frontend
 }

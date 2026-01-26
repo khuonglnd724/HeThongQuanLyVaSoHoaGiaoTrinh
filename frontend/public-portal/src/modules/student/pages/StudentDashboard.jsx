@@ -10,6 +10,7 @@ const StudentDashboard = ({ user, onLogout }) => {
   const [followedSyllabi, setFollowedSyllabi] = useState([])
   const [followedDetails, setFollowedDetails] = useState({})
   const [recentSyllabi, setRecentSyllabi] = useState([])
+  const [studentMajor, setStudentMajor] = useState(null)
 
   useEffect(() => {
     let mounted = true
@@ -17,6 +18,11 @@ const StudentDashboard = ({ user, onLogout }) => {
       setLoading(true)
       setError(null)
       try {
+        // Get student major from user object
+        if (user?.major) {
+          setStudentMajor(user.major)
+        }
+
         // Load API data
         const res = await studentAPI.getDashboard()
         const data = res?.data || {}
@@ -166,6 +172,12 @@ const StudentDashboard = ({ user, onLogout }) => {
               {followedSyllabi.map((id) => {
                 const syl = followedDetails[id]
                 if (!syl) return null
+                
+                // Filter by student's major - only show if major matches or major is not set
+                if (studentMajor && syl.programName && syl.programName !== studentMajor) {
+                  return null
+                }
+                
                 return (
                   <button
                     key={id}

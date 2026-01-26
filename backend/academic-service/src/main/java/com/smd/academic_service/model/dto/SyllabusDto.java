@@ -21,6 +21,10 @@ public class SyllabusDto {
     private String academicYear;
     private Integer semester;
     private Long subjectId;
+    private String subjectName;
+    private String subjectCode;
+    private Long programId;
+    private String programName;
     private String content;
     private String learningObjectives;
     private String teachingMethods;

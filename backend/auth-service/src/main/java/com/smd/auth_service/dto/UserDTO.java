@@ -16,6 +16,7 @@ public class UserDTO {
     private String email;
     private String fullName;
     private String phoneNumber;
+    private String major;
     private String password;
     private Boolean isActive;
     private Boolean isLocked;

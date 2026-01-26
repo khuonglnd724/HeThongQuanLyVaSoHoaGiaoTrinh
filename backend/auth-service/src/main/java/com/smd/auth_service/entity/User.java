@@ -18,7 +18,8 @@ import java.util.Set;
 public class User {
     
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "user_id_seq")
+    @SequenceGenerator(name = "user_id_seq", sequenceName = "user_id_seq", allocationSize = 1)
     private Long userId;
     
     @Column(nullable = false, unique = true)
@@ -35,6 +36,9 @@ public class User {
     
     @Column(name = "phone_number")
     private String phoneNumber;
+    
+    @Column
+    private String major;
     
     @Column(nullable = false)
     @Builder.Default
