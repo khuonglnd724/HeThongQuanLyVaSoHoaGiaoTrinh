@@ -63,4 +63,43 @@ public interface SyllabusRepository extends JpaRepository<Syllabus, UUID> {
                         @Param("since") Instant since);
 
         Optional<Syllabus> findByWorkflowId(UUID workflowId);
+
+        @Query("""
+                        select s
+                        from Syllabus s
+                        where s.deleted = false
+                          and s.status = com.smd.syllabus.domain.SyllabusStatus.APPROVED
+                          and s.subjectCode in (:subjectCodes)
+                        order by s.updatedAt desc
+                        """)
+        List<Syllabus> findApprovedSyllabusesBySubjectCodes(@Param("subjectCodes") List<String> subjectCodes);
+
+        @Query("""
+                        select s
+                        from Syllabus s
+                        where s.deleted = false
+                          and s.status in (:statuses)
+                          and s.subjectCode in (:subjectCodes)
+                        order by s.updatedAt desc
+                        """)
+        List<Syllabus> findByStatusesAndSubjectCodes(@Param("statuses") List<SyllabusStatus> statuses, @Param("subjectCodes") List<String> subjectCodes);
+
+        @Query("""
+                        select s
+                        from Syllabus s
+                        where s.deleted = false
+                          and s.status = :status
+                        order by s.updatedAt desc
+                        """)
+        List<Syllabus> findByStatus(@Param("status") SyllabusStatus status);
+
+        @Query("""
+                        select s
+                        from Syllabus s
+                        where s.deleted = false
+                          and s.status = :status
+                          and s.subjectCode in (:subjectCodes)
+                        order by s.updatedAt desc
+                        """)
+        List<Syllabus> findByStatusAndSubjectCodeIn(@Param("status") SyllabusStatus status, @Param("subjectCodes") List<String> subjectCodes);
 }

@@ -436,5 +436,56 @@ public class SyllabusService {
                 "Syllabus " + safeCode(s) + " deleted",
                 actor);
     }
-}
 
+    /**
+     * Get APPROVED syllabuses by Subject Codes (for Public Portal)
+     * Used by public portal to fetch APPROVED syllabuses for a set of subjects
+     */
+    public List<SyllabusResponse> getApprovedSyllabusesBySubjectCodes(List<String> subjectCodes) {
+        if (subjectCodes == null || subjectCodes.isEmpty()) {
+            return new ArrayList<>();
+        }
+
+        return syllabusRepository.findApprovedSyllabusesBySubjectCodes(subjectCodes)
+                .stream()
+                .map(SyllabusMapper::toResponse)
+                .toList();
+    }
+
+    /**
+     * Get APPROVED and PUBLISHED syllabuses by Subject Codes (for Student Portal)
+     * Students can see both APPROVED and PUBLISHED syllabuses of their program
+     */
+    public List<SyllabusResponse> getApprovedAndPublishedSyllabusesBySubjectCodes(List<String> subjectCodes) {
+        if (subjectCodes == null || subjectCodes.isEmpty()) {
+            return new ArrayList<>();
+        }
+
+        List<SyllabusStatus> statuses = List.of(SyllabusStatus.APPROVED, SyllabusStatus.PUBLISHED);
+        return syllabusRepository.findByStatusesAndSubjectCodes(statuses, subjectCodes)
+                .stream()
+                .map(SyllabusMapper::toResponse)
+                .toList();
+    }
+
+    /**
+     * Get PUBLIC syllabuses (for guest/non-student users)
+     * Returns syllabuses with PUBLISHED status
+     * Can optionally filter by subject codes
+     */
+    public List<SyllabusResponse> getPublicSyllabuses(List<String> subjectCodes) {
+        List<Syllabus> syllabuses;
+        
+        if (subjectCodes == null || subjectCodes.isEmpty()) {
+            // Get all PUBLISHED syllabuses
+            syllabuses = syllabusRepository.findByStatus(SyllabusStatus.PUBLISHED);
+        } else {
+            // Get PUBLISHED syllabuses filtered by subject codes
+            syllabuses = syllabusRepository.findByStatusAndSubjectCodeIn(SyllabusStatus.PUBLISHED, subjectCodes);
+        }
+
+        return syllabuses.stream()
+                .map(SyllabusMapper::toResponse)
+                .toList();
+    }
+}

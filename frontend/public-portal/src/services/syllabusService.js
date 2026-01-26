@@ -1,6 +1,6 @@
 import axios from 'axios'
 
-const API_BASE = '/api/academic/syllabus'
+const API_BASE = '/api/v1/syllabus'
 
 const getAuthHeader = () => {
   const token = localStorage.getItem('token')
@@ -92,6 +92,20 @@ const syllabusService = {
       return response.data?.data || response.data || []
     } catch (error) {
       console.warn('Error fetching syllabus documents:', error.message)
+      return []
+    }
+  },
+
+  // Get all APPROVED syllabuses (fallback when no specific filter)
+  getAllApprovedSyllabuses: async () => {
+    try {
+      const response = await axios.get(`${API_BASE}/status/APPROVED`, {
+        headers: getAuthHeader()
+      })
+      const data = response.data?.data || response.data
+      return Array.isArray(data) ? data : []
+    } catch (error) {
+      console.error('Error fetching APPROVED syllabuses:', error.message)
       return []
     }
   }

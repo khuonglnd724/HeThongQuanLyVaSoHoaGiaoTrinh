@@ -10,7 +10,7 @@ import StudentProfilePage from './pages/StudentProfilePage'
 import AdminDashboard from './pages/AdminDashboard'
 import AcademicDashboard from './modules/academic/pages/AcademicDashboard'
 import HODDashboard from './modules/academic/pages/HODDashboard'
-import RectorDashboard from './modules/academic/pages/RectorDashboard'
+import RectorDashboard from './pages/RectorDashboard'
 import ProgramManagement from './modules/academic/pages/ProgramManagement'
 import SyllabusListPage from './modules/lecturer/pages/SyllabusListPage'
 import SyllabusEditorPage from './modules/lecturer/pages/SyllabusEditorPage'
@@ -53,10 +53,11 @@ function App() {
   const isLecturerPortal = location.pathname.startsWith('/lecturer/portal')
   const isAdminPortal = location.pathname.startsWith('/admin/portal')
   const isAcademicPortal = location.pathname.startsWith('/academic')
+  const isRectorPortal = location.pathname.startsWith('/rector')
 
   return (
     <div className="flex flex-col min-h-screen">
-      {!isLoginPage && !isStudentPage && !isLecturerDashboard && !isLecturerPortal && !isAdminPortal && !isAcademicPortal && <Header />}
+      {!isLoginPage && !isStudentPage && !isLecturerDashboard && !isLecturerPortal && !isAdminPortal && !isAcademicPortal && !isRectorPortal && <Header />}
 
       <main className="flex-1">
         <Routes>
@@ -127,7 +128,7 @@ function App() {
         </Routes>
       </main>
 
-      {!isLoginPage && !isStudentPage && !isLecturerDashboard && !isLecturerPortal && !isAdminPortal && !isAcademicPortal && <Footer />}
+      {!isLoginPage && !isStudentPage && !isLecturerDashboard && !isLecturerPortal && !isAdminPortal && !isAcademicPortal && !isRectorPortal && <Footer />}
     </div>
   )
 }

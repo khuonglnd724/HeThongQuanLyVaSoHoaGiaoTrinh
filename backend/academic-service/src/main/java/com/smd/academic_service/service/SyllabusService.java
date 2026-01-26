@@ -10,6 +10,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -202,7 +203,7 @@ public class SyllabusService {
         log.info("Syllabus approval status updated successfully with id: {}", id);
         return mapToDto(updatedSyllabus);
     }
-    
+
     // Utility
     private SyllabusDto mapToDto(Syllabus syllabus) {
         return SyllabusDto.builder()
