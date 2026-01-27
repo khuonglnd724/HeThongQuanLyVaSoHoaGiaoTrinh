@@ -130,3 +130,13 @@ SELECT count(*) AS roles_count FROM roles;
 SELECT count(*) AS permissions_count FROM permissions;
 SELECT count(*) AS users_count FROM users;
 
+-- ============================================================
+-- Reset sequences to continue after initial data
+-- This ensures new users get ID > max existing ID
+-- ============================================================
+SELECT setval('user_id_seq', COALESCE((SELECT MAX(user_id) FROM users), 0) + 1, false);
+SELECT setval('roles_role_id_seq', COALESCE((SELECT MAX(role_id) FROM roles), 0) + 1, false);
+SELECT setval('permissions_permission_id_seq', COALESCE((SELECT MAX(permission_id) FROM permissions), 0) + 1, false);
+
+-- Log current sequence values for verification
+SELECT 'user_id_seq' as sequence_name, last_value FROM user_id_seq;
