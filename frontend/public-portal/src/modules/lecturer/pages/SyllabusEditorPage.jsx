@@ -690,7 +690,7 @@ const SyllabusEditorPage = ({ syllabusId: initialSyllabusId, rootId, user, onBac
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
-
+{/* 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Mục tiêu học tập</label>
                   <textarea
@@ -723,7 +723,7 @@ const SyllabusEditorPage = ({ syllabusId: initialSyllabusId, rootId, user, onBac
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
-
+*/}
                 {/* Program/PLO Info */}
                 {formData.subjectId && (programInfo || plos.length > 0) && (
                   <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
