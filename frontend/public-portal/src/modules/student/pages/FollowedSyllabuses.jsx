@@ -1,13 +1,12 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, BookOpen, Heart, Trash2, Clock, GraduationCap, BookMarked } from 'lucide-react'
-import syllabusService from '../../../services/syllabusService'
+import { getMyFollowedSyllabuses, unfollowSyllabus } from '../services/studentService'
 
 export default function FollowedSyllabuses({ user }) {
   const navigate = useNavigate()
   const [followedSyllabi, setFollowedSyllabi] = useState([])
   const [loading, setLoading] = useState(true)
-  const [syllabusDetails, setSyllabusDetails] = useState({})
   const [studentMajor, setStudentMajor] = useState(null)
 
   useEffect(() => {
@@ -20,42 +19,31 @@ export default function FollowedSyllabuses({ user }) {
   const loadFollowedSyllabi = async () => {
     setLoading(true)
     try {
-      // Get followed IDs from localStorage
-      const followed = JSON.parse(localStorage.getItem('followedSyllabuses') || '[]')
-      setFollowedSyllabi(followed)
-
-      // Load details for each followed syllabus
-      const details = {}
-      for (const id of followed) {
-        try {
-          // Use academic-service API so we get programName for filtering
-          const data = await syllabusService.getSyllabusById(id)
-          details[id] = data
-        } catch (err) {
-          console.warn('Could not load details for', id)
-        }
-      }
-      setSyllabusDetails(details)
+      // Get followed syllabuses from API
+      const followedData = await getMyFollowedSyllabuses()
+      console.log('[FollowedSyllabuses] Loaded from API:', followedData)
+      setFollowedSyllabi(followedData)
     } catch (err) {
       console.error('Error loading followed syllabi:', err)
+      setFollowedSyllabi([])
     } finally {
       setLoading(false)
     }
   }
 
-  const handleRemove = (id) => {
-    const updated = followedSyllabi.filter(sid => sid !== id)
-    setFollowedSyllabi(updated)
-    localStorage.setItem('followedSyllabuses', JSON.stringify(updated))
-
-    // Remove from details
-    const newDetails = { ...syllabusDetails }
-    delete newDetails[id]
-    setSyllabusDetails(newDetails)
+  const handleRemove = async (rootId) => {
+    try {
+      await unfollowSyllabus(rootId)
+      // Remove from list
+      const updated = followedSyllabi.filter(s => s.rootId !== rootId)
+      setFollowedSyllabi(updated)
+    } catch (err) {
+      console.error('Error unfollowing syllabus:', err)
+    }
   }
 
-  const handleViewDetail = (id) => {
-    navigate(`/public/syllabus/${id}`)
+  const handleViewDetail = (rootId) => {
+    navigate(`/public/syllabus/${rootId}`)
   }
 
   if (loading) {
@@ -139,8 +127,7 @@ export default function FollowedSyllabuses({ user }) {
 
             {/* Syllabi List */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {followedSyllabi.map((id) => {
-                const syllabus = syllabusDetails[id]
+              {followedSyllabi.map((syllabus) => {
                 if (!syllabus) return null
                 
                 // Filter by student's major - only show if major matches or major is not set
@@ -150,7 +137,7 @@ export default function FollowedSyllabuses({ user }) {
 
                 return (
                   <div
-                    key={id}
+                    key={syllabus.rootId}
                     className="bg-white rounded-lg shadow-md hover:shadow-xl transition overflow-hidden border-l-4 border-blue-500 group"
                   >
                     {/* Card Header */}
@@ -160,7 +147,7 @@ export default function FollowedSyllabuses({ user }) {
                           {syllabus.subjectCode}
                         </span>
                         <button
-                          onClick={() => handleRemove(id)}
+                          onClick={() => handleRemove(syllabus.rootId)}
                           className="text-blue-100 hover:text-white transition p-1"
                           title="Hủy theo dõi"
                         >
@@ -175,32 +162,36 @@ export default function FollowedSyllabuses({ user }) {
                     {/* Card Body */}
                     <div className="p-4">
                       <p className="text-gray-600 text-sm mb-4 line-clamp-2">
-                        {syllabus.content || 'Không có mô tả'}
+                        {syllabus.summary || syllabus.content || 'Không có mô tả'}
                       </p>
 
                       {/* Info Grid */}
                       <div className="space-y-2 mb-4 pb-4 border-b border-gray-200">
                         <div className="flex items-center justify-between text-sm">
-                          <span className="text-gray-600">Kỳ:</span>
-                          <span className="font-semibold text-gray-900">{syllabus.semester}</span>
+                          <span className="text-gray-600">Trạng thái:</span>
+                          <span className="font-semibold text-gray-900">{syllabus.status || 'N/A'}</span>
                         </div>
                         <div className="flex items-center justify-between text-sm">
-                          <span className="text-gray-600">Năm học:</span>
-                          <span className="font-semibold text-gray-900">{syllabus.academicYear}</span>
+                          <span className="text-gray-600">Phiên bản:</span>
+                          <span className="font-semibold text-gray-900">{syllabus.versionNo || '1'}</span>
                         </div>
                         <div className="flex items-center justify-between text-sm">
-                          <span className="text-gray-600">Mã:</span>
-                          <span className="font-semibold text-gray-900">{syllabus.syllabusCode}</span>
+                          <span className="text-gray-600">Tác giả:</span>
+                          <span className="font-semibold text-gray-900">{syllabus.createdBy || 'N/A'}</span>
                         </div>
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="text-gray-600">Ngành:</span>
-                          <span className="font-semibold text-gray-900 text-right">{syllabus.programName}</span>
-                        </div>
+                        {syllabus.followedAt && (
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="text-gray-600">Theo dõi từ:</span>
+                            <span className="font-semibold text-gray-900 text-right">
+                              {new Date(syllabus.followedAt).toLocaleDateString('vi-VN')}
+                            </span>
+                          </div>
+                        )}
                       </div>
 
                       {/* Action Button */}
                       <button
-                        onClick={() => handleViewDetail(id)}
+                        onClick={() => handleViewDetail(syllabus.rootId)}
                         className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition font-medium flex items-center justify-center gap-2"
                       >
                         <BookMarked size={16} />
