@@ -255,6 +255,18 @@ export default function PublicSyllabusDetailPage() {
       
       if (!jobId) throw new Error('No jobId returned')
       
+      console.log(`[Summary] Job created: ${jobId} for document ${docId}`)
+      
+      // Save jobId to syllabus_documents.ai_ingestion_job_id immediately
+      try {
+        console.log(`[Summary] Saving jobId to database...`)
+        await apiClient.put(`/api/syllabus/documents/${docId}/update-job-id`, { jobId })
+        console.log(`[Summary] ✅ jobId saved to database successfully`)
+      } catch (saveError) {
+        console.warn(`[Summary] ⚠️ Failed to save jobId:`, saveError)
+        // Continue polling even if save fails
+      }
+      
       // Poll for result
       let attempts = 0
       const maxAttempts = 60
@@ -282,6 +294,21 @@ export default function PublicSyllabusDetailPage() {
             [docId]: summary
           }))
           setSummarizingDocId(null)
+          
+          // Reload documents to update UI with new aiIngestionJobId
+          try {
+            const user = localStorage.getItem('user')
+            if (user) {
+              const documentsResponse = await apiClient.get(`/api/syllabus/documents/syllabus/${id}`)
+              const documentsData = documentsResponse.data?.data || documentsResponse.data
+              const docs = documentsData.documents || documentsData || []
+              setDocuments(docs)
+              console.log(`[Summary] ✅ Documents reloaded with updated jobId`)
+            }
+          } catch (reloadErr) {
+            console.warn(`[Summary] Could not reload documents:`, reloadErr)
+          }
+          
           return summary
         } else if (status.status === 'FAILED') {
           throw new Error(status.error || 'Summary generation failed')

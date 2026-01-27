@@ -290,7 +290,7 @@ const SyllabusDetailModal = ({
 
               {/* Workflow Timeline */}
               <div className="bg-gray-50 border border-gray-200 rounded-lg p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Lịch sử workflow</h3>
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Lịch sử</h3>
                 <div className="space-y-3">
                   {syllabusDetailData.submittedAt && (
                     <div className="flex items-center gap-3">
@@ -485,67 +485,9 @@ const SyllabusDetailModal = ({
                             </div>
 
                             {documentSummaries[doc.id] && (
-                              <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded text-sm space-y-2">
-                                <div>
-                                  <p className="font-semibold text-blue-900 mb-1">Tóm tắt:</p>
-                                  <p className="text-blue-800">{documentSummaries[doc.id].summary}</p>
-                                </div>
-
-                                {documentSummaries[doc.id].bullets && documentSummaries[doc.id].bullets.length > 0 && (
-                                  <div>
-                                    <p className="font-semibold text-blue-900 mb-1">Nội dung chính:</p>
-                                    <ul className="list-disc list-inside text-blue-800 space-y-1">
-                                      {documentSummaries[doc.id].bullets.map((bullet, idx) => (
-                                        <li key={idx} className="text-xs">
-                                          {bullet}
-                                        </li>
-                                      ))}
-                                    </ul>
-                                  </div>
-                                )}
-
-                                {documentSummaries[doc.id].keywords && documentSummaries[doc.id].keywords.length > 0 && (
-                                  <div>
-                                    <p className="font-semibold text-blue-900 mb-1">Từ khoá:</p>
-                                    <div className="flex flex-wrap gap-1">
-                                      {documentSummaries[doc.id].keywords.map((kw, idx) => (
-                                        <span
-                                          key={idx}
-                                          className="inline-block px-2 py-1 bg-blue-200 text-blue-900 text-xs rounded"
-                                        >
-                                          {kw}
-                                        </span>
-                                      ))}
-                                    </div>
-                                  </div>
-                                )}
-
-                                {documentSummaries[doc.id].targetAudience && (
-                                  <div>
-                                    <p className="font-semibold text-blue-900 mb-1">Đối tượng học:</p>
-                                    <p className="text-blue-800 text-xs">{documentSummaries[doc.id].targetAudience}</p>
-                                  </div>
-                                )}
-
-                                {documentSummaries[doc.id].prerequisites && (
-                                  <div>
-                                    <p className="font-semibold text-blue-900 mb-1">Điều kiện tiên quyết:</p>
-                                    <p className="text-blue-800 text-xs">{documentSummaries[doc.id].prerequisites}</p>
-                                  </div>
-                                )}
-
-                                {documentSummaries[doc.id].ragUsed && (
-                                  <div className="bg-purple-100 p-2 rounded">
-                                    <p className="font-semibold text-purple-900 mb-1">RAG Context:</p>
-                                    <p className="text-purple-800 text-xs whitespace-pre-wrap">{documentSummaries[doc.id].ragContext}</p>
-                                  </div>
-                                )}
-
-                                {documentSummaries[doc.id].model && (
-                                  <p className="text-xs text-blue-600 italic border-t border-blue-200 pt-2">
-                                    Model: {documentSummaries[doc.id].model} | Tokens: {documentSummaries[doc.id].tokens}
-                                  </p>
-                                )}
+                              <div className="mt-2 flex items-center gap-2">
+                                <CheckCircle size={14} className="text-green-600" />
+                                <span className="text-xs text-green-700 font-medium">Đã có tóm tắt AI</span>
                               </div>
                             )}
                           </div>
@@ -559,7 +501,7 @@ const SyllabusDetailModal = ({
                               <Eye size={14} />
                               Xem
                             </button>
-                            {doc.aiIngestionJobId && (
+                            {(doc.aiIngestionJobId || documentSummaries[doc.id]) && (
                               <button
                                 onClick={() => {
                                   setLocalSelectedDocumentForSummary(doc)

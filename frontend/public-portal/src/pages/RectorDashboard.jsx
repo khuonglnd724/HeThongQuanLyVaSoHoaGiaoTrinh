@@ -161,11 +161,60 @@ const RectorDashboard = () => {
       const syllabusData = res.data
       
       setSyllabusDetailData(syllabusData)
+      setSyllabusDetailLoading(false)
+      
+      // Fetch documents for this syllabus
+      setSyllabusDetailDocumentsLoading(true)
+      try {
+        console.log('[RectorDashboard] Fetching documents for syllabus:', syllabusId)
+        const docsRes = await syllabusServiceV2.getDocumentsBySyllabus(syllabusId)
+        const docsData = docsRes.data?.data || docsRes.data || []
+        const docs = docsData.documents || docsData || []
+        console.log('[RectorDashboard] Documents loaded:', docs)
+        setSyllabusDetailDocuments(docs)
+        
+        // Load cached summaries for documents that have aiIngestionJobId
+        const summaries = {}
+        for (const doc of docs) {
+          const docId = doc.id || doc.documentId
+          const jobId = doc.aiIngestionJobId
+          
+          if (jobId) {
+            try {
+              console.log(`[RectorDashboard] Loading cached summary for doc ${docId}, jobId: ${jobId}`)
+              const jobRes = await aiService.getJobStatus(jobId)
+              const jobData = jobRes.data || jobRes
+              
+              if (jobData.status === 'succeeded' && jobData.result) {
+                let summaryData = jobData.result
+                if (typeof summaryData === 'string') {
+                  try {
+                    summaryData = JSON.parse(summaryData)
+                  } catch {}
+                }
+                // Set summary data directly (not wrapped) - modal expects direct access to properties
+                summaries[docId] = summaryData
+                console.log(`[RectorDashboard] ✅ Cached summary loaded for doc ${docId}`)
+              }
+            } catch (err) {
+              console.warn(`[RectorDashboard] Failed to load cached summary for doc ${docId}:`, err)
+            }
+          }
+        }
+        
+        if (Object.keys(summaries).length > 0) {
+          setDocumentSummaries(prev => ({ ...prev, ...summaries }))
+        }
+      } catch (docErr) {
+        console.warn('[RectorDashboard] Failed to load documents:', docErr)
+        setSyllabusDetailDocuments([])
+      } finally {
+        setSyllabusDetailDocumentsLoading(false)
+      }
     } catch (err) {
       console.error('[RectorDashboard] Error loading detail:', err)
       alert('Lỗi khi tải chi tiết giáo trình')
       setShowSyllabusDetailModal(false)
-    } finally {
       setSyllabusDetailLoading(false)
     }
   }

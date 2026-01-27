@@ -87,18 +87,10 @@ INSERT INTO user_roles (user_id, role_id) VALUES (6, 2) ON CONFLICT DO NOTHING;
 -- Reset sequences to start from the next available ID after initial data is loaded
 -- This ensures that newly created users via the application don't conflict with existing IDs
 -- The sequences were pre-created in schema.sql
-DO $$
-BEGIN
-    -- Reset user_id sequence to max(user_id) + 1
-    PERFORM SETVAL('user_id_seq', (SELECT COALESCE(MAX(user_id), 0) + 1 FROM users));
-    
-    -- Reset role_id sequence to max(role_id) + 1 (if roles are inserted)
-    PERFORM SETVAL('role_id_seq', (SELECT COALESCE(MAX(role_id), 0) + 1 FROM roles));
-    
-    -- Reset permission_id sequence to max(permission_id) + 1 (if permissions are inserted)
-    PERFORM SETVAL('permission_id_seq', (SELECT COALESCE(MAX(permission_id), 0) + 1 FROM permissions));
-    
-    RAISE NOTICE 'Sequences reset successfully. Next user_id will be: %', (SELECT COALESCE(MAX(user_id), 0) + 1 FROM users);
-EXCEPTION WHEN OTHERS THEN
-    RAISE WARNING 'Error resetting sequences: %', SQLERRM;
-END $$;
+-- Reset sequences to start from the next available ID
+-- SETVAL(seq, value, is_called) - when is_called=true, nextval will return value+1
+-- when is_called=false, nextval will return value
+-- We want nextval to return MAX+1, so we use SETVAL(seq, MAX, true) or SETVAL(seq, MAX+1, false)
+SELECT SETVAL('user_id_seq', GREATEST((SELECT COALESCE(MAX(user_id), 0) FROM users), 1), true);
+SELECT SETVAL('role_id_seq', GREATEST((SELECT COALESCE(MAX(role_id), 0) FROM roles), 1), true);
+SELECT SETVAL('permission_id_seq', GREATEST((SELECT COALESCE(MAX(permission_id), 0) FROM permissions), 1), true);
