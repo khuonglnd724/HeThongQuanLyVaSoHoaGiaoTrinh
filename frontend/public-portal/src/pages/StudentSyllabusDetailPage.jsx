@@ -5,6 +5,7 @@ import {
   Calendar, GraduationCap, ChevronRight, Star, Download
 } from 'lucide-react'
 import syllabusService from '../services/syllabusService'
+import { followSyllabus, unfollowSyllabus, isFollowingSyllabus } from '../modules/student/services/studentService'
 
 const StudentSyllabusDetailPage = () => {
   const { id } = useParams()
@@ -12,13 +13,13 @@ const StudentSyllabusDetailPage = () => {
   const [syllabus, setSyllabus] = useState(null)
   const [loading, setLoading] = useState(true)
   const [isFollowing, setIsFollowing] = useState(false)
+  const [followLoading, setFollowLoading] = useState(false)
   const [showNotifications, setShowNotifications] = useState(false)
   const [notifications, setNotifications] = useState([])
   const [activeTab, setActiveTab] = useState('overview')
 
   useEffect(() => {
     loadSyllabusDetail()
-    checkIfFollowing()
     loadNotificationHistory()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id])
@@ -26,6 +27,7 @@ const StudentSyllabusDetailPage = () => {
   useEffect(() => {
     if (syllabus) {
       addToRecentlyViewed()
+      checkIfFollowing() // Check follow status after syllabus is loaded
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [syllabus])
@@ -42,10 +44,19 @@ const StudentSyllabusDetailPage = () => {
     }
   }
 
-  const checkIfFollowing = () => {
-    const followed = JSON.parse(localStorage.getItem('followedSyllabuses') || '[]')
-    const isAlreadyFollowing = followed.some(s => s.id === id)
-    setIsFollowing(isAlreadyFollowing)
+  const checkIfFollowing = async () => {
+    try {
+      // Use rootId if available, otherwise use id
+      const rootId = syllabus?.rootId || id
+      const result = await isFollowingSyllabus(rootId)
+      setIsFollowing(result)
+    } catch (err) {
+      console.warn('Could not check follow status:', err)
+      // Fallback to localStorage for compatibility
+      const followed = JSON.parse(localStorage.getItem('followedSyllabuses') || '[]')
+      const isAlreadyFollowing = followed.some(s => s.id === id)
+      setIsFollowing(isAlreadyFollowing)
+    }
   }
 
   const loadNotificationHistory = () => {
@@ -89,25 +100,42 @@ const StudentSyllabusDetailPage = () => {
     localStorage.setItem('recentlyViewed', JSON.stringify(filtered.slice(0, 10)))
   }
 
-  const handleFollowToggle = () => {
-    const followed = JSON.parse(localStorage.getItem('followedSyllabuses') || '[]')
+  const handleFollowToggle = async () => {
+    const rootId = syllabus?.rootId || id
+    setFollowLoading(true)
     
-    if (isFollowing) {
-      // Unfollow
-      const updated = followed.filter(s => s.id !== id)
-      localStorage.setItem('followedSyllabuses', JSON.stringify(updated))
-      setIsFollowing(false)
-    } else {
-      // Follow
-      const newFollowed = {
-        id,
-        name: syllabus?.subject_name || 'Giáo trình',
-        code: syllabus?.subject_code || 'N/A',
-        followedAt: new Date().toISOString()
+    try {
+      if (isFollowing) {
+        // Unfollow via API
+        await unfollowSyllabus(rootId)
+        setIsFollowing(false)
+        
+        // Also update localStorage for compatibility
+        const followed = JSON.parse(localStorage.getItem('followedSyllabuses') || '[]')
+        const updated = followed.filter(s => s.id !== id)
+        localStorage.setItem('followedSyllabuses', JSON.stringify(updated))
+      } else {
+        // Follow via API
+        await followSyllabus(rootId)
+        setIsFollowing(true)
+        
+        // Also update localStorage for compatibility
+        const followed = JSON.parse(localStorage.getItem('followedSyllabuses') || '[]')
+        const newFollowed = {
+          id,
+          rootId,
+          name: syllabus?.subject_name || syllabus?.subjectName || 'Giáo trình',
+          code: syllabus?.subject_code || syllabus?.subjectCode || 'N/A',
+          followedAt: new Date().toISOString()
+        }
+        followed.push(newFollowed)
+        localStorage.setItem('followedSyllabuses', JSON.stringify(followed))
       }
-      followed.push(newFollowed)
-      localStorage.setItem('followedSyllabuses', JSON.stringify(followed))
-      setIsFollowing(true)
+    } catch (err) {
+      console.error('Error toggling follow:', err)
+      alert('Không thể thực hiện thao tác. Vui lòng thử lại.')
+    } finally {
+      setFollowLoading(false)
     }
   }
 
@@ -164,13 +192,18 @@ const StudentSyllabusDetailPage = () => {
               {/* Follow Button */}
               <button
                 onClick={handleFollowToggle}
+                disabled={followLoading}
                 className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all shadow-md ${
                   isFollowing
-                    ? 'bg-gradient-to-r from-red-500 to-red-600 text-white hover:from-red-600 hover:to-red-700'
+                    ? 'bg-gradient-to-r from-pink-500 to-pink-600 text-white hover:from-pink-600 hover:to-pink-700'
                     : 'bg-gradient-to-r from-blue-600 to-blue-700 text-white hover:from-blue-700 hover:to-blue-800'
-                }`}
+                } ${followLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
               >
-                <Heart size={18} className={isFollowing ? 'fill-current' : ''} />
+                {followLoading ? (
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <Heart size={18} className={isFollowing ? 'fill-current' : ''} />
+                )}
                 <span>{isFollowing ? 'Đang theo dõi' : 'Theo dõi'}</span>
               </button>
 

@@ -26,18 +26,8 @@ export const FollowButton = ({ syllabusId, initialFollowed = false, onFollowChan
   }
 
   const handleExportPdf = async () => {
-    try {
-      const response = await syllabusService.exportPdf(syllabusId)
-      const url = window.URL.createObjectURL(new Blob([response.data]))
-      const link = document.createElement('a')
-      link.href = url
-      link.setAttribute('download', `syllabus-${syllabusId}.pdf`)
-      document.body.appendChild(link)
-      link.click()
-      link.parentNode.removeChild(link)
-    } catch (err) {
-      console.error('Error exporting PDF:', err)
-    }
+    // TODO: Implement PDF export when backend supports it
+    alert('Chức năng xuất PDF đang được phát triển.')
   }
 
   const handleShare = () => {
@@ -47,7 +37,10 @@ export const FollowButton = ({ syllabusId, initialFollowed = false, onFollowChan
         url: window.location.href,
       })
     } else {
-      alert('Sao chép liên kết: ' + window.location.href)
+      // Fallback: copy to clipboard
+      navigator.clipboard.writeText(window.location.href)
+        .then(() => alert('Đã sao chép liên kết!'))
+        .catch(() => alert('Sao chép liên kết: ' + window.location.href))
     }
   }
 
@@ -56,18 +49,26 @@ export const FollowButton = ({ syllabusId, initialFollowed = false, onFollowChan
       <button
         onClick={handleFollow}
         disabled={loading}
-        className={`btn ${followed ? 'btn-primary' : 'btn-outline'} gap-2`}
+        className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all ${
+          followed 
+            ? 'bg-pink-100 text-pink-600 hover:bg-pink-200 border border-pink-300' 
+            : 'bg-gray-100 text-gray-600 hover:bg-gray-200 border border-gray-300'
+        } ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
       >
-        <Heart size={18} fill={followed ? 'currentColor' : 'none'} />
+        {loading ? (
+          <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+        ) : (
+          <Heart size={18} fill={followed ? 'currentColor' : 'none'} />
+        )}
         {followed ? 'Đã theo dõi' : 'Theo dõi'}
       </button>
 
-      <button onClick={handleShare} className="btn btn-secondary gap-2">
+      <button onClick={handleShare} className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-600 hover:bg-gray-200 border border-gray-300 rounded-lg font-medium transition-all">
         <Share2 size={18} />
         Chia sẻ
       </button>
 
-      <button onClick={handleExportPdf} className="btn btn-secondary gap-2">
+      <button onClick={handleExportPdf} className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-600 hover:bg-gray-200 border border-gray-300 rounded-lg font-medium transition-all">
         <Download size={18} />
         Xuất PDF
       </button>

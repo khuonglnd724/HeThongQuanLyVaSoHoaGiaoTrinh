@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, BookOpen, Calendar, User, FileText, Loader, Eye, Zap, Download } from 'lucide-react'
+import { ArrowLeft, BookOpen, Calendar, User, FileText, Loader, Eye, Zap, Download, Heart } from 'lucide-react'
 import syllabusServiceV2 from '../../lecturer/services/syllabusServiceV2'
 import apiClient from '../../../services/api/apiClient'
+import { followSyllabus, unfollowSyllabus, isFollowingSyllabus } from '../../student/services/studentService'
 
 // CLO Details Display Component
 const CLODetailsDisplay = ({ cloIds }) => {
@@ -142,6 +143,65 @@ export default function PublicSyllabusDetailPage() {
   const [summarizingDocId, setSummarizingDocId] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [isFollowing, setIsFollowing] = useState(false)
+  const [followLoading, setFollowLoading] = useState(false)
+  const [isStudent, setIsStudent] = useState(false)
+
+  // Check if user is a student
+  useEffect(() => {
+    const userData = localStorage.getItem('user')
+    if (userData) {
+      try {
+        const user = JSON.parse(userData)
+        const studentRole = user.roles?.some(r => r === 'STUDENT' || r === 'ROLE_STUDENT') 
+                         || user.role === 'STUDENT' 
+                         || user.role === 'ROLE_STUDENT'
+        setIsStudent(studentRole)
+      } catch (e) {
+        console.error('Error parsing user data:', e)
+      }
+    }
+  }, [])
+
+  // Check follow status when syllabus is loaded
+  useEffect(() => {
+    const checkFollowStatus = async () => {
+      if (!isStudent || !syllabus) return
+      
+      try {
+        const rootId = syllabus.rootId || id
+        const result = await isFollowingSyllabus(rootId)
+        setIsFollowing(result)
+      } catch (err) {
+        console.warn('Could not check follow status:', err)
+      }
+    }
+    
+    checkFollowStatus()
+  }, [syllabus, isStudent, id])
+
+  // Handle follow/unfollow toggle
+  const handleToggleFollow = async () => {
+    if (!syllabus) return
+    
+    const rootId = syllabus.rootId || id
+    setFollowLoading(true)
+    
+    try {
+      if (isFollowing) {
+        await unfollowSyllabus(rootId)
+        setIsFollowing(false)
+      } else {
+        await followSyllabus(rootId)
+        setIsFollowing(true)
+      }
+    } catch (err) {
+      console.error('Error toggling follow:', err)
+      alert('Không thể thực hiện thao tác. Vui lòng thử lại.')
+    } finally {
+      setFollowLoading(false)
+    }
+  }
 
   useEffect(() => {
     const fetchSyllabusDetail = async () => {
@@ -442,9 +502,30 @@ export default function PublicSyllabusDetailPage() {
             <ArrowLeft size={20} />
             Quay lại
           </button>
-          <div className="flex items-center gap-3 mb-2">
-            <BookOpen size={32} />
-            <h1 className="text-4xl font-bold">{syllabus.subjectCode || 'N/A'}</h1>
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-3">
+              <BookOpen size={32} />
+              <h1 className="text-4xl font-bold">{syllabus.subjectCode || 'N/A'}</h1>
+            </div>
+            {/* Follow Button - Only show for logged-in students */}
+            {isStudent && (
+              <button
+                onClick={handleToggleFollow}
+                disabled={followLoading}
+                className={`flex items-center gap-2 px-5 py-2.5 rounded-lg font-medium transition-all shadow-lg ${
+                  isFollowing
+                    ? 'bg-pink-500 text-white hover:bg-pink-600'
+                    : 'bg-white text-blue-700 hover:bg-blue-50'
+                } ${followLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+              >
+                {followLoading ? (
+                  <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <Heart size={20} fill={isFollowing ? 'currentColor' : 'none'} />
+                )}
+                <span>{isFollowing ? 'Đang theo dõi' : 'Theo dõi'}</span>
+              </button>
+            )}
           </div>
           <h2 className="text-2xl text-blue-100 mb-4">{syllabus.subjectName || 'Tên môn học'}</h2>
           <div className="flex flex-wrap gap-4 text-sm text-blue-100">

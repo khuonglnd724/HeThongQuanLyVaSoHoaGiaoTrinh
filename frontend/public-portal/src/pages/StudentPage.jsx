@@ -4,6 +4,7 @@ import {
   BookOpen, LogOut, Search, Bell, Star, Clock, Eye, ChevronRight,
   TrendingUp, Home, BookMarked, Heart
 } from 'lucide-react'
+import { getMyFollowedSyllabuses } from '../modules/student/services/studentService'
 
 const StudentPage = () => {
   const navigate = useNavigate()
@@ -27,9 +28,10 @@ const StudentPage = () => {
     try {
       setLoading(true)
       
-      // Load followed syllabuses from localStorage (mock data for now)
-      const followed = JSON.parse(localStorage.getItem('followedSyllabuses') || '[]')
-      setFollowedSyllabuses(followed)
+      // Load followed syllabuses from API
+      const followedData = await getMyFollowedSyllabuses()
+      console.log('[StudentPage] Loaded followed syllabuses:', followedData)
+      setFollowedSyllabuses(followedData)
       
       // Load recently viewed from localStorage
       const recent = JSON.parse(localStorage.getItem('recentlyViewed') || '[]')
@@ -218,16 +220,16 @@ const StudentPage = () => {
                   <div className="space-y-4">
                     {followedSyllabuses.slice(0, 3).map((syllabus, idx) => (
                       <div
-                        key={idx}
-                        onClick={() => navigate(`/student/syllabus/${syllabus.id}`)}
+                        key={syllabus.rootId || idx}
+                        onClick={() => navigate(`/public/syllabus/${syllabus.rootId}`)}
                         className="flex items-center gap-4 p-4 bg-gradient-to-r from-yellow-50 to-orange-50 rounded-lg hover:shadow-md transition-all cursor-pointer border border-yellow-200 hover:border-yellow-300"
                       >
                         <div className="w-12 h-12 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-lg flex items-center justify-center flex-shrink-0">
                           <BookMarked size={24} className="text-white" />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <h4 className="font-semibold text-gray-900 truncate">{syllabus.name}</h4>
-                          <p className="text-sm text-gray-600">{syllabus.code}</p>
+                          <h4 className="font-semibold text-gray-900 truncate">{syllabus.subjectName || syllabus.name}</h4>
+                          <p className="text-sm text-gray-600">{syllabus.subjectCode || syllabus.code}</p>
                         </div>
                         <ChevronRight size={20} className="text-gray-400" />
                       </div>
