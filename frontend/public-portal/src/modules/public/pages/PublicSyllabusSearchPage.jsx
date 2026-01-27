@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react'
-import { BookOpen, Search, Filter, X, ChevronRight, Calendar, User, BookMarked, GraduationCap, SortAsc } from 'lucide-react'
+import { BookOpen, Search, Filter, X, ChevronRight, Calendar, User, BookMarked, GraduationCap, SortAsc, Heart } from 'lucide-react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import syllabusService from '../../../services/syllabusService'
+import { followSyllabus, unfollowSyllabus, isFollowingSyllabus } from '../../student/services/studentService'
 
 export default function PublicSyllabusSearchPage() {
   const navigate = useNavigate()
@@ -18,6 +19,8 @@ export default function PublicSyllabusSearchPage() {
   const [programs, setPrograms] = useState([])
   const [selectedProgram, setSelectedProgram] = useState('')
   const [isStudent, setIsStudent] = useState(false)
+  const [followedMap, setFollowedMap] = useState({}) // Track follow status for each syllabus
+  const [followLoading, setFollowLoading] = useState({}) // Track loading state for follow buttons
 
   useEffect(() => {
     // Load user from localStorage on mount
@@ -192,6 +195,60 @@ export default function PublicSyllabusSearchPage() {
   useEffect(() => {
     fetchSyllabi(localUser, selectedProgram)
   }, [localUser, selectedProgram, fetchSyllabi])
+
+  // Check follow status for all syllabuses when they load (only for students)
+  useEffect(() => {
+    const checkFollowStatus = async () => {
+      if (!isStudent || syllabi.length === 0) return
+      
+      console.log('🔍 Checking follow status for', syllabi.length, 'syllabuses')
+      const statusMap = {}
+      
+      for (const syllabus of syllabi) {
+        const rootId = syllabus.rootId || syllabus.id
+        try {
+          const isFollowed = await isFollowingSyllabus(rootId)
+          statusMap[rootId] = isFollowed
+        } catch (err) {
+          console.warn('Could not check follow status for', rootId)
+          statusMap[rootId] = false
+        }
+      }
+      
+      setFollowedMap(statusMap)
+      console.log('✅ Follow status loaded:', statusMap)
+    }
+    
+    checkFollowStatus()
+  }, [syllabi, isStudent])
+
+  // Handle follow/unfollow toggle
+  const handleToggleFollow = async (syllabus, e) => {
+    e.stopPropagation() // Prevent navigation when clicking follow button
+    
+    const rootId = syllabus.rootId || syllabus.id
+    const currentlyFollowed = followedMap[rootId]
+    
+    setFollowLoading(prev => ({ ...prev, [rootId]: true }))
+    
+    try {
+      if (currentlyFollowed) {
+        await unfollowSyllabus(rootId)
+        console.log('✅ Unfollowed syllabus:', rootId)
+      } else {
+        await followSyllabus(rootId)
+        console.log('✅ Followed syllabus:', rootId)
+      }
+      
+      // Update local state
+      setFollowedMap(prev => ({ ...prev, [rootId]: !currentlyFollowed }))
+    } catch (err) {
+      console.error('❌ Error toggling follow:', err)
+      alert('Không thể thực hiện thao tác. Vui lòng thử lại.')
+    } finally {
+      setFollowLoading(prev => ({ ...prev, [rootId]: false }))
+    }
+  }
 
   const filteredAndSortedSyllabi = useMemo(() => {
     let filtered = syllabi.filter(item => {
@@ -396,16 +453,42 @@ export default function PublicSyllabusSearchPage() {
                         {syllabus.snippet || syllabus.summary || 'Không có mô tả'}
                       </p>
 
-
-
-                      {/* Action Button */}
-                      <button
-                        onClick={() => navigate(`/public/syllabus/${syllabus.id}`)}
-                        className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all duration-300 font-medium group"
-                      >
-                        Xem Chi Tiết
-                        <ChevronRight size={20} className="group-hover:translate-x-1 transition-transform" />
-                      </button>
+                      {/* Action Buttons */}
+                      <div className="flex gap-3">
+                        <button
+                          onClick={() => navigate(`/public/syllabus/${syllabus.id}`)}
+                          className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all duration-300 font-medium group"
+                        >
+                          Xem Chi Tiết
+                          <ChevronRight size={20} className="group-hover:translate-x-1 transition-transform" />
+                        </button>
+                        
+                        {/* Follow Button - Only show for logged-in students */}
+                        {isStudent && (
+                          <button
+                            onClick={(e) => handleToggleFollow(syllabus, e)}
+                            disabled={followLoading[syllabus.rootId || syllabus.id]}
+                            className={`flex items-center justify-center gap-2 px-4 py-3 rounded-lg font-medium transition-all duration-300 ${
+                              followedMap[syllabus.rootId || syllabus.id]
+                                ? 'bg-pink-100 text-pink-600 hover:bg-pink-200 border border-pink-300'
+                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200 border border-gray-300'
+                            } ${followLoading[syllabus.rootId || syllabus.id] ? 'opacity-50 cursor-not-allowed' : ''}`}
+                            title={followedMap[syllabus.rootId || syllabus.id] ? 'Bỏ theo dõi' : 'Theo dõi'}
+                          >
+                            {followLoading[syllabus.rootId || syllabus.id] ? (
+                              <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                            ) : (
+                              <Heart 
+                                size={20} 
+                                fill={followedMap[syllabus.rootId || syllabus.id] ? 'currentColor' : 'none'}
+                              />
+                            )}
+                            <span className="hidden sm:inline">
+                              {followedMap[syllabus.rootId || syllabus.id] ? 'Đã theo dõi' : 'Theo dõi'}
+                            </span>
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
                 ))}
