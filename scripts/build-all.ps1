@@ -172,7 +172,8 @@ $dockerServices = @(
   "academic-service",
   "public-service",
   "workflow-service",
-  "syllabus-service"
+  "syllabus-service",
+  "notification-service"
 )
 
 Write-Host "Building Docker images using docker compose..." -ForegroundColor Yellow

@@ -135,10 +135,33 @@ SELECT count(*) AS users_count FROM users;
 -- This ensures new users get ID > max existing ID
 -- setval(seq, value, is_called=true) means nextval returns value+1
 -- setval(seq, value, is_called=false) means nextval returns value
+-- Uses pg_get_serial_sequence to avoid missing-sequence errors
 -- ============================================================
-SELECT setval('user_id_seq', GREATEST(COALESCE((SELECT MAX(user_id) FROM users), 0), 1), true);
-SELECT setval('roles_role_id_seq', GREATEST(COALESCE((SELECT MAX(role_id) FROM roles), 0), 1), true);
-SELECT setval('permissions_permission_id_seq', GREATEST(COALESCE((SELECT MAX(permission_id) FROM permissions), 0), 1), true);
+DO $$
+DECLARE
+	seq_name text;
+BEGIN
+	seq_name := pg_get_serial_sequence('users', 'user_id');
+	IF seq_name IS NOT NULL THEN
+		EXECUTE format(
+			'SELECT setval(%L, GREATEST(COALESCE((SELECT MAX(user_id) FROM users), 0), 1), true)',
+			seq_name
+		);
+	END IF;
 
--- Log current sequence values for verification
-SELECT 'user_id_seq' as sequence_name, last_value, is_called FROM user_id_seq;
+	seq_name := pg_get_serial_sequence('roles', 'role_id');
+	IF seq_name IS NOT NULL THEN
+		EXECUTE format(
+			'SELECT setval(%L, GREATEST(COALESCE((SELECT MAX(role_id) FROM roles), 0), 1), true)',
+			seq_name
+		);
+	END IF;
+
+	seq_name := pg_get_serial_sequence('permissions', 'permission_id');
+	IF seq_name IS NOT NULL THEN
+		EXECUTE format(
+			'SELECT setval(%L, GREATEST(COALESCE((SELECT MAX(permission_id) FROM permissions), 0), 1), true)',
+			seq_name
+		);
+	END IF;
+END $$;

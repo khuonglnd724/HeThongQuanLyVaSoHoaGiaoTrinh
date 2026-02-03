@@ -22,15 +22,22 @@ spring:
   kafka:
     bootstrap-servers: localhost:9092
     consumer:
-      group-id: notification-service
-      auto-offset-reset: earliest
-      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
-      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      group-id: notification-service-v2
+      auto-offset-reset: latest
+      key-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
       properties:
+        spring.deserializer.key.delegate.class: org.apache.kafka.common.serialization.StringDeserializer
+        spring.deserializer.value.delegate.class: org.springframework.kafka.support.serializer.JsonDeserializer
         spring.json.trusted.packages: "*"
+        spring.json.use.type.info.headers: "false"
+        spring.json.default.value.type: java.util.Map
+        spring.json.value.default.type: java.util.Map
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      properties:
+        spring.json.add.type.headers: "true"
 
 # Firebase Configuration
 firebase:
@@ -45,7 +52,7 @@ server:
 eureka:
   client:
     serviceUrl:
-      defaultZone: http://localhost:8761/eureka/
+      defaultZone: http://discovery-server:8761/eureka/
   instance:
     preferIpAddress: true
 
