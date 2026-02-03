@@ -414,6 +414,37 @@ services:
     networks:
       - smd-network
 
+  # Notification Service - FCM Push Notifications
+  notification-service:
+    build:
+      context: ../backend/notification-service
+      dockerfile: Dockerfile
+    image: smd/notification-service:latest
+    container_name: smd-notification-service
+    ports:
+      - "8086:8086"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/logs_db
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: 123456
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      FIREBASE_CONFIG_PATH: /app/firebase-service-account.json
+      EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE: http://discovery-server:8761/eureka/
+      JAVA_OPTS: "-Xmx512m -Xms256m"
+    volumes:
+      - ../backend/notification-service/src/main/resources/firebase-service-account.json:/app/firebase-service-account.json:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      discovery-server:
+        condition: service_healthy
+    networks:
+      - smd-network
+    restart: unless-stopped
+
   # Prometheus - Metrics collection and monitoring
   prometheus:
     image: prom/prometheus:latest
@@ -426,6 +457,8 @@ services:
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
+      - '--web.external-url=http://localhost:8080/prometheus'
+      - '--web.route-prefix=/prometheus'
       - '--web.console.libraries=/usr/share/prometheus/console_libraries'
       - '--web.console.templates=/usr/share/prometheus/consoles'
     networks:
@@ -439,11 +472,21 @@ services:
     ports:
       - "3000:3000"
     environment:
-      GF_SECURITY_ADMIN_USER: admin
-      GF_SECURITY_ADMIN_PASSWORD: admin123
-      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_SERVER_ROOT_URL: http://localhost:8080/grafana/
+      GF_SERVER_SERVE_FROM_SUB_PATH: "true"
+      GF_SECURITY_ALLOW_EMBEDDING: "true"
+      GF_AUTH_BASIC_ENABLED: "false"
+      GF_AUTH_DISABLE_LOGIN_FORM: "true"
+      GF_AUTH_PROXY_ENABLED: "true"
+      GF_AUTH_PROXY_HEADER_NAME: X-User-Id
+      GF_AUTH_PROXY_HEADER_PROPERTY: username
+      GF_AUTH_PROXY_AUTO_SIGN_UP: "true"
+      GF_USERS_AUTO_ASSIGN_ORG_ROLE: Viewer
+      GF_PATHS_PROVISIONING: /etc/grafana/provisioning
     volumes:
       - grafana_data:/var/lib/grafana
+      - ./observability/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
+      - ./observability/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
     depends_on:
       - prometheus
       - loki
@@ -476,6 +519,21 @@ services:
     command: -config.file=/etc/promtail/config.yml
     depends_on:
       - loki
+    networks:
+      - smd-network
+    restart: unless-stopped
+
+  # NiFi - Log/ETL flow management
+  nifi:
+    image: apache/nifi:1.25.0
+    container_name: smd-nifi
+    ports:
+      - "8088:8088"
+    environment:
+      NIFI_WEB_HTTP_PORT: 8088
+      NIFI_WEB_HTTP_HOST: 0.0.0.0
+    volumes:
+      - nifi_data:/opt/nifi/nifi-current
     networks:
       - smd-network
     restart: unless-stopped
@@ -531,4 +589,6 @@ volumes:
   syllabus-uploads:
     driver: local
   transformers_cache:
+    driver: local
+  nifi_data:
     driver: local

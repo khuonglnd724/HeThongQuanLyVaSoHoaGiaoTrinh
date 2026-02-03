@@ -12,7 +12,8 @@ RUN npm install
 # Copy source code (support building from repo root as context)
 COPY frontend/public-portal/. ./
 
-# Build the app
+# Build the app (ignore warnings, only fail on errors)
+ENV CI=false
 RUN npm run build
 
 # Stage 2: Runtime (Nginx + SPA)

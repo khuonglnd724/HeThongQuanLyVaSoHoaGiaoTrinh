@@ -84,6 +84,18 @@ export const syllabusService = {
     }
   },
 
+  // Get published syllabi (đã công bố)
+  getPublishedSyllabi: async () => {
+    try {
+      const response = await apiClient.get('/api/syllabuses', { params: { status: 'PUBLISHED', size: 200 } })
+      const data = response.data
+      return data?.content || data || []
+    } catch (error) {
+      console.error('Syllabus Service - Get published error:', error)
+      throw error.response?.data || { message: error.message || 'Failed to fetch published syllabi' }
+    }
+  },
+
   // Approve syllabus
   approveSyllabus: async (id, comment = '') => {
     try {

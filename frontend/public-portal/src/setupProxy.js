@@ -2,6 +2,30 @@ const { createProxyMiddleware } = require('http-proxy-middleware');
 
 module.exports = function(app) {
   console.log('✅ setupProxy.js LOADED!');
+  
+  // Proxy notification-service requests directly to port 8086
+  app.use(
+    '/api/notifications',
+    createProxyMiddleware({
+      target: 'http://localhost:8086', // Notification Service
+      changeOrigin: true,
+      pathRewrite: (path) => {
+        return `/api/notifications${path.replace('/api/notifications', '')}`;
+      },
+      logLevel: 'debug',
+      onProxyReq: (proxyReq, req, res) => {
+        const authHeader = req.headers['authorization'];
+        if (authHeader) {
+          proxyReq.setHeader('Authorization', authHeader);
+          console.log(`[NOTIFICATION PROXY] ${req.method} ${req.originalUrl} -> Auth present`);
+        }
+      },
+      onProxyRes: (proxyRes, req, res) => {
+        console.log(`[NOTIFICATION PROXY] ${req.method} ${req.originalUrl} -> ${proxyRes.statusCode}`);
+      }
+    })
+  );
+  
   // Proxy all /api/* requests to API Gateway (port 8080)
   app.use(
     '/api',
@@ -41,19 +65,8 @@ module.exports = function(app) {
     })
   );
 
-  // Proxy WebSocket connections to API Gateway
-  app.use(
-    '/ws',
-    createProxyMiddleware({
-      target: 'ws://localhost:8080',
-      changeOrigin: true,
-      ws: true,
-      logLevel: 'debug',
-      onError: (err, req, res) => {
-        console.error(`[WS PROXY ERROR]:`, err.message);
-      }
-    })
-  );
+  // NOTE: Do not proxy '/ws' here. CRA dev server uses '/ws' for HMR
+  // and proxying it breaks the WebSocket with an invalid frame header.
 };
 
 

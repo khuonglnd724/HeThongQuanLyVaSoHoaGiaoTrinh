@@ -158,9 +158,40 @@ services:
       - smd-network
     restart: unless-stopped
 
+  # Notification Service
+  notification-service:
+    build:
+      context: ./backend/notification-service
+      dockerfile: Dockerfile
+    container_name: smd-notification-service
+    ports:
+      - "8086:8086"
+    environment:
+      - SERVER_PORT=8086
+      - EUREKA_SERVER_URL=http://discovery-server:8761/eureka
+      - CONFIG_SERVER_URL=http://config-server:8888
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://smd-postgres:5432/logs_db
+      - SPRING_DATASOURCE_USERNAME=postgres
+      - SPRING_DATASOURCE_PASSWORD=postgres
+      - SPRING_JPA_HIBERNATE_DDL_AUTO=update
+      - SPRING_KAFKA_BOOTSTRAP_SERVERS=smd-kafka:9092
+      - FIREBASE_CONFIG_PATH=/app/firebase-service-account.json
+    depends_on:
+      - discovery-server
+      - config-server
+      - postgres
+      - kafka
+    networks:
+      - smd-network
+    restart: unless-stopped
+    volumes:
+      - ./backend/notification-service/src/main/resources/firebase-service-account.json:/app/firebase-service-account.json:ro
+
 networks:
   smd-network:
     driver: bridge
+  docker_smd-network:
+    external: true
 
 volumes:
   postgres_data:

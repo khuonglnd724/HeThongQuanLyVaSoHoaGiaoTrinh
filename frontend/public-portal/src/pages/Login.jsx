@@ -13,6 +13,15 @@ const Login = () => {
   const [loading, setLoading] = useState(false)
   const [currentUser, setCurrentUser] = useState(null)
 
+  const setAccessTokenCookie = (token) => {
+    if (!token) return
+    document.cookie = `access_token=${token}; path=/; SameSite=Lax`
+  }
+
+  const clearAccessTokenCookie = () => {
+    document.cookie = 'access_token=; Max-Age=0; path=/; SameSite=Lax'
+  }
+
   useEffect(() => {
     // Check if user is already logged in
     const userData = localStorage.getItem('user')
@@ -25,6 +34,7 @@ const Login = () => {
     localStorage.removeItem('token')
     localStorage.removeItem('refreshToken')
     localStorage.removeItem('user')
+    clearAccessTokenCookie()
     setCurrentUser(null)
     setEmail('')
     setPassword('')
@@ -63,6 +73,7 @@ const Login = () => {
       // Save token
       if (response.token) {
         localStorage.setItem('token', response.token)
+        setAccessTokenCookie(response.token)
         console.log('[Login] Token saved')
       } else {
         console.warn('[Login] No token in response')
@@ -187,6 +198,7 @@ const Login = () => {
           userId: '1'
         }
         localStorage.setItem('token', 'demo-token-' + Date.now())
+        setAccessTokenCookie(localStorage.getItem('token'))
         localStorage.setItem('user', JSON.stringify(demoUser))
         setCurrentUser(demoUser)
         // Demo fallback: respect admin role and route accordingly

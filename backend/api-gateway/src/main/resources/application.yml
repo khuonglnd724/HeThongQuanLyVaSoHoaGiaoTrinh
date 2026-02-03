@@ -100,7 +100,6 @@ security:
       - /actuator/health
       - /
 
-# Management endpoints
 management:
   endpoints:
     web:
@@ -115,6 +114,9 @@ management:
     export:
       prometheus:
         enabled: true
+
+prometheus:
+  url: http://prometheus:9090
 
 springdoc:
   api-docs:

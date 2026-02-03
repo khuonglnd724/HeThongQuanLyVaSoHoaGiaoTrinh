@@ -5,7 +5,7 @@ export const userService = {
   // Get all users
   getAllUsers: async (params = {}) => {
     try {
-      const response = await apiClient.get('/api/auth/users', { params })
+      const response = await apiClient.get('/api/users', { params })
       return response.data
     } catch (error) {
       console.error('User Service - Get all users error:', error)
@@ -16,7 +16,7 @@ export const userService = {
   // Get user by ID
   getUserById: async (id) => {
     try {
-      const response = await apiClient.get(`/api/auth/users/${id}`)
+      const response = await apiClient.get(`/api/users/${id}`)
       return response.data
     } catch (error) {
       console.error('User Service - Get user error:', error)
@@ -38,7 +38,7 @@ export const userService = {
   // Create new user
   createUser: async (userData) => {
     try {
-      const response = await apiClient.post('/api/auth/users', userData)
+      const response = await apiClient.post('/api/users', userData)
       return response.data
     } catch (error) {
       console.error('User Service - Create user error:', error)
@@ -49,7 +49,7 @@ export const userService = {
   // Update user
   updateUser: async (id, userData) => {
     try {
-      const response = await apiClient.put(`/api/auth/users/${id}`, userData)
+      const response = await apiClient.put(`/api/users/${id}`, userData)
       return response.data
     } catch (error) {
       console.error('User Service - Update user error:', error)
@@ -60,7 +60,7 @@ export const userService = {
   // Delete user
   deleteUser: async (id) => {
     try {
-      const response = await apiClient.delete(`/api/auth/users/${id}`)
+      const response = await apiClient.delete(`/api/users/${id}`)
       return response.data
     } catch (error) {
       console.error('User Service - Delete user error:', error)
@@ -71,7 +71,7 @@ export const userService = {
   // Update user role
   updateUserRole: async (userId, roles) => {
     try {
-      const response = await apiClient.put(`/api/auth/users/${userId}/roles`, { roles })
+      const response = await apiClient.put(`/api/users/${userId}/roles`, { roles })
       return response.data
     } catch (error) {
       console.error('User Service - Update role error:', error)
@@ -96,7 +96,7 @@ export const userService = {
   // Get users by role
   getUsersByRole: async (role) => {
     try {
-      const response = await apiClient.get(`/api/auth/users/role/${role}`)
+      const response = await apiClient.get(`/api/users/role/${role}`)
       return response.data
     } catch (error) {
       console.error('User Service - Get users by role error:', error)

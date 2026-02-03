@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Search, BookOpen, Calendar, Tag, ChevronRight } from 'lucide-react'
+import { Search, BookOpen, Calendar, Tag, ChevronRight, Filter, X } from 'lucide-react'
 import { publicService } from '../services'
 
 const SearchPage = () => {
@@ -12,6 +12,12 @@ const SearchPage = () => {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [pagination, setPagination] = useState({ total: 0, page: 1, size: 10 })
+  const [showFilters, setShowFilters] = useState(false)
+  const [filters, setFilters] = useState({
+    department: '',
+    semester: '',
+    year: ''
+  })
 
   const fetchSyllabi = useCallback(async (searchQuery = '') => {
     setLoading(true)
@@ -52,35 +58,197 @@ const SearchPage = () => {
     <div className="container-custom py-8">
       {/* Search Header */}
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-4">🔍 Tìm Kiếm Giáo Trình</h1>
+        <h1 className="text-3xl font-bold text-gray-900 mb-2">🔍 Tìm Kiếm Giáo Trình</h1>
+        <p className="text-gray-600 mb-6">Tìm kiếm giáo trình theo tên môn học, mã môn, giảng viên hoặc từ khóa</p>
         
         {/* Search Form */}
-        <form onSubmit={handleSearch} className="flex gap-4">
-          <div className="flex-1 relative">
-            <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
-            <input
-              type="text"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Nhập tên môn học, mã môn hoặc từ khóa..."
-              className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-            />
+        <form onSubmit={handleSearch} className="space-y-4">
+          <div className="flex gap-4">
+            <div className="flex-1 relative">
+              <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+              <input
+                type="text"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Nhập tên môn học, mã môn, giảng viên hoặc từ khóa..."
+                className="w-full pl-12 pr-4 py-3.5 text-lg border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition"
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={loading}
+              className="px-8 py-3.5 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition flex items-center gap-2 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Search size={20} />
+              Tìm Kiếm
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowFilters(!showFilters)}
+              className="px-6 py-3.5 border-2 border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition flex items-center gap-2"
+            >
+              <Filter size={20} />
+              Bộ Lọc
+            </button>
           </div>
-          <button
-            type="submit"
-            className="px-6 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition flex items-center gap-2"
-          >
-            <Search size={20} />
-            Tìm Kiếm
-          </button>
+
+          {/* Advanced Filters */}
+          {showFilters && (
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-6 space-y-4">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-semibold text-gray-900">Bộ lọc nâng cao</h3>
+                <button
+                  type="button"
+                  onClick={() => setShowFilters(false)}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Khoa/Ngành
+                  </label>
+                  <select
+                    value={filters.department}
+                    onChange={(e) => setFilters({ ...filters, department: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                  >
+                    <option value="">Tất cả</option>
+                    <option value="CNTT">Công nghệ thông tin</option>
+                    <option value="KT">Kinh tế</option>
+                    <option value="QT">Quản trị kinh doanh</option>
+                    <option value="NN">Ngoại ngữ</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Học kỳ
+                  </label>
+                  <select
+                    value={filters.semester}
+                    onChange={(e) => setFilters({ ...filters, semester: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                  >
+                    <option value="">Tất cả</option>
+                    <option value="1">Học kỳ 1</option>
+                    <option value="2">Học kỳ 2</option>
+                    <option value="3">Học kỳ hè</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Năm học
+                  </label>
+                  <select
+                    value={filters.year}
+                    onChange={(e) => setFilters({ ...filters, year: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                  >
+                    <option value="">Tất cả</option>
+                    <option value="2025-2026">2025-2026</option>
+                    <option value="2024-2025">2024-2025</option>
+                    <option value="2023-2024">2023-2024</option>
+                  </select>
+                </div>
+              </div>
+              <div className="flex gap-3 pt-4 border-t border-gray-200">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFilters({ department: '', semester: '', year: '' })
+                    fetchSyllabi(query)
+                  }}
+                  className="px-4 py-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-100 transition"
+                >
+                  Xóa bộ lọc
+                </button>
+                <button
+                  type="button"
+                  onClick={() => fetchSyllabi(query)}
+                  className="px-6 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition"
+                >
+                  Áp dụng
+                </button>
+              </div>
+            </div>
+          )}
         </form>
+
+        {/* Quick Suggestions */}
+        {!query && (
+          <div className="mt-6 flex flex-wrap gap-2">
+            <span className="text-sm text-gray-600">Gợi ý:</span>
+            {['Lập trình', 'Toán', 'Tiếng Anh', 'Quản trị', 'Marketing'].map((suggestion) => (
+              <button
+                key={suggestion}
+                onClick={() => {
+                  setQuery(suggestion)
+                  fetchSyllabi(suggestion)
+                }}
+                className="px-3 py-1 bg-gray-100 hover:bg-primary-100 text-gray-700 hover:text-primary-700 rounded-full text-sm transition"
+              >
+                {suggestion}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Results */}
       <div className="space-y-4">
-        {/* Stats */}
-        <div className="flex justify-between items-center text-gray-600">
-          <span>Tìm thấy <strong>{pagination.total}</strong> giáo trình</span>
+        {/* Stats and Active Filters */}
+        <div className="flex flex-wrap justify-between items-center gap-4">
+          <div className="flex items-center gap-3">
+            <span className="text-gray-600">
+              Tìm thấy <strong className="text-primary-600 text-lg">{pagination.total}</strong> giáo trình
+            </span>
+            {query && (
+              <span className="px-3 py-1 bg-primary-50 text-primary-700 rounded-full text-sm">
+                "{query}"
+              </span>
+            )}
+          </div>
+          
+          {/* Active Filters Tags */}
+          {(filters.department || filters.semester || filters.year) && (
+            <div className="flex flex-wrap gap-2">
+              {filters.department && (
+                <span className="px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-sm flex items-center gap-2">
+                  Khoa: {filters.department}
+                  <button
+                    onClick={() => setFilters({ ...filters, department: '' })}
+                    className="hover:text-blue-900"
+                  >
+                    <X size={14} />
+                  </button>
+                </span>
+              )}
+              {filters.semester && (
+                <span className="px-3 py-1 bg-green-50 text-green-700 rounded-full text-sm flex items-center gap-2">
+                  Học kỳ {filters.semester}
+                  <button
+                    onClick={() => setFilters({ ...filters, semester: '' })}
+                    className="hover:text-green-900"
+                  >
+                    <X size={14} />
+                  </button>
+                </span>
+              )}
+              {filters.year && (
+                <span className="px-3 py-1 bg-purple-50 text-purple-700 rounded-full text-sm flex items-center gap-2">
+                  Năm: {filters.year}
+                  <button
+                    onClick={() => setFilters({ ...filters, year: '' })}
+                    className="hover:text-purple-900"
+                  >
+                    <X size={14} />
+                  </button>
+                </span>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Loading */}

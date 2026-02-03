@@ -1,7 +1,9 @@
-import React from 'react'
+import React, { useEffect, useState } from 'react'
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { Header, Footer } from './shared/components/Layout'
 import HomePage from './pages/HomePage'
+import notificationService from './services/notificationService'
+import { Bell } from 'lucide-react'
 import SyllabusDetailPage from './pages/SyllabusDetailPage'
 import Login from './pages/Login'
 import StudentPage from './pages/StudentPage'
@@ -47,6 +49,8 @@ const RequireRole = ({ allowedRoles, children }) => {
 
 function App() {
   const location = useLocation()
+  const [showNotificationToast, setShowNotificationToast] = useState(false)
+  const [notificationData, setNotificationData] = useState(null)
   const isLoginPage = location.pathname === '/login'
   const isStudentPage = location.pathname.startsWith('/student')
   const isLecturerDashboard = location.pathname === '/lecturer/dashboard'
@@ -55,9 +59,103 @@ function App() {
   const isAcademicPortal = location.pathname.startsWith('/academic')
   const isRectorPortal = location.pathname.startsWith('/rector')
 
+  // Setup FCM notifications
+  useEffect(() => {
+    const initializeNotifications = async () => {
+      const user = JSON.parse(localStorage.getItem('user') || '{}')
+      
+      // Expose notificationService to global scope for debugging
+      window.notificationService = notificationService
+      
+      // Only setup notifications for logged-in users
+      if (!user || !user.id) return
+
+      // Check if browser supports notifications
+      if (!notificationService.isNotificationSupported()) {
+        console.log('Notifications not supported in this browser')
+        return
+      }
+
+      // Auto-request permission if not already set
+      if (Notification.permission === 'default') {
+        await notificationService.requestPermission()
+      } else if (Notification.permission === 'granted') {
+        // Get FCM token if permission already granted
+        await notificationService.getFCMToken()
+      }
+
+      // Setup foreground message listener (when user is online)
+      notificationService.setupForegroundListener((notification) => {
+        console.log('📩 Received notification:', notification)
+        
+        // Show toast notification
+        setNotificationData(notification)
+        setShowNotificationToast(true)
+        
+        // Auto-hide after 5 seconds
+        setTimeout(() => {
+          setShowNotificationToast(false)
+        }, 5000)
+      })
+    }
+
+    initializeNotifications()
+
+    // Register service worker for background notifications
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/firebase-messaging-sw.js')
+        .then((registration) => {
+          console.log('✅ Service Worker registered:', registration.scope)
+        })
+        .catch((error) => {
+          console.error('❌ Service Worker registration failed:', error)
+        })
+    }
+  }, [])
+
+  const handleNotificationClick = () => {
+    setShowNotificationToast(false)
+    
+    // Navigate based on notification type
+    if (notificationData?.data?.type === 'APPROVAL_REQUEST' && notificationData?.data?.syllabusId) {
+      window.location.href = `/academic/approval?syllabusId=${notificationData.data.syllabusId}`
+    } else if (notificationData?.data?.type === 'NEW_SYLLABUS' && notificationData?.data?.syllabusId) {
+      window.location.href = `/public/syllabus/${notificationData.data.syllabusId}`
+    } else if (notificationData?.data?.syllabusId) {
+      window.location.href = `/public/syllabus/${notificationData.data.syllabusId}`
+    }
+  }
+
   return (
     <div className="flex flex-col min-h-screen">
       {!isLoginPage && !isStudentPage && !isLecturerDashboard && !isLecturerPortal && !isAdminPortal && !isAcademicPortal && !isRectorPortal && <Header />}
+
+      {/* Notification Toast */}
+      {showNotificationToast && notificationData && (
+        <div 
+          className="fixed top-20 right-4 z-50 bg-white shadow-2xl rounded-xl p-4 max-w-sm cursor-pointer hover:shadow-xl transition-all duration-300 border-l-4 border-indigo-600 animate-slide-in"
+          onClick={handleNotificationClick}
+        >
+          <div className="flex items-start gap-3">
+            <div className="bg-indigo-100 p-2 rounded-lg">
+              <Bell className="w-5 h-5 text-indigo-600" />
+            </div>
+            <div className="flex-1">
+              <h4 className="font-semibold text-gray-900 mb-1">{notificationData.title}</h4>
+              <p className="text-sm text-gray-600">{notificationData.body}</p>
+            </div>
+            <button 
+              onClick={(e) => {
+                e.stopPropagation()
+                setShowNotificationToast(false)
+              }}
+              className="text-gray-400 hover:text-gray-600"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
 
       <main className="flex-1">
         <Routes>

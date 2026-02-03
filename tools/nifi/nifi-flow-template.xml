@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<flow serialization-version="1.2" root-group-id="root">
+    <templateName>Loki to PostgreSQL Flow</templateName>
+    <description>Read logs from Loki and write to PostgreSQL</description>
+    
+    <groupId>root</groupId>
+    <groupName>NiFi Flow</groupName>
+    
+    <!-- Processors -->
+    <processor>
+        <id>gen-file</id>
+        <name>Generate Loki Query</name>
+        <type>org.apache.nifi.processors.standard.GenerateFlowFile</type>
+        <position x="100" y="100"/>
+        <properties>
+            <property name="File Size">1 B</property>
+            <property name="Data Format">Text</property>
+        </properties>
+    </processor>
+    
+    <processor>
+        <id>invoke-http</id>
+        <name>Query Loki</name>
+        <type>org.apache.nifi.processors.standard.InvokeHTTP</type>
+        <position x="300" y="100"/>
+        <properties>
+            <property name="HTTP Method">GET</property>
+            <property name="Remote URL">http://loki:3100/loki/api/v1/query_range?query={job="docker"}&amp;start=1&amp;end=9999999999&amp;limit=1000</property>
+            <property name="Connection Timeout">5 seconds</property>
+            <property name="Read Timeout">10 seconds</property>
+        </properties>
+    </processor>
+    
+    <processor>
+        <id>split-results</id>
+        <name>Split JSON Results</name>
+        <type>org.apache.nifi.processors.standard.SplitJson</type>
+        <position x="500" y="100"/>
+        <properties>
+            <property name="JsonPath Expression">$.data.result[*]</property>
+        </properties>
+    </processor>
+    
+    <processor>
+        <id>split-entries</id>
+        <name>Split Log Entries</name>
+        <type>org.apache.nifi.processors.standard.SplitJson</type>
+        <position x="700" y="100"/>
+        <properties>
+            <property name="JsonPath Expression">$.values[*]</property>
+        </properties>
+    </processor>
+    
+    <processor>
+        <id>jolt-transform</id>
+        <name>Transform to System Logs</name>
+        <type>org.apache.nifi.processors.standard.JoltTransformJSON</type>
+        <position x="900" y="100"/>
+        <properties>
+            <property name="Jolt Specification">{
+  "operation": "shift",
+  "spec": {
+    "0": "ts",
+    "1": "message"
+  }
+}</property>
+            <property name="Jolt Transform">jolt</property>
+        </properties>
+    </processor>
+    
+    <processor>
+        <id>put-db</id>
+        <name>Write to PostgreSQL</name>
+        <type>org.apache.nifi.processors.standard.PutDatabaseRecord</type>
+        <position x="1100" y="100"/>
+        <properties>
+            <property name="Database Connection Pooling Service">PostgreSQL_Logs</property>
+            <property name="Table Name">system_logs</property>
+            <property name="Statement Type">INSERT</property>
+        </properties>
+    </processor>
+    
+    <!-- Connections -->
+    <connection>
+        <source processor="gen-file" relationship="success"/>
+        <destination processor="invoke-http"/>
+    </connection>
+    
+    <connection>
+        <source processor="invoke-http" relationship="Response"/>
+        <destination processor="split-results"/>
+    </connection>
+    
+    <connection>
+        <source processor="split-results" relationship="split"/>
+        <destination processor="split-entries"/>
+    </connection>
+    
+    <connection>
+        <source processor="split-entries" relationship="split"/>
+        <destination processor="jolt-transform"/>
+    </connection>
+    
+    <connection>
+        <source processor="jolt-transform" relationship="success"/>
+        <destination processor="put-db"/>
+    </connection>
+</flow>

@@ -252,9 +252,14 @@ export default function PublicSyllabusSearchPage() {
 
   const filteredAndSortedSyllabi = useMemo(() => {
     let filtered = syllabi.filter(item => {
+      const searchLower = searchTerm.toLowerCase()
       const matchesSearch = !searchTerm || 
-        item.code?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.title?.toLowerCase().includes(searchTerm.toLowerCase())
+        item.code?.toLowerCase().includes(searchLower) ||
+        item.title?.toLowerCase().includes(searchLower) ||
+        item.subjectName?.toLowerCase().includes(searchLower) ||
+        item.description?.toLowerCase().includes(searchLower) ||
+        item.lecturer?.toLowerCase().includes(searchLower) ||
+        item.credits?.toString().includes(searchLower)
       
       return matchesSearch
     })
@@ -271,9 +276,45 @@ export default function PublicSyllabusSearchPage() {
     return filtered
   }, [syllabi, searchTerm, sortBy])
 
-  const handleSearch = (e) => {
+  const handleSearch = async (e) => {
     e.preventDefault()
-    // Search is handled by filteredAndSortedSyllabi useMemo
+    setLoading(true)
+    setError(null)
+    
+    try {
+      // If searchTerm is empty, load normal syllabi
+      if (!searchTerm.trim()) {
+        fetchSyllabi(localUser, selectedProgram)
+        return
+      }
+      
+      // Search API call - search across all syllabi
+      const token = localStorage.getItem('token')
+      const headers = token ? { 'Authorization': `Bearer ${token}` } : {}
+      
+      // Use public API for search
+      const searchUrl = `/api/public/syllabi/search?keyword=${encodeURIComponent(searchTerm)}`
+      
+      console.log('🔍 Searching syllabi:', searchUrl)
+      const response = await fetch(searchUrl, { headers })
+      
+      if (response.ok) {
+        const data = await response.json()
+        const results = Array.isArray(data) ? data : (data.data || [])
+        setSyllabi(results)
+        console.log('✅ Search results:', results)
+      } else {
+        // Fallback: filter client-side
+        console.warn('Search API not available, filtering client-side')
+        setError(null)
+      }
+    } catch (err) {
+      console.error('❌ Search error:', err)
+      // Don't show error, just use client-side filter
+      setError(null)
+    } finally {
+      setLoading(false)
+    }
   }
 
   const clearFilters = () => {
@@ -326,10 +367,7 @@ export default function PublicSyllabusSearchPage() {
         </div>
       </div>
 
-      {/* ============================================================
-          TODO: Search Bar - Sticky
-          Thanh tìm kiếm cố định với các nút lọc và tìm kiếm
-          
+      {/* Search Bar - Sticky */}
       <div className="bg-white border-b border-gray-200 sticky top-0 z-20 shadow-md">
         <div className="container mx-auto px-6 py-4">
           <form onSubmit={handleSearch} className="flex gap-3">
@@ -339,7 +377,7 @@ export default function PublicSyllabusSearchPage() {
                 type="text"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Tìm theo mã môn (VD: CS101), tên môn hoặc từ khóa..."
+                placeholder="Tìm theo mã môn (VD: IT101), tên môn hoặc từ khóa..."
                 className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
             </div>
@@ -353,14 +391,14 @@ export default function PublicSyllabusSearchPage() {
             </button>
             <button
               type="submit"
-              className="hidden lg:block px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium"
+              className="hidden lg:flex px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium items-center gap-2"
             >
+              <Search size={20} />
               Tìm kiếm
             </button>
           </form>
         </div>
       </div>
-      ============================================================ */}
 
       {/* Mobile Filter Drawer */}
       {showMobileFilters && (

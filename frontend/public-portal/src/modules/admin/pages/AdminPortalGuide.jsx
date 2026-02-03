@@ -1,9 +1,17 @@
-import React, { useEffect } from 'react'
+import React, { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Users, Settings, FileText, BarChart3, LogOut } from 'lucide-react'
+import { Users, BarChart3, LogOut } from 'lucide-react'
+import { userService, syllabusService } from '../../../services'
 
 export default function AdminPortalGuide() {
   const navigate = useNavigate()
+  const [stats, setStats] = useState({
+    totalUsers: 0,
+    publicSyllabi: 0,
+    pendingSyllabi: 0,
+    logsToday: 0,
+    loading: true
+  })
 
   // Check auth on mount
   useEffect(() => {
@@ -28,6 +36,71 @@ export default function AdminPortalGuide() {
     }
   }, [navigate])
 
+  // Fetch real data
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        console.log('[AdminPortalGuide] Fetching stats...')
+        
+        let totalUsers = 0
+        let publicSyllabi = 0
+        let pendingSyllabi = 0
+        let logsToday = 0
+
+        // Get total users
+        try {
+          const usersData = await userService.getAllUsers({ size: 1 })
+          console.log('[AdminPortalGuide] Users data:', usersData)
+          totalUsers = usersData?.totalElements || usersData?.length || 0
+        } catch (e) {
+          console.warn('[AdminPortalGuide] Could not fetch users:', e)
+          totalUsers = 0
+        }
+
+        // Get public syllabi (đã công bố)
+        try {
+          const publicSyllabiData = await syllabusService.getPublishedSyllabi()
+          console.log('[AdminPortalGuide] Public syllabi data:', publicSyllabiData)
+          publicSyllabi = Array.isArray(publicSyllabiData) 
+            ? publicSyllabiData.length 
+            : 0
+        } catch (e) {
+          console.warn('[AdminPortalGuide] Could not fetch public syllabi:', e)
+          publicSyllabi = 0
+        }
+
+        // Get pending syllabi (đang chờ duyệt)
+        try {
+          const pendingSyllabiData = await syllabusService.getPendingSyllabi()
+          console.log('[AdminPortalGuide] Pending syllabi data:', pendingSyllabiData)
+          pendingSyllabi = Array.isArray(pendingSyllabiData) 
+            ? pendingSyllabiData.length 
+            : 0
+        } catch (e) {
+          console.warn('[AdminPortalGuide] Could not fetch pending syllabi:', e)
+          pendingSyllabi = 0
+        }
+
+        // Get logs today - no endpoint available, set to 0
+        logsToday = 0
+        
+        console.log('[AdminPortalGuide] Final stats:', { totalUsers, publicSyllabi, pendingSyllabi, logsToday })
+        setStats({
+          totalUsers,
+          publicSyllabi,
+          pendingSyllabi,
+          logsToday,
+          loading: false
+        })
+      } catch (error) {
+        console.error('[AdminPortalGuide] Error fetching stats:', error)
+        setStats(prev => ({ ...prev, loading: false }))
+      }
+    }
+
+    fetchStats()
+  }, [])
+
   const sections = [
     {
       id: 'users',
@@ -43,41 +116,15 @@ export default function AdminPortalGuide() {
       ]
     },
     {
-      id: 'system',
-      title: 'Cấu hình hệ thống',
-      icon: Settings,
-      description: 'Thiết lập năm học, học kỳ, workflow',
-      features: [
-        'Cấu hình năm học & học kỳ',
-        'Quản lý khoa & bộ môn',
-        'Thiết lập quy trình workflow',
-        'Tạo template CLO, Rubric',
-        'Định nghĩa form mẫu syllabus'
-      ]
-    },
-    {
-      id: 'publishing',
-      title: 'Quản lý công bố',
-      icon: FileText,
-      description: 'Công bố/Hủy công bố syllabus',
-      features: [
-        'Xem danh sách syllabus đã duyệt',
-        'Công bố & hủy công bố',
-        'Lưu trữ (Archive)',
-        'Thiết lập ngày hiệu lực',
-        'Quản lý phiên bản công bố'
-      ]
-    },
-    {
       id: 'audit',
       title: 'Kiểm tra & giám sát',
       icon: BarChart3,
-      description: 'Log hệ thống & báo cáo',
+      description: 'Giám sát hệ thống',
       features: [
-        'Xem log đăng nhập',
-        'Log chỉnh sửa syllabus',
-        'Lịch sử duyệt',
-        'Xuất báo cáo (PDF/CSV)',
+        'Giám sát hệ thống real-time',
+        'Xem trạng thái các dịch vụ',
+        'Xem metrics và performance',
+        'Xem logs hệ thống',
         'Phục vụ kiểm định'
       ]
     }
@@ -110,7 +157,13 @@ export default function AdminPortalGuide() {
             return (
               <button
                 key={section.id}
-                onClick={() => navigate(`/admin/portal/${section.id}`)}
+            onClick={() => {
+              if (section.id === 'audit') {
+                navigate('/admin/portal/monitoring')
+              } else {
+                navigate(`/admin/portal/${section.id}`)
+              }
+            }}
                 className="group relative bg-white rounded-xl shadow-md hover:shadow-xl hover:scale-105 transition-all p-6 text-left border-l-4 border-blue-500"
               >
                 <div className="absolute top-0 right-0 w-20 h-20 bg-blue-100 rounded-bl-2xl opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -142,10 +195,10 @@ export default function AdminPortalGuide() {
         {/* Quick Stats */}
         <div className="mt-16 grid grid-cols-1 md:grid-cols-4 gap-4">
           {[
-            { label: 'Tổng người dùng', value: '256' },
-            { label: 'Syllabus đã công bố', value: '48' },
-            { label: 'Đang chờ duyệt', value: '12' },
-            { label: 'Log hôm nay', value: '1,240' }
+            { label: 'Tổng người dùng', value: stats.loading ? '-' : stats.totalUsers.toString() },
+            { label: 'Giáo trình đã công bố', value: stats.loading ? '-' : stats.publicSyllabi.toString() },
+            { label: 'Đang chờ duyệt', value: stats.loading ? '-' : stats.pendingSyllabi.toString() },
+            { label: 'Log hôm nay', value: stats.loading ? '-' : stats.logsToday.toString() }
           ].map((stat, i) => (
             <div key={i} className="bg-white rounded-lg p-4 border-b-4 border-blue-500 shadow">
               <p className="text-gray-600 text-sm font-medium">{stat.label}</p>

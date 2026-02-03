@@ -26,17 +26,9 @@ scrape_configs:
         labels:
           service: 'eureka'
   
-  # Config Server
-  - job_name: 'config-server'
-    metrics_path: '/actuator/prometheus'
-    static_configs:
-      - targets:
-          - 'config-server:8888'
-        labels:
-          service: 'config'
-  
   # Prometheus self-monitoring
   - job_name: 'prometheus'
+    metrics_path: '/prometheus/metrics'
     static_configs:
       - targets:
           - 'localhost:9090'

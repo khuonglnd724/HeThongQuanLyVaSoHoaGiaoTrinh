@@ -12,6 +12,7 @@ import com.smd.syllabus.dto.UpdateSyllabusRequest;
 import com.smd.syllabus.repository.SyllabusRepository;
 import com.smd.syllabus.repository.SyllabusDocumentRepository;
 import com.smd.syllabus.domain.SyllabusDocument;
+import com.smd.syllabus.event.SyllabusKafkaEventPublisher;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -30,18 +31,21 @@ public class SyllabusService {
     private final SyllabusDocumentRepository documentRepository;
     private final WorkflowClient workflowClient;
     private final ReviewCommentService reviewCommentService;
+    private final SyllabusKafkaEventPublisher eventPublisher;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public SyllabusService(SyllabusRepository syllabusRepository,
             NotificationService notificationService,
             SyllabusDocumentRepository documentRepository,
             WorkflowClient workflowClient,
-            ReviewCommentService reviewCommentService) {
+            ReviewCommentService reviewCommentService,
+            SyllabusKafkaEventPublisher eventPublisher) {
         this.syllabusRepository = syllabusRepository;
         this.notificationService = notificationService;
         this.documentRepository = documentRepository;
         this.workflowClient = workflowClient;
         this.reviewCommentService = reviewCommentService;
+        this.eventPublisher = eventPublisher;
     }
 
     // helper
@@ -265,7 +269,54 @@ public class SyllabusService {
                 "Syllabus " + safeCode(saved) + " submitted for review",
                 actor);
 
+        // Publish Kafka event for notification-service
+        // In real scenario, get approver from workflow or user management service
+        // For now, use hardcoded approver info as example
+        try {
+            Long approverId = getNextApprover(actor, roleToUse);
+            String approverRole = getApproverRole(roleToUse);
+            
+            eventPublisher.publishSyllabusSubmitted(
+                Long.valueOf(saved.getId().toString().hashCode()), // Simple ID conversion for demo
+                saved.getSubjectName(),
+                Long.valueOf(actor.hashCode()),
+                actor,
+                approverId,
+                "Approver", // In real scenario, get from user service
+                approverRole
+            );
+        } catch (Exception e) {
+            System.err.println("Failed to publish Kafka event: " + e.getMessage());
+        }
+
         return SyllabusMapper.toResponse(saved);
+    }
+
+    // Helper method to determine next approver based on submitter role
+    private Long getNextApprover(String submitter, String role) {
+        // In real scenario, query from user management or workflow service
+        // For demo: if LECTURER submits -> HOD approves (userId=3)
+        //           if HOD approves -> ACADEMIC_AFFAIRS (userId=4)
+        //           if ACADEMIC_AFFAIRS approves -> RECTOR (userId=5)
+        if (role.contains("LECTURER")) {
+            return 3L; // HOD
+        } else if (role.contains("HOD")) {
+            return 4L; // Academic Affairs
+        } else if (role.contains("ACADEMIC")) {
+            return 5L; // Rector
+        }
+        return 3L; // Default to HOD
+    }
+
+    private String getApproverRole(String submitterRole) {
+        if (submitterRole.contains("LECTURER")) {
+            return "HOD";
+        } else if (submitterRole.contains("HOD")) {
+            return "ACADEMIC_AFFAIRS";
+        } else if (submitterRole.contains("ACADEMIC")) {
+            return "RECTOR";
+        }
+        return "HOD";
     }
 
     @Transactional
@@ -299,6 +350,28 @@ public class SyllabusService {
                 NotificationType.SYLLABUS_SUBMITTED,
                 "Syllabus " + safeCode(saved) + " moved to approval",
                 actor);
+
+        // Publish Kafka event - HOD approved, notify next approver (Academic Affairs)
+        try {
+            Long nextApproverId = 4L; // Academic Affairs
+            String nextApproverRole = "ACADEMIC_AFFAIRS";
+            
+            eventPublisher.publishWorkflowStatusChanged(
+                Long.valueOf(saved.getId().toString().hashCode()),
+                saved.getSubjectName(),
+                "APPROVED",
+                Long.valueOf(actor.hashCode()),
+                actor,
+                "HOD",
+                Long.valueOf(saved.getCreatedBy().hashCode()),
+                saved.getCreatedBy(),
+                "HOD approved, forwarding to Academic Affairs",
+                nextApproverId,
+                nextApproverRole
+            );
+        } catch (Exception e) {
+            System.err.println("Failed to publish workflow event: " + e.getMessage());
+        }
 
         return SyllabusMapper.toResponse(saved);
     }

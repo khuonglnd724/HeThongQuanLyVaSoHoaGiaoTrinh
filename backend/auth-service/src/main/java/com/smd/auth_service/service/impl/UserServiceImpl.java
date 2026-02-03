@@ -226,18 +226,21 @@ public class UserServiceImpl implements UserService {
         }
         
         User user = User.builder()
-                .username(request.getUsername())
-                .email(request.getEmail())
-                .password(passwordEncoder.encode(request.getPassword()))
-                .fullName(request.getFullName())
-                .phoneNumber(request.getPhoneNumber())
-                .major(request.getMajor())
-                .isActive(true)
-                .isLocked(false)
-                .failedAttempts(0)
-                .roles(roles)
-                .build();
-        
+            .username(request.getUsername())
+            .email(request.getEmail())
+            .password(passwordEncoder.encode(request.getPassword()))
+            .fullName(request.getFullName())
+            .phoneNumber(request.getPhoneNumber())
+            .major(request.getMajor())
+            .isActive(true)
+            .isLocked(false)
+            .failedAttempts(0)
+            .roles(roles)
+            .build();
+
+        // Ensure DB sequence is aligned before insert
+        userRepository.syncUserIdSequence();
+
         userRepository.save(user);
         return mapToDTO(user);
     }

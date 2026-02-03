@@ -5,6 +5,7 @@ CREATE DATABASE syllabus_db;
 CREATE DATABASE workflow_db;
 CREATE DATABASE public_db;
 CREATE DATABASE ai_service_db;
+CREATE DATABASE logs_db;
 
 -- Grant permissions to postgres user
 GRANT ALL PRIVILEGES ON DATABASE auth_db TO postgres;
@@ -13,3 +14,4 @@ GRANT ALL PRIVILEGES ON DATABASE syllabus_db TO postgres;
 GRANT ALL PRIVILEGES ON DATABASE workflow_db TO postgres;
 GRANT ALL PRIVILEGES ON DATABASE public_db TO postgres;
 GRANT ALL PRIVILEGES ON DATABASE ai_service_db TO postgres;
+GRANT ALL PRIVILEGES ON DATABASE logs_db TO postgres;

@@ -2,8 +2,6 @@ import React, { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   Users,
-  Settings,
-  FileText,
   BarChart3,
   LogOut,
   Home,
@@ -11,16 +9,24 @@ import {
   Menu,
   X
 } from 'lucide-react'
+import authService from '../../../services/auth/authService'
 import UserManagement from '../pages/UserManagement'
-import SystemConfiguration from '../pages/SystemConfiguration'
-import PublishingManagement from '../pages/PublishingManagement'
-import AuditMonitoring from '../pages/AuditMonitoring'
+import ServerMonitoring from '../pages/ServerMonitoring'
 
 export default function AdminPortalLayout() {
   const { section } = useParams()
   const navigate = useNavigate()
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
+
+  const setAccessTokenCookie = (token) => {
+    if (!token) return
+    document.cookie = `access_token=${token}; path=/; SameSite=Lax`
+  }
+
+  const clearAccessTokenCookie = () => {
+    document.cookie = 'access_token=; Max-Age=0; path=/; SameSite=Lax'
+  }
 
   // Check auth on mount
   useEffect(() => {
@@ -32,6 +38,8 @@ export default function AdminPortalLayout() {
       navigate('/login')
       return
     }
+
+    setAccessTokenCookie(token)
     
     try {
       const userData = JSON.parse(user)
@@ -44,6 +52,21 @@ export default function AdminPortalLayout() {
       navigate('/login')
     }
   }, [navigate])
+
+  const handleLogout = async () => {
+    try {
+      await authService.logout()
+    } catch (e) {
+      console.error('[AdminPortalLayout] Logout error:', e)
+    } finally {
+      localStorage.removeItem('token')
+      localStorage.removeItem('refreshToken')
+      localStorage.removeItem('user')
+      localStorage.removeItem('role')
+      clearAccessTokenCookie()
+      navigate('/login')
+    }
+  }
 
   const navItems = [
     {
@@ -59,22 +82,10 @@ export default function AdminPortalLayout() {
       onClick: () => navigate('/admin/portal/users')
     },
     {
-      id: 'system',
-      label: 'Cấu hình hệ thống',
-      icon: Settings,
-      onClick: () => navigate('/admin/portal/system')
-    },
-    {
-      id: 'publishing',
-      label: 'Quản lý công bố',
-      icon: FileText,
-      onClick: () => navigate('/admin/portal/publishing')
-    },
-    {
-      id: 'audit',
-      label: 'Kiểm tra & giám sát',
+      id: 'monitoring',
+      label: 'Giám sát hệ thống',
       icon: BarChart3,
-      onClick: () => navigate('/admin/portal/audit')
+      onClick: () => navigate('/admin/portal/monitoring')
     }
   ]
 
@@ -83,17 +94,9 @@ export default function AdminPortalLayout() {
       title: 'Quản lý người dùng',
       component: <UserManagement />
     },
-    system: {
-      title: 'Cấu hình hệ thống',
-      component: <SystemConfiguration />
-    },
-    publishing: {
-      title: 'Quản lý công bố',
-      component: <PublishingManagement />
-    },
-    audit: {
-      title: 'Kiểm tra & giám sát',
-      component: <AuditMonitoring />
+    monitoring: {
+      title: 'Giám sát hệ thống',
+      component: <ServerMonitoring />
     }
   }
 
@@ -112,7 +115,7 @@ export default function AdminPortalLayout() {
           <div className="flex items-center justify-between">
             <div className={`flex items-center gap-3 ${!sidebarOpen && 'justify-center w-full'}`}>
               <div className="bg-blue-400 p-2 rounded-lg">
-                <Settings size={24} />
+                <Users size={24} />
               </div>
               {sidebarOpen && (
                 <div>
@@ -188,7 +191,10 @@ export default function AdminPortalLayout() {
 
             {userMenuOpen && sidebarOpen && (
               <div className="absolute bottom-full left-0 right-0 mb-2 bg-white rounded-lg shadow-lg text-gray-900 py-2 z-50">
-                <button className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2">
+                <button
+                  onClick={handleLogout}
+                  className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2"
+                >
                   <LogOut size={16} />
                   Đăng xuất
                 </button>
@@ -198,7 +204,7 @@ export default function AdminPortalLayout() {
 
           {sidebarOpen && (
             <button
-              onClick={() => window.location.href = '/login'}
+              onClick={handleLogout}
               className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-red-600 hover:bg-red-700 rounded-lg transition-colors text-sm font-medium"
             >
               <LogOut size={16} />

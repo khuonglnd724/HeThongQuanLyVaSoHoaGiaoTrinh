@@ -215,7 +215,7 @@ const AdminDashboard = ({ user, onLogout }) => {
       <div className="bg-white border-b border-gray-200">
         <div className="container mx-auto px-6">
           <div className="flex gap-8">
-            {['overview', 'users', 'syllabi'].map(tab => (
+            {['overview', 'users', 'syllabi', 'monitoring'].map(tab => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
@@ -228,6 +228,7 @@ const AdminDashboard = ({ user, onLogout }) => {
                 {tab === 'overview' && '📊 Tổng quan'}
                 {tab === 'users' && '👥 Quản lý người dùng'}
                 {tab === 'syllabi' && '📋 Phê duyệt giáo trình'}
+                {tab === 'monitoring' && '📈 Giám sát hệ thống'}
               </button>
             ))}
           </div>
@@ -554,6 +555,39 @@ const AdminDashboard = ({ user, onLogout }) => {
                   <p className="text-gray-600 mt-2">Tất cả giáo trình đã được xử lý!</p>
                 </div>
               )}
+            </div>
+          </div>
+        )}
+
+        {/* MONITORING TAB */}
+        {activeTab === 'monitoring' && (
+          <div>
+            <h2 className="text-2xl font-bold text-gray-900 mb-6">📈 Giám sát hệ thống</h2>
+            
+            {/* Grafana Dashboard Embed */}
+            <div className="bg-white rounded-xl shadow-lg p-6 mb-8">
+              <h3 className="text-lg font-bold text-gray-900 mb-4">📊 Grafana Dashboard</h3>
+              <iframe
+                src="/grafana/d/smd-microservices/smd-microservices?orgId=1&kiosk=tv"
+                width="100%"
+                height="700"
+                frameBorder="0"
+                title="Grafana Dashboard"
+                className="rounded-lg border border-gray-200"
+              />
+            </div>
+
+            {/* Service Metrics */}
+            <div className="bg-white rounded-xl shadow-lg p-6">
+              <h3 className="text-lg font-bold text-gray-900 mb-4">🔍 Metrics chi tiết</h3>
+              <iframe
+                src="/grafana/d/smd-microservices/smd-microservices?orgId=1&kiosk"
+                width="100%"
+                height="800"
+                frameBorder="0"
+                title="Grafana Metrics"
+                className="rounded-lg border border-gray-200"
+              />
             </div>
           </div>
         )}

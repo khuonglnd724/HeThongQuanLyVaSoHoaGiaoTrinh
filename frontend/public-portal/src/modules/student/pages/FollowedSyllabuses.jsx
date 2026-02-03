@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, BookOpen, Heart, Trash2, Clock, GraduationCap, BookMarked } from 'lucide-react'
+import { ArrowLeft, BookOpen, Heart, Trash2, BookMarked } from 'lucide-react'
 import { getMyFollowedSyllabuses, unfollowSyllabus } from '../services/studentService'
 
 export default function FollowedSyllabuses({ user }) {
@@ -58,10 +58,10 @@ export default function FollowedSyllabuses({ user }) {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white pb-12">
+    <div className="min-h-screen bg-gradient-to-b from-slate-50 via-blue-50 to-white pb-16">
       {/* Header */}
-      <div className="bg-gradient-to-r from-blue-600 to-blue-800 text-white shadow-lg">
-        <div className="container mx-auto px-6 py-8">
+      <div className="bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-700 text-white shadow-lg">
+        <div className="container mx-auto px-6 py-10">
           <button
             onClick={() => navigate('/student')}
             className="flex items-center gap-2 mb-6 text-blue-100 hover:text-white transition"
@@ -69,21 +69,31 @@ export default function FollowedSyllabuses({ user }) {
             <ArrowLeft size={20} />
             Quay lại
           </button>
-          <h1 className="text-4xl font-bold mb-2">📚 Giáo Trình Theo Dõi</h1>
-          <p className="text-blue-100">Danh sách tất cả giáo trình bạn đang theo dõi</p>
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+            <div>
+              <h1 className="text-4xl font-bold mb-2">📚 Giáo Trình Theo Dõi</h1>
+              <p className="text-blue-100">Danh sách tất cả giáo trình bạn đang theo dõi</p>
+            </div>
+            <div className="bg-white/10 backdrop-blur px-5 py-3 rounded-xl border border-white/20">
+              <p className="text-sm text-blue-100">Tổng số đang theo dõi</p>
+              <p className="text-3xl font-bold text-white">{followedSyllabi.length}</p>
+            </div>
+          </div>
         </div>
       </div>
 
       {/* Main Content */}
       <div className="container mx-auto px-6 py-12">
         {followedSyllabi.length === 0 ? (
-          <div className="text-center py-16 bg-white rounded-xl shadow-md">
-            <Heart className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-            <h2 className="text-2xl font-semibold text-gray-700 mb-2">Chưa có giáo trình theo dõi</h2>
-            <p className="text-gray-500 mb-6">Hãy khám phá và theo dõi những giáo trình mà bạn quan tâm</p>
+          <div className="text-center py-16 bg-white rounded-2xl shadow-md border border-slate-100">
+            <div className="w-20 h-20 rounded-full bg-blue-50 flex items-center justify-center mx-auto mb-4">
+              <Heart className="w-10 h-10 text-blue-400" />
+            </div>
+            <h2 className="text-2xl font-semibold text-gray-800 mb-2">Chưa có giáo trình theo dõi</h2>
+            <p className="text-gray-500 mb-6">Khám phá và theo dõi những giáo trình bạn quan tâm</p>
             <button
               onClick={() => navigate('/public/search')}
-              className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition font-medium"
+              className="bg-blue-600 text-white px-6 py-3 rounded-xl hover:bg-blue-700 transition font-medium"
             >
               Tìm Giáo Trình
             </button>
@@ -91,36 +101,15 @@ export default function FollowedSyllabuses({ user }) {
         ) : (
           <>
             {/* Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-              <div className="bg-white rounded-lg shadow-md p-6 border-l-4 border-blue-500">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-gray-600 text-sm">Đang theo dõi</p>
-                    <p className="text-3xl font-bold text-blue-600">{followedSyllabi.length}</p>
-                  </div>
-                  <BookOpen className="w-12 h-12 text-blue-200" />
+            <div className="mb-8">
+              <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 flex items-center justify-between">
+                <div>
+                  <p className="text-gray-500 text-sm">Đang theo dõi</p>
+                  <p className="text-3xl font-bold text-blue-600">{followedSyllabi.length}</p>
+                  <p className="text-xs text-gray-400 mt-1">Cập nhật theo danh sách đã theo dõi</p>
                 </div>
-              </div>
-
-              <div className="bg-white rounded-lg shadow-md p-6 border-l-4 border-purple-500">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-gray-600 text-sm">Đã hoàn thành</p>
-                    <p className="text-3xl font-bold text-purple-600">0</p>
-                  </div>
-                  <GraduationCap className="w-12 h-12 text-purple-200" />
-                </div>
-              </div>
-
-              <div className="bg-white rounded-lg shadow-md p-6 border-l-4 border-orange-500">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-gray-600 text-sm">Gần đây xem</p>
-                    <p className="text-3xl font-bold text-orange-600">
-                      {JSON.parse(localStorage.getItem('recentlySyllabuses') || '[]').length}
-                    </p>
-                  </div>
-                  <Clock className="w-12 h-12 text-orange-200" />
+                <div className="w-14 h-14 rounded-2xl bg-blue-50 flex items-center justify-center">
+                  <BookOpen className="w-7 h-7 text-blue-500" />
                 </div>
               </div>
             </div>
@@ -138,17 +127,17 @@ export default function FollowedSyllabuses({ user }) {
                 return (
                   <div
                     key={syllabus.rootId}
-                    className="bg-white rounded-lg shadow-md hover:shadow-xl transition overflow-hidden border-l-4 border-blue-500 group"
+                    className="bg-white rounded-2xl shadow-sm hover:shadow-xl transition-all duration-200 overflow-hidden border border-slate-100 group"
                   >
                     {/* Card Header */}
-                    <div className="bg-gradient-to-r from-blue-500 to-blue-600 text-white p-4">
+                    <div className="bg-gradient-to-r from-blue-500 via-blue-600 to-indigo-600 text-white p-4">
                       <div className="flex items-start justify-between gap-2 mb-2">
                         <span className="inline-block bg-blue-700 text-white px-3 py-1 rounded-full text-xs font-semibold">
                           {syllabus.subjectCode}
                         </span>
                         <button
                           onClick={() => handleRemove(syllabus.rootId)}
-                          className="text-blue-100 hover:text-white transition p-1"
+                          className="text-blue-100 hover:text-white transition p-1 rounded-md hover:bg-white/10"
                           title="Hủy theo dõi"
                         >
                           <Trash2 size={18} />
@@ -192,7 +181,7 @@ export default function FollowedSyllabuses({ user }) {
                       {/* Action Button */}
                       <button
                         onClick={() => handleViewDetail(syllabus.rootId)}
-                        className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition font-medium flex items-center justify-center gap-2"
+                        className="w-full bg-blue-600 text-white py-2.5 rounded-xl hover:bg-blue-700 transition font-medium flex items-center justify-center gap-2"
                       >
                         <BookMarked size={16} />
                         Xem Chi Tiết

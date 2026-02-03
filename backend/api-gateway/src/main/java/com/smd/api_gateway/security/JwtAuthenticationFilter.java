@@ -45,7 +45,12 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
 
         String authHeader = exchange.getRequest().getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-            return unauthorized(exchange, "Missing or invalid Authorization header");
+            String cookieToken = getTokenFromCookie(exchange);
+            if (cookieToken != null && !cookieToken.isBlank()) {
+                authHeader = "Bearer " + cookieToken;
+            } else {
+                return unauthorized(exchange, "Missing or invalid Authorization header");
+            }
         }
 
         String token = authHeader.substring(7);
@@ -110,6 +115,22 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
             }
         }
         return false;
+    }
+
+    private String getTokenFromCookie(ServerWebExchange exchange) {
+        var cookies = exchange.getRequest().getCookies();
+        if (cookies == null || cookies.isEmpty()) {
+            return null;
+        }
+        var accessTokenCookie = cookies.getFirst("access_token");
+        if (accessTokenCookie != null) {
+            return accessTokenCookie.getValue();
+        }
+        var tokenCookie = cookies.getFirst("token");
+        if (tokenCookie != null) {
+            return tokenCookie.getValue();
+        }
+        return null;
     }
 
     private Mono<Void> unauthorized(ServerWebExchange exchange, String message) {

@@ -8,6 +8,7 @@ const HomePage = () => {
   const navigate = useNavigate()
   const [syllabuses, setSyllabuses] = useState([])
   const [loading, setLoading] = useState(true)
+  const [publishedCount, setPublishedCount] = useState(0)
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedMajor, setSelectedMajor] = useState('all')
   const [selectedSemester, setSelectedSemester] = useState('all')
@@ -28,7 +29,20 @@ const HomePage = () => {
         params: { status: 'PUBLISHED', page: 0, size: 8 }
       })
       const data = response.data
-      setSyllabuses(Array.isArray(data) ? data : data.content || data.data || [])
+      const items = Array.isArray(data) ? data : data.content || data.data || []
+      setSyllabuses(items)
+
+      const totalFromApi =
+        data?.totalElements ??
+        data?.total ??
+        data?.count ??
+        null
+
+      const publicItemsCount = items.filter(
+        (item) => item?.status === 'PUBLISHED' || item?.status === 'PUBLIC' || item?.isPublic === true
+      ).length
+
+      setPublishedCount(totalFromApi ?? publicItemsCount)
     } catch (err) {
       console.error('Error loading syllabuses:', err)
     } finally {
@@ -51,8 +65,7 @@ const HomePage = () => {
 
   const filteredSyllabuses = syllabuses.slice(0, 6)
   
-  // Đếm số giáo trình có status PUBLISHED
-  const publishedCount = syllabuses.filter(s => s.status === 'PUBLISHED').length
+
 
   return (
     <div className="min-h-screen bg-white">

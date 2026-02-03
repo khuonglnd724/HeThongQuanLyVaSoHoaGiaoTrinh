@@ -39,7 +39,8 @@ $projects = @(
   "backend/academic-service",
   "backend/public-service",
   "backend/workflow-service",
-  "backend/syllabus-service"
+  "backend/syllabus-service",
+  "backend/notification-service"
 )
 
 Write-Host "Building services..." -ForegroundColor Green
